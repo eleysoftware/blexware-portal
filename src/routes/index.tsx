@@ -20,7 +20,7 @@ import { Section, SectionHeading } from "@/components/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import heroImage from "@/assets/hero-collage.jpg";
+import heroPortrait from "@/assets/hero-portrait.jpg";
 
 import { articles, formatDate } from "@/content/articles";
 import { industryGroups } from "@/content/industries";
@@ -102,11 +102,11 @@ function Home() {
 
           <div className="relative">
             <img
-              src={heroImage}
-              alt="Laptop and phone showing a custom analytics dashboard built by BLEXware"
-              width={1408}
-              height={1008}
-              className="w-full rounded-2xl"
+              src={heroPortrait}
+              alt="A BLEXware consultant smiling while working with a client on a laptop"
+              width={1344}
+              height={896}
+              className="w-full rounded-2xl object-cover"
             />
           </div>
         </div>
