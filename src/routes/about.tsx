@@ -1,14 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Compass, HeartHandshake, ShieldCheck, Target } from "lucide-react";
+import { Compass, HeartHandshake, ShieldCheck, Sparkles, Target } from "lucide-react";
 
 import { CtaBand } from "@/components/CtaBand";
 import { PageHero } from "@/components/PageHero";
 import { Section, SectionHeading } from "@/components/Section";
 import { processSteps } from "@/content/services";
+import teamCollab from "@/assets/team-collab.jpg";
+import workshopImage from "@/assets/workshop.jpg";
+import engineerPortrait from "@/assets/engineer-portrait.jpg";
 
-const title = "About BLEXware — Engineers, Not Order Takers";
+const title = "About BLEXware — Black Excellence in Custom Software";
 const description =
-  "BLEXware is a software studio building custom websites, applications, and AI automation with security, accessibility, and long-term maintenance built in.";
+  "BLEX stands for Black Excellence. BLEXware is a software studio building custom websites, applications, and AI automation — and long-term relationships with the people we build for.";
 
 const values = [
   {
@@ -31,7 +34,13 @@ const values = [
     name: "Built to be maintained",
     copy: "Boring, documented architecture that another engineer can pick up two years from now.",
   },
+  {
+    icon: Sparkles,
+    name: "Relationships outlast releases",
+    copy: "Clients stay with us for years because we treat the partnership — not the ticket queue — as the product.",
+  },
 ];
+
 
 export const Route = createFileRoute("/about")({
   head: () => ({
