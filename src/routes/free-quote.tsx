@@ -106,6 +106,8 @@ export const Route = createFileRoute("/free-quote")({
 
 function FreeQuotePage() {
   const [step, setStep] = useState(0);
+  const [files, setFiles] = useState<File[]>([]);
+
   const [values, setValues] = useState<QuoteForm>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
