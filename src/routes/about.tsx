@@ -91,7 +91,7 @@ function AboutPage() {
 
       <Section>
         <SectionHeading eyebrow="Process" title="How engagements run" />
-        <ol className="mx-auto mt-12 grid max-w-3xl gap-4">
+        <ol className="mx-auto mt-12 grid max-w-4xl gap-x-8 gap-y-4 sm:grid-cols-2">
           {processSteps.map((step, index) => (
             <li key={step.name} className="flex gap-4 text-sm">
               <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-xs font-bold text-primary">
