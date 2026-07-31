@@ -14,7 +14,10 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FreeQuoteRouteImport } from './routes/free-quote'
 import { Route as IndustriesRouteImport } from './routes/industries'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ServicesRouteImport } from './routes/services'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
 import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
@@ -45,9 +48,24 @@ const IndustriesRoute = IndustriesRouteImport.update({
   path: '/industries',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIndexRoute = PortfolioIndexRouteImport.update({
@@ -77,7 +95,10 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
+  '/privacy': typeof PrivacyRoute
+  '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
+  '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
@@ -89,7 +110,10 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
+  '/privacy': typeof PrivacyRoute
+  '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
+  '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio': typeof PortfolioIndexRoute
@@ -102,7 +126,10 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
+  '/privacy': typeof PrivacyRoute
+  '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
+  '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
@@ -116,7 +143,10 @@ export interface FileRouteTypes {
     | '/contact'
     | '/free-quote'
     | '/industries'
+    | '/privacy'
+    | '/security'
     | '/services'
+    | '/terms'
     | '/portfolio/$slug'
     | '/resources/$slug'
     | '/portfolio/'
@@ -128,7 +158,10 @@ export interface FileRouteTypes {
     | '/contact'
     | '/free-quote'
     | '/industries'
+    | '/privacy'
+    | '/security'
     | '/services'
+    | '/terms'
     | '/portfolio/$slug'
     | '/resources/$slug'
     | '/portfolio'
@@ -140,7 +173,10 @@ export interface FileRouteTypes {
     | '/contact'
     | '/free-quote'
     | '/industries'
+    | '/privacy'
+    | '/security'
     | '/services'
+    | '/terms'
     | '/portfolio/$slug'
     | '/resources/$slug'
     | '/portfolio/'
@@ -153,7 +189,10 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   FreeQuoteRoute: typeof FreeQuoteRoute
   IndustriesRoute: typeof IndustriesRoute
+  PrivacyRoute: typeof PrivacyRoute
+  SecurityRoute: typeof SecurityRoute
   ServicesRoute: typeof ServicesRoute
+  TermsRoute: typeof TermsRoute
   PortfolioSlugRoute: typeof PortfolioSlugRoute
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
@@ -197,11 +236,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndustriesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
       fullPath: '/services'
       preLoaderRoute: typeof ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portfolio/': {
@@ -241,7 +301,10 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   FreeQuoteRoute: FreeQuoteRoute,
   IndustriesRoute: IndustriesRoute,
+  PrivacyRoute: PrivacyRoute,
+  SecurityRoute: SecurityRoute,
   ServicesRoute: ServicesRoute,
+  TermsRoute: TermsRoute,
   PortfolioSlugRoute: PortfolioSlugRoute,
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
