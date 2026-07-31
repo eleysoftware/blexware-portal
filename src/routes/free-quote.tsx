@@ -268,18 +268,24 @@ function FreeQuotePage() {
               ) : null}
 
               {step === 4 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="features">Desired features (optional)</Label>
-                  <Textarea
-                    id="features"
-                    rows={6}
-                    value={values.features}
-                    onChange={(e) => set("features", e.target.value)}
-                    placeholder="Logins, dashboards, payments, integrations, AI assistance…"
-                  />
-                  <FieldError message={errors.features} />
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="features">Desired features (optional)</Label>
+                    <Textarea
+                      id="features"
+                      rows={6}
+                      value={values.features}
+                      onChange={(e) => set("features", e.target.value)}
+                      placeholder="Logins, dashboards, payments, integrations, AI assistance…"
+                    />
+                    <FieldError message={errors.features} />
+                  </div>
+                  <div className="border-t border-border pt-6">
+                    <QuoteAttachments files={files} onChange={setFiles} />
+                  </div>
                 </div>
               ) : null}
+
 
               {step === 5 ? (
                 <Choices
