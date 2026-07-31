@@ -96,7 +96,8 @@ function AboutPage() {
       </Section>
 
 
-      <Section tone="surface">
+      <Section>
+
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <h2 className="text-2xl">Our mission</h2>
@@ -131,8 +132,8 @@ function AboutPage() {
       </Section>
 
       <Section tone="mint">
-        <SectionHeading eyebrow="Values" title="Four commitments we hold to on every project" />
-        <div className="mt-12 grid gap-5 sm:grid-cols-2">
+        <SectionHeading eyebrow="Values" title="Five commitments we hold to on every project" />
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {values.map((value) => (
             <div
               key={value.name}
@@ -148,7 +149,34 @@ function AboutPage() {
         </div>
       </Section>
 
+      <Section tone="surface">
+        <SectionHeading
+          eyebrow="The people"
+          title="You will know the engineers building your product"
+          description="No account-manager relay. The people in discovery are the people writing the code and answering your questions after launch."
+        />
+        <div className="mt-12 grid gap-5 sm:grid-cols-2">
+          <img
+            src={workshopImage}
+            alt="A BLEXware tech lead facilitating a discovery workshop at a whiteboard with clients"
+            loading="lazy"
+            width={1200}
+            height={800}
+            className="h-full w-full rounded-2xl object-cover shadow-card"
+          />
+          <img
+            src={engineerPortrait}
+            alt="A BLEXware engineer building an analytics dashboard at a standing desk"
+            loading="lazy"
+            width={1000}
+            height={1000}
+            className="h-full w-full rounded-2xl object-cover shadow-card"
+          />
+        </div>
+      </Section>
+
       <CtaBand />
+
     </>
   );
 }
