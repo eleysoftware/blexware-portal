@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-import logo from "@/assets/blexware-logo.png";
+const logo = "/__l5e/assets-v1/9dc38178-e3c5-4097-bbc8-7eae353e336d/blexware-logo.png";
 
 export function Logo({ className = "h-8" }: { className?: string }) {
   return (
