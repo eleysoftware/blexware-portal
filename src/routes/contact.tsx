@@ -105,6 +105,15 @@ function ContactPage() {
           </form>
 
           <aside className="space-y-4">
+            <img
+              src={consultationImage}
+              alt="A BLEXware consultant talking through a project plan with a client"
+              loading="lazy"
+              width={1200}
+              height={900}
+              className="w-full rounded-2xl object-cover shadow-card"
+            />
+
             {[
               {
                 icon: Mail,
