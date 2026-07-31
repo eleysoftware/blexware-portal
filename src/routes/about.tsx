@@ -64,36 +64,27 @@ function AboutPage() {
       />
 
       <Section tone="surface">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-              The name
-            </p>
-            <h2 className="mt-3 text-3xl">BLEX stands for Black Excellence.</h2>
-            <p className="mt-5 text-base leading-relaxed text-slate">
-              The <span className="font-semibold text-headline">ware</span> is the software we
-              build. The <span className="font-semibold text-headline">BLEX</span> is the standard
-              we hold it to — Black Excellence, expressed as craft: code that holds up under audit,
-              interfaces anyone can use, and engineers who take the harder, more durable path
-              because it is the right one.
-            </p>
-            <p className="mt-4 text-base leading-relaxed text-slate">
-              It is also about who we are in the room. We are a Black-led team of engineers and
-              consultants, and the technical work is only half of it. The other half is the
-              relationship: understanding your business, telling you the truth, and still being
-              reachable a year after launch.
-            </p>
-          </div>
-          <img
-            src={teamCollab}
-            alt="Two BLEXware engineers reviewing code together at a shared workstation"
-            loading="lazy"
-            width={1200}
-            height={800}
-            className="w-full rounded-2xl object-cover shadow-card"
-          />
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            The name
+          </p>
+          <h2 className="mt-3 text-3xl">BLEX stands for Black Excellence.</h2>
+          <p className="mt-5 text-base leading-relaxed text-slate">
+            The <span className="font-semibold text-headline">ware</span> is the software we build.
+            The <span className="font-semibold text-headline">BLEX</span> is the standard we hold
+            it to — Black Excellence, expressed as craft: code that holds up under audit, interfaces
+            anyone can use, and engineers who take the harder, more durable path because it is the
+            right one.
+          </p>
+          <p className="mt-4 text-base leading-relaxed text-slate">
+            It is also about who we are in the room. We are a Black-led team of engineers and
+            consultants, and the technical work is only half of it. The other half is the
+            relationship: understanding your business, telling you the truth, and still being
+            reachable a year after launch.
+          </p>
         </div>
       </Section>
+
 
 
       <Section>
