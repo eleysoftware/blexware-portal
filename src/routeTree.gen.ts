@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as FreeQuoteRouteImport } from './routes/free-quote'
 import { Route as IndustriesRouteImport } from './routes/industries'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
@@ -32,6 +33,11 @@ const AboutRoute = AboutRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FreeQuoteRoute = FreeQuoteRouteImport.update({
+  id: '/free-quote',
+  path: '/free-quote',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndustriesRoute = IndustriesRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contact': typeof ContactRoute
+  '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
   '/services': typeof ServicesRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contact': typeof ContactRoute
+  '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
   '/services': typeof ServicesRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/contact': typeof ContactRoute
+  '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
   '/services': typeof ServicesRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/contact'
+    | '/free-quote'
     | '/industries'
     | '/services'
     | '/portfolio/$slug'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/contact'
+    | '/free-quote'
     | '/industries'
     | '/services'
     | '/portfolio/$slug'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/contact'
+    | '/free-quote'
     | '/industries'
     | '/services'
     | '/portfolio/$slug'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   ContactRoute: typeof ContactRoute
+  FreeQuoteRoute: typeof FreeQuoteRoute
   IndustriesRoute: typeof IndustriesRoute
   ServicesRoute: typeof ServicesRoute
   PortfolioSlugRoute: typeof PortfolioSlugRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/free-quote': {
+      id: '/free-quote'
+      path: '/free-quote'
+      fullPath: '/free-quote'
+      preLoaderRoute: typeof FreeQuoteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/industries': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   ContactRoute: ContactRoute,
+  FreeQuoteRoute: FreeQuoteRoute,
   IndustriesRoute: IndustriesRoute,
   ServicesRoute: ServicesRoute,
   PortfolioSlugRoute: PortfolioSlugRoute,

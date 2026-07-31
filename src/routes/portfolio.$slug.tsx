@@ -32,7 +32,7 @@ export const Route = createFileRoute("/portfolio/$slug")({
 });
 
 function ProjectPage() {
-  const { project } = Route.useLoaderData();
+  const { project } = Route.useLoaderData() as { project: PortfolioProject };
   const others = portfolio.filter((item) => item.slug !== project.slug);
 
   return (

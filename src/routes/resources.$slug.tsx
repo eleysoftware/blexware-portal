@@ -31,7 +31,7 @@ export const Route = createFileRoute("/resources/$slug")({
 });
 
 function ArticlePage() {
-  const { article } = Route.useLoaderData();
+  const { article } = Route.useLoaderData() as { article: Article };
 
   return (
     <>
