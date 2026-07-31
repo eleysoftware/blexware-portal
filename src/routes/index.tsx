@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import heroImage from "@/assets/hero-collage.jpg";
-import teamCollab from "@/assets/team-collab.jpg";
 
 import { articles, formatDate } from "@/content/articles";
 import { industryGroups } from "@/content/industries";
