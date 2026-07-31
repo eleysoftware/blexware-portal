@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { PageHero } from "@/components/PageHero";
+import { QuoteAttachments } from "@/components/QuoteAttachments";
+
 import { Section } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
