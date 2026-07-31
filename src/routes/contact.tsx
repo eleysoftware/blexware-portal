@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CONTACT_EMAIL } from "@/content/site";
+import consultationImage from "@/assets/consultation.jpg";
+
 
 const title = "Contact BLEXware — Start a Conversation";
 const description =
@@ -103,6 +105,15 @@ function ContactPage() {
           </form>
 
           <aside className="space-y-4">
+            <img
+              src={consultationImage}
+              alt="A BLEXware consultant talking through a project plan with a client"
+              loading="lazy"
+              width={1200}
+              height={900}
+              className="w-full rounded-2xl object-cover shadow-card"
+            />
+
             {[
               {
                 icon: Mail,

@@ -24,10 +24,14 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div className="lg:col-span-1">
           <Logo className="h-8" />
-          <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate">
+          <p className="mt-4 max-w-xs text-sm font-medium text-headline">
+            BLEX — Black Excellence. Software built by people who stay.
+          </p>
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate">
             Custom websites, web apps, mobile apps, and AI automation for businesses that have
             outgrown off-the-shelf software.
           </p>
+
           <a
             href={`mailto:${CONTACT_EMAIL}`}
             className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-hover"
