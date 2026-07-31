@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { PageHero } from "@/components/PageHero";
+import { QuoteAttachments } from "@/components/QuoteAttachments";
+
 import { Section } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -104,6 +106,8 @@ export const Route = createFileRoute("/free-quote")({
 
 function FreeQuotePage() {
   const [step, setStep] = useState(0);
+  const [files, setFiles] = useState<File[]>([]);
+
   const [values, setValues] = useState<QuoteForm>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -268,18 +272,24 @@ function FreeQuotePage() {
               ) : null}
 
               {step === 4 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="features">Desired features (optional)</Label>
-                  <Textarea
-                    id="features"
-                    rows={6}
-                    value={values.features}
-                    onChange={(e) => set("features", e.target.value)}
-                    placeholder="Logins, dashboards, payments, integrations, AI assistance…"
-                  />
-                  <FieldError message={errors.features} />
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="features">Desired features (optional)</Label>
+                    <Textarea
+                      id="features"
+                      rows={6}
+                      value={values.features}
+                      onChange={(e) => set("features", e.target.value)}
+                      placeholder="Logins, dashboards, payments, integrations, AI assistance…"
+                    />
+                    <FieldError message={errors.features} />
+                  </div>
+                  <div className="border-t border-border pt-6">
+                    <QuoteAttachments files={files} onChange={setFiles} />
+                  </div>
                 </div>
               ) : null}
+
 
               {step === 5 ? (
                 <Choices

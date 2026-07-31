@@ -1,45 +1,62 @@
 ## Goal
 
-Restructure the About page so the "Our mission" content replaces the current "The name" section, with its text and image split into two columns. The "How engagements run" process list then becomes a full-width section of its own.
+Turn the Free Quote form into a real, stored pipeline backed by the existing **BLEXware_site** Supabase project: PDF attachments, a secure quote record, an authenticated admin portal, and manually triggered AI proposal drafts that an admin reviews and sends.
 
-## Current state (verified)
+## Step 0 — Connect the backend
 
-`src/routes/about.tsx` currently has:
-1. `PageHero`
-2. "The name" section — two-column text + `engineerPortrait` image (just added)
-3. Combined section — left column is "Our mission" text + `teamCollab` image stacked; right column is "How engagements run" process list
-4. Values section
-5. "The people" section
-6. `CtaBand`
+Link the project to the existing **BLEXware_site** Supabase project via the Supabase connector (not a new Cloud-provisioned database), then generate the typed client, auth middleware, and env wiring against it. All schema below lands as migrations in that project.
 
-## Changes
+## Step 1 — Data model (one migration, with grants + RLS)
 
-### `src/routes/about.tsx`
+- `quotes` — quote_number, industry, project_type, project_name, description, budget, timeline/launch_date, goals, features, contact name/email/company/phone, consent, status (`new | reviewing | proposal_draft | proposal_sent | approved | declined`), timestamps, soft-delete column.
+- `quote_files` — quote_id FK, storage path, original filename, byte size, mime type, uploaded_at.
+- `proposals` — quote_id FK, model used, prompt text, generated markdown, status (`draft | sent | approved | changes_requested | declined`), reviewed_by, sent_at, public review token.
+- `app_role` enum + `user_roles` table + `has_role()` security-definer function (roles never on a profile row).
+- `audit_log` — actor, action, entity, entity_id, metadata, created_at; insert-only.
+- Explicit `GRANT`s per table, RLS enabled everywhere. No anon reads. Quote/file writes go only through server functions; admin reads gated by `has_role(auth.uid(),'admin')`.
 
-1. **Remove the entire "The name" section** (lines 66–96).
-   - The Black Excellence name-story copy and the `engineerPortrait` image in that section are removed.
-   - `engineerPortrait` remains imported because it is still used in the "The people" section below.
+Storage: private bucket `quote-uploads`, no public access. Admin downloads use short-lived signed URLs and each download writes an audit row.
 
-2. **Convert "Our mission" into its own two-column Section.**
-   - Use the existing `Section` wrapper.
-   - Left column: "Our mission" heading and both paragraphs.
-   - Right column: `teamCollab` image, with `rounded-2xl`, `object-cover`, `shadow-card`, and descriptive alt text preserved.
-   - Apply `grid items-center gap-10 lg:grid-cols-2 lg:gap-14` for alignment and spacing consistent with the previous two-column treatment.
+## Step 2 — File attachment on the Free Quote form
 
-3. **Move "How engagements run" into a separate full-width Section below.**
-   - Remove it from the shared two-column grid with "Our mission".
-   - Use `SectionHeading` with eyebrow "Process" and title "How engagements run" for consistency with other pages.
-   - Render the `processSteps` list across the full container width (single column, same step styling).
+Add PDF upload to the wizard (folded into the existing steps so the flow stays 8 steps).
 
-## Resulting page order
+- PDF only, max 20 MB, up to 3 files, with remove controls and keyboard-accessible, inline errors.
+- Server-side re-validation: magic-byte check (`%PDF-`), reject encrypted/password-protected PDFs, reject files containing `/JavaScript` or `/Launch`, reject MIME/extension mismatches. Failures are rejected with a plain-language message and never stored.
+- On submit, a server function stores files at `quotes/{quote_id}/{uuid}.pdf` in the private bucket.
 
-- PageHero
-- Our mission (two-column: text + image)
-- How engagements run (full-width process list)
-- Values
-- The people
-- CtaBand
+On virus scanning: the spec asks for malware scanning. Structural PDF validation is what we can do in-platform; a real AV scan needs a third-party service (VirusTotal, ClamAV API). I'll leave a clearly marked hook and wire a provider when you pick one.
 
-## Scope
+## Step 3 — Quote submission workflow
 
-Presentation-layer only. No changes to content-model types, forms, validation, or site metadata. SEO description already references Black Excellence and remains unchanged.
+`submitQuote` server function: Zod validation → insert quote → generate a sequential quote number (`BLX-2026-0001`) → validate and store files → write audit row → return the number. Rate limiting on submissions per email/IP per hour. Confirmation screen shows the quote number and next steps. No AI runs here.
+
+## Step 4 — Admin portal (authenticated)
+
+- `/auth` sign-in page (email + password, plus Google sign-in).
+- `/admin` under the authenticated route gate with an admin-role check; non-admins redirected.
+- **Dashboard:** counts by status, recent quotes, recent proposals.
+- **Quotes list:** search, filter by status/industry, sort by date.
+- **Quote detail:** full submission, attached PDFs via signed-URL downloads, status control, audit trail.
+- Every admin action writes an `audit_log` row.
+
+## Step 5 — User-initiated AI proposal generation
+
+- **Generate proposal draft** button on the quote detail page — never automatic.
+- Server function builds the prompt from the quote (plus extracted PDF text where feasible), calls the Lovable AI Gateway, and stores prompt + output + model as a `draft`.
+- Draft renders with a persistent "AI-generated draft — human review required" banner and the spec's sections: Executive Summary, Business Goals, Functional Requirements, Technical Requirements, Architecture, Recommended Technology, Timeline, Phases, Deliverables, Optional Features, Discovery Questions.
+- Admin edits the draft, then clicks **Send to prospect** — also manual. Sending marks it `sent` and records who sent it.
+
+Email delivery is the one open piece: actually emailing needs Resend (or similar) with a verified sending domain. I'll build the send action and state now; until Resend is connected, "send" produces a shareable review link.
+
+## Step 6 — Public proposal review link
+
+Read-only `/proposal/{token}` route using an unguessable token, showing the proposal with Approve / Request changes / Decline actions that update its status. No login, no other quote data exposed.
+
+## Out of scope this phase
+
+Contracts, invoices, payments, e-signature, CMS-backed blog/portfolio admin, Twilio SMS, MFA enrollment UI — next once the quote pipeline is solid.
+
+## Technical notes
+
+All backend logic uses TanStack Start server functions (`createServerFn`); no Supabase Edge Functions. Admin reads run through the authenticated Supabase context under RLS; the service-role client is used only for storage writes and signed-URL minting after the caller's admin role is verified. Secrets stay in the platform secret store.
