@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CONTACT_EMAIL } from "@/content/site";
+import consultationImage from "@/assets/consultation.jpg";
+
 
 const title = "Contact BLEXware — Start a Conversation";
 const description =
