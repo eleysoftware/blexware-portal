@@ -66,43 +66,8 @@ function AboutPage() {
       <Section tone="surface">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-              The name
-            </p>
-            <h2 className="mt-3 text-3xl sm:text-4xl">BLEX stands for Black Excellence.</h2>
+            <h2 className="text-3xl sm:text-4xl">Our mission</h2>
             <p className="mt-5 text-base leading-relaxed text-slate">
-              The <span className="font-semibold text-headline">ware</span> is the software we build.
-              The <span className="font-semibold text-headline">BLEX</span> is the standard we hold
-              it to — Black Excellence, expressed as craft: code that holds up under audit, interfaces
-              anyone can use, and engineers who take the harder, more durable path because it is the
-              right one.
-            </p>
-            <p className="mt-4 text-base leading-relaxed text-slate">
-              It is also about who we are in the room. We are a Black-led team of engineers and
-              consultants, and the technical work is only half of it. The other half is the
-              relationship: understanding your business, telling you the truth, and still being
-              reachable a year after launch.
-            </p>
-          </div>
-          <img
-            src={engineerPortrait}
-            alt="A BLEXware engineer building an analytics dashboard at a standing desk"
-            loading="lazy"
-            width={1000}
-            height={1000}
-            className="w-full rounded-2xl object-cover shadow-card"
-          />
-        </div>
-      </Section>
-
-
-
-      <Section>
-
-        <div className="grid gap-12 lg:grid-cols-2">
-          <div>
-            <h2 className="text-2xl">Our mission</h2>
-            <p className="mt-4 text-base leading-relaxed text-slate">
               Make custom software a realistic option for organizations that were told they had to
               settle for templates and duct-taped subscriptions. That means honest scoping, a fixed
               process, and technology chosen for the client's next five years rather than our resume.
@@ -112,33 +77,33 @@ function AboutPage() {
               operations. What connects them is the same pattern: a manual process that stopped
               scaling, and a team ready to replace it with something they own.
             </p>
-            <img
-              src={teamCollab}
-              alt="Two BLEXware engineers reviewing code together at a shared workstation"
-              loading="lazy"
-              width={1200}
-              height={800}
-              className="mt-8 w-full rounded-2xl object-cover shadow-card"
-            />
           </div>
-
-          <div>
-            <h2 className="text-2xl">How engagements run</h2>
-            <ol className="mt-4 space-y-3">
-              {processSteps.map((step, index) => (
-                <li key={step.name} className="flex gap-4 text-sm">
-                  <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-xs font-bold text-primary">
-                    {index + 1}
-                  </span>
-                  <span>
-                    <span className="font-semibold text-headline">{step.name}</span>
-                    <span className="mt-0.5 block leading-relaxed text-slate">{step.description}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
+          <img
+            src={teamCollab}
+            alt="Two BLEXware engineers reviewing code together at a shared workstation"
+            loading="lazy"
+            width={1200}
+            height={800}
+            className="w-full rounded-2xl object-cover shadow-card"
+          />
         </div>
+      </Section>
+
+      <Section>
+        <SectionHeading eyebrow="Process" title="How engagements run" />
+        <ol className="mx-auto mt-12 grid max-w-3xl gap-4">
+          {processSteps.map((step, index) => (
+            <li key={step.name} className="flex gap-4 text-sm">
+              <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-xs font-bold text-primary">
+                {index + 1}
+              </span>
+              <span>
+                <span className="font-semibold text-headline">{step.name}</span>
+                <span className="mt-0.5 block leading-relaxed text-slate">{step.description}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
       </Section>
 
       <Section tone="mint">
