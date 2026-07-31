@@ -102,7 +102,16 @@ function AboutPage() {
               operations. What connects them is the same pattern: a manual process that stopped
               scaling, and a team ready to replace it with something they own.
             </p>
+            <img
+              src={teamCollab}
+              alt="Two BLEXware engineers reviewing code together at a shared workstation"
+              loading="lazy"
+              width={1200}
+              height={800}
+              className="mt-8 w-full rounded-2xl object-cover shadow-card"
+            />
           </div>
+
           <div>
             <h2 className="text-2xl">How engagements run</h2>
             <ol className="mt-4 space-y-3">
