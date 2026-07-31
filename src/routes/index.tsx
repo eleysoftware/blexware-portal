@@ -223,38 +223,6 @@ function Home() {
         </ol>
       </Section>
 
-      <Section tone="surface">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <img
-            src={teamCollab}
-            alt="Two BLEXware engineers reviewing code together at a shared workstation"
-            loading="lazy"
-            width={1200}
-            height={800}
-            className="w-full rounded-2xl object-cover shadow-card"
-          />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-              Who we are
-            </p>
-            <h2 className="mt-3 text-3xl leading-tight">
-              BLEX stands for Black Excellence — and excellence here means people, not just code.
-            </h2>
-            <p className="mt-5 text-base leading-relaxed text-slate">
-              We are a Black-led team of engineers and consultants who build software the way it
-              should be built: audited, accessible, and documented. Just as importantly, we build
-              the relationship behind it — plain-language explanations, honest pushback, and the
-              same people on the call a year after launch.
-            </p>
-            <Button asChild variant="outline" className="mt-7">
-              <Link to="/about">
-                Meet the team behind the name
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </Section>
 
 
 
