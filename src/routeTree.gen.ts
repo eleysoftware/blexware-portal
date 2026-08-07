@@ -22,6 +22,7 @@ import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
 import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
+import { Route as ProposalTokenRouteImport } from './routes/proposal.$token'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
@@ -91,6 +92,11 @@ const PortfolioSlugRoute = PortfolioSlugRouteImport.update({
   path: '/portfolio/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProposalTokenRoute = ProposalTokenRouteImport.update({
+  id: '/proposal/$token',
+  path: '/proposal/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
   id: '/resources/',
   path: '/resources/',
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/resources': typeof ResourcesIndexRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/terms'
     | '/portfolio/$slug'
+    | '/proposal/$token'
     | '/resources/$slug'
     | '/portfolio/'
     | '/resources/'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/terms'
     | '/portfolio/$slug'
+    | '/proposal/$token'
     | '/resources/$slug'
     | '/portfolio'
     | '/resources'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/terms'
     | '/portfolio/$slug'
+    | '/proposal/$token'
     | '/resources/$slug'
     | '/portfolio/'
     | '/resources/'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
   PortfolioSlugRoute: typeof PortfolioSlugRoute
+  ProposalTokenRoute: typeof ProposalTokenRoute
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
@@ -338,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/proposal/$token': {
+      id: '/proposal/$token'
+      path: '/proposal/$token'
+      fullPath: '/proposal/$token'
+      preLoaderRoute: typeof ProposalTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/resources/': {
       id: '/resources/'
       path: '/resources'
@@ -395,6 +415,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
   PortfolioSlugRoute: PortfolioSlugRoute,
+  ProposalTokenRoute: ProposalTokenRoute,
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
