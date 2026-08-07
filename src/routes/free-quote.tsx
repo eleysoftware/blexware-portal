@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+
+import { submitQuote } from "@/lib/quotes.functions";
 import { z } from "zod";
 
 import { PageHero } from "@/components/PageHero";
@@ -111,6 +114,9 @@ function FreeQuotePage() {
   const [values, setValues] = useState<QuoteForm>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
+  const send = useServerFn(submitQuote);
 
   const total = stepTitles.length;
   const progress = useMemo(() => Math.round(((step + 1) / total) * 100), [step, total]);
@@ -139,7 +145,7 @@ function FreeQuotePage() {
     setStep((s) => Math.min(s + 1, total - 1));
   };
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const result = schema.safeParse(values);
     if (!result.success) {
@@ -149,8 +155,22 @@ function FreeQuotePage() {
       toast.error("Some answers still need attention.");
       return;
     }
-    setSubmitted(true);
-    toast.success("Quote request received.");
+
+    const body = new FormData();
+    body.set("payload", JSON.stringify(result.data));
+    for (const file of files) body.append("files", file);
+
+    setSending(true);
+    try {
+      const response = await send({ data: body });
+      setQuoteNumber(response.quoteNumber);
+      setSubmitted(true);
+      toast.success("Quote request received.");
+    } catch (error) {
+      toast.error((error as Error).message || "Something went wrong. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) {
@@ -165,6 +185,12 @@ function FreeQuotePage() {
             Thanks, {values.name.split(" ")[0]}. We review every request by hand and will send a
             scoped proposal to {values.email} within one business day.
           </p>
+          {quoteNumber ? (
+            <p className="mt-4 text-sm text-slate">
+              Your reference number is{" "}
+              <strong className="text-foreground">{quoteNumber}</strong>.
+            </p>
+          ) : null}
         </div>
       </Section>
     );
@@ -385,7 +411,7 @@ function FreeQuotePage() {
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Button>
               ) : (
-                <Button type="submit" className="shadow-cta">
+                <Button type="submit" className="shadow-cta" disabled={sending}>
                   Submit request
                 </Button>
               )}

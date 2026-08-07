@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FreeQuoteRouteImport } from './routes/free-quote'
 import { Route as IndustriesRouteImport } from './routes/industries'
@@ -20,17 +22,29 @@ import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
 import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
+import { Route as ProposalTokenRouteImport } from './routes/proposal.$token'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -78,6 +92,11 @@ const PortfolioSlugRoute = PortfolioSlugRouteImport.update({
   path: '/portfolio/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProposalTokenRoute = ProposalTokenRouteImport.update({
+  id: '/proposal/$token',
+  path: '/proposal/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResourcesIndexRoute = ResourcesIndexRouteImport.update({
   id: '/resources/',
   path: '/resources/',
@@ -88,10 +107,22 @@ const ResourcesSlugRoute = ResourcesSlugRouteImport.update({
   path: '/resources/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminQuotesIdRoute =
+  AuthenticatedAdminQuotesIdRouteImport.update({
+    id: '/admin/quotes/$id',
+    path: '/admin/quotes/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
@@ -100,13 +131,17 @@ export interface FileRoutesByFullPath {
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
@@ -115,14 +150,19 @@ export interface FileRoutesByTo {
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/resources': typeof ResourcesIndexRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
+  '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/free-quote': typeof FreeQuoteRoute
   '/industries': typeof IndustriesRoute
@@ -131,15 +171,19 @@ export interface FileRoutesById {
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
+  '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/about'
+    | '/auth'
     | '/contact'
     | '/free-quote'
     | '/industries'
@@ -148,13 +192,17 @@ export interface FileRouteTypes {
     | '/services'
     | '/terms'
     | '/portfolio/$slug'
+    | '/proposal/$token'
     | '/resources/$slug'
     | '/portfolio/'
     | '/resources/'
+    | '/admin/'
+    | '/admin/quotes/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
+    | '/auth'
     | '/contact'
     | '/free-quote'
     | '/industries'
@@ -163,13 +211,18 @@ export interface FileRouteTypes {
     | '/services'
     | '/terms'
     | '/portfolio/$slug'
+    | '/proposal/$token'
     | '/resources/$slug'
     | '/portfolio'
     | '/resources'
+    | '/admin'
+    | '/admin/quotes/$id'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/about'
+    | '/auth'
     | '/contact'
     | '/free-quote'
     | '/industries'
@@ -178,14 +231,19 @@ export interface FileRouteTypes {
     | '/services'
     | '/terms'
     | '/portfolio/$slug'
+    | '/proposal/$token'
     | '/resources/$slug'
     | '/portfolio/'
     | '/resources/'
+    | '/_authenticated/admin/'
+    | '/_authenticated/admin/quotes/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
+  AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
   FreeQuoteRoute: typeof FreeQuoteRoute
   IndustriesRoute: typeof IndustriesRoute
@@ -194,6 +252,7 @@ export interface RootRouteChildren {
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
   PortfolioSlugRoute: typeof PortfolioSlugRoute
+  ProposalTokenRoute: typeof ProposalTokenRoute
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
@@ -208,11 +267,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -278,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/proposal/$token': {
+      id: '/proposal/$token'
+      path: '/proposal/$token'
+      fullPath: '/proposal/$token'
+      preLoaderRoute: typeof ProposalTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/resources/': {
       id: '/resources/'
       path: '/resources'
@@ -292,12 +372,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResourcesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/quotes/$id': {
+      id: '/_authenticated/admin/quotes/$id'
+      path: '/admin/quotes/$id'
+      fullPath: '/admin/quotes/$id'
+      preLoaderRoute: typeof AuthenticatedAdminQuotesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminQuotesIdRoute: typeof AuthenticatedAdminQuotesIdRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedAdminQuotesIdRoute: AuthenticatedAdminQuotesIdRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutRoute: AboutRoute,
+  AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
   FreeQuoteRoute: FreeQuoteRoute,
   IndustriesRoute: IndustriesRoute,
@@ -306,6 +415,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
   PortfolioSlugRoute: PortfolioSlugRoute,
+  ProposalTokenRoute: ProposalTokenRoute,
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
@@ -313,13 +423,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
