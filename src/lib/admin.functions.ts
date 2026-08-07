@@ -294,6 +294,7 @@ export const sendProposal = createServerFn({ method: "POST" })
 
 export const getAdminStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((data: Record<string, never>) => data)
   .handler(async ({ context }) => {
     const client = context.supabase as unknown as {
       rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown }>;
