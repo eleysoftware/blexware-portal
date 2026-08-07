@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 const title = "Team sign in — BLEXware";
 const description =
@@ -57,14 +56,6 @@ function AuthPage() {
     navigate({ to: "/admin" });
   };
 
-  const google = async () => {
-    try {
-      await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    } catch {
-      toast.error("Google sign-in is unavailable right now.");
-    }
-  };
-
   return (
     <>
       <PageHero eyebrow="Team portal" title="Sign in" description="BLEXware staff only." />
@@ -98,15 +89,10 @@ function AuthPage() {
             </Button>
           </form>
 
-          <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-slate">
-            <span className="h-px flex-1 bg-border" />
-            or
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <Button type="button" variant="outline" className="w-full" onClick={google}>
-            Continue with Google
-          </Button>
+          <p className="mt-6 text-xs leading-relaxed text-slate">
+            Accounts are created by a BLEXware administrator. Contact your admin if you need
+            access.
+          </p>
         </div>
       </Section>
     </>
