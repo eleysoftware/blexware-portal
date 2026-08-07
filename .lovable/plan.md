@@ -2,9 +2,9 @@
 
 Turn the Free Quote form into a real, stored pipeline backed by the existing **BLEXware_site** Supabase project: PDF attachments, a secure quote record, an authenticated admin portal, and manually triggered AI proposal drafts that an admin reviews and sends.
 
-## Step 0 — Connect the backend
+## Step 0 — Connect the backend (done)
 
-Link the project to the existing **BLEXware_site** Supabase project via the Supabase connector (not a new Cloud-provisioned database), then generate the typed client, auth middleware, and env wiring against it. All schema below lands as migrations in that project.
+The Supabase project is connected and the typed client, auth middleware, and env wiring are in place. All schema below lands as migrations in that project.
 
 ## Step 1 — Data model (one migration, with grants + RLS)
 
