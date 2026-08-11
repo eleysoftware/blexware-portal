@@ -14,16 +14,255 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_label: string | null
+          created_at: string
+          entity: string
+          entity_id: string | null
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          entity: string
+          entity_id?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Relationships: []
+      }
+      proposals: {
+        Row: {
+          client_response_note: string | null
+          content: string
+          created_at: string
+          id: string
+          model: string
+          prompt: string
+          quote_id: string
+          responded_at: string | null
+          review_token: string
+          reviewed_by: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["proposal_status"]
+          updated_at: string
+        }
+        Insert: {
+          client_response_note?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          model: string
+          prompt: string
+          quote_id: string
+          responded_at?: string | null
+          review_token?: string
+          reviewed_by?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          updated_at?: string
+        }
+        Update: {
+          client_response_note?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          model?: string
+          prompt?: string
+          quote_id?: string
+          responded_at?: string | null
+          review_token?: string
+          reviewed_by?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_files: {
+        Row: {
+          byte_size: number
+          created_at: string
+          id: string
+          mime_type: string
+          original_name: string
+          quote_id: string
+          scan_status: string
+          storage_path: string
+        }
+        Insert: {
+          byte_size: number
+          created_at?: string
+          id?: string
+          mime_type: string
+          original_name: string
+          quote_id: string
+          scan_status?: string
+          storage_path: string
+        }
+        Update: {
+          byte_size?: number
+          created_at?: string
+          id?: string
+          mime_type?: string
+          original_name?: string
+          quote_id?: string
+          scan_status?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_files_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          budget: string
+          company: string | null
+          consent: boolean
+          contact_email: string
+          contact_name: string
+          created_at: string
+          deleted_at: string | null
+          features: string | null
+          goals: string
+          id: string
+          industry: string
+          internal_notes: string | null
+          phone: string | null
+          project_type: string
+          quote_number: string
+          services: string[]
+          source_ip: string | null
+          status: Database["public"]["Enums"]["quote_status"]
+          timeline: string
+          updated_at: string
+        }
+        Insert: {
+          budget: string
+          company?: string | null
+          consent?: boolean
+          contact_email: string
+          contact_name: string
+          created_at?: string
+          deleted_at?: string | null
+          features?: string | null
+          goals: string
+          id?: string
+          industry: string
+          internal_notes?: string | null
+          phone?: string | null
+          project_type: string
+          quote_number?: string
+          services?: string[]
+          source_ip?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          timeline: string
+          updated_at?: string
+        }
+        Update: {
+          budget?: string
+          company?: string | null
+          consent?: boolean
+          contact_email?: string
+          contact_name?: string
+          created_at?: string
+          deleted_at?: string | null
+          features?: string | null
+          goals?: string
+          id?: string
+          industry?: string
+          internal_notes?: string | null
+          phone?: string | null
+          project_type?: string
+          quote_number?: string
+          services?: string[]
+          source_ip?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          timeline?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      next_quote_number: { Args: never; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "staff" | "user"
+      proposal_status:
+        | "draft"
+        | "sent"
+        | "approved"
+        | "changes_requested"
+        | "declined"
+      quote_status:
+        | "new"
+        | "reviewing"
+        | "proposal_draft"
+        | "proposal_sent"
+        | "approved"
+        | "declined"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +389,23 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "staff", "user"],
+      proposal_status: [
+        "draft",
+        "sent",
+        "approved",
+        "changes_requested",
+        "declined",
+      ],
+      quote_status: [
+        "new",
+        "reviewing",
+        "proposal_draft",
+        "proposal_sent",
+        "approved",
+        "declined",
+      ],
+    },
   },
 } as const
