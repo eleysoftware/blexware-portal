@@ -88,11 +88,23 @@ function QuoteDetailPage() {
       toast.success("Proposal marked as sent");
       void navigator.clipboard
         ?.writeText(`${window.location.origin}${result.reviewPath}`)
+        .then(() => toast.success("Review link copied to clipboard"))
         .catch(() => undefined);
       void invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const copyReviewLink = async () => {
+    if (!proposal?.review_token) return;
+    const url = `${window.location.origin}/proposal/${proposal.review_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Review link copied to clipboard");
+    } catch {
+      toast.error("Could not copy link. Copy it manually from the address bar.");
+    }
+  };
 
   const openFile = async (fileId: string) => {
     try {
