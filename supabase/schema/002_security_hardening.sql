@@ -24,7 +24,10 @@ grant execute on function public.has_role(uuid, public.app_role) to authenticate
 --    Uploads are performed server-side with the service role (bypasses RLS).
 --    Clients get NO direct write access; admins may read/manage objects.
 -- ---------------------------------------------------------------------------
-alter table storage.objects enable row level security;
+-- NOTE: do NOT run `alter table storage.objects enable row level security;`
+-- here. storage.objects is owned by the supabase_storage_admin role, so the SQL
+-- editor role cannot alter it ("must be owner of table objects"). RLS is already
+-- enabled on that table by default; only the policies below are needed.
 
 drop policy if exists "quote uploads admin read" on storage.objects;
 create policy "quote uploads admin read"
