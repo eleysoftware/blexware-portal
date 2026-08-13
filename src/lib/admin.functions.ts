@@ -73,7 +73,7 @@ export const getQuoteDetail = createServerFn({ method: "POST" })
 
     const { data: proposals } = await db
       .from("proposals")
-      .select("*")
+      .select("id, status, content, review_token, sent_at, client_response_note, created_at")
       .eq("quote_id", data.id)
       .order("created_at", { ascending: false });
 

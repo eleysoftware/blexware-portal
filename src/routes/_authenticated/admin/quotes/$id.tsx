@@ -88,11 +88,23 @@ function QuoteDetailPage() {
       toast.success("Proposal marked as sent");
       void navigator.clipboard
         ?.writeText(`${window.location.origin}${result.reviewPath}`)
+        .then(() => toast.success("Review link copied to clipboard"))
         .catch(() => undefined);
       void invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const copyReviewLink = async () => {
+    if (!proposal?.review_token) return;
+    const url = `${window.location.origin}/proposal/${proposal.review_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Review link copied to clipboard");
+    } catch {
+      toast.error("Could not copy link. Copy it manually from the address bar.");
+    }
+  };
 
   const openFile = async (fileId: string) => {
     try {
@@ -226,7 +238,15 @@ function QuoteDetailPage() {
                       onClick={() => sendMutation.mutate()}
                       disabled={sendMutation.isPending}
                     >
-                      Send to client
+                      {sendMutation.isPending ? "Sending…" : "Send to client"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={copyReviewLink}
+                      disabled={!proposal?.review_token}
+                    >
+                      Copy review link
                     </Button>
                   </>
                 ) : null}
@@ -234,8 +254,9 @@ function QuoteDetailPage() {
             </div>
 
             <p className="mt-3 text-sm text-slate">
-              AI drafts are always reviewed by a human before they reach a client. Sending copies a
-              secure review link to your clipboard.
+              AI drafts are always reviewed by a human before they reach a client. Use "Send to client"
+              to mark the proposal as sent and copy the link, or use "Copy review link" to share it
+              manually.
             </p>
 
             {proposal ? (

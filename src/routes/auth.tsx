@@ -14,6 +14,7 @@ const description =
   "Secure sign-in for the BLEXware team portal, where quote requests and proposal drafts are reviewed.";
 
 export const Route = createFileRoute("/auth")({
+  ssr: false,
   head: () => ({
     meta: [
       { title },
