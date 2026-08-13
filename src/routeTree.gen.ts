@@ -26,7 +26,10 @@ import { Route as ProposalTokenRouteImport } from './routes/proposal.$token'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal/index'
 import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
+import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authenticated/portal/quotes/$id'
+import { Route as ApiPublicAuthHooksPasswordCheckRouteImport } from './routes/api/public/auth-hooks/password-check'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -112,11 +115,29 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPortalIndexRoute =
+  AuthenticatedPortalIndexRouteImport.update({
+    id: '/portal/',
+    path: '/portal/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminQuotesIdRoute =
   AuthenticatedAdminQuotesIdRouteImport.update({
     id: '/admin/quotes/$id',
     path: '/admin/quotes/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPortalQuotesIdRoute =
+  AuthenticatedPortalQuotesIdRouteImport.update({
+    id: '/portal/quotes/$id',
+    path: '/portal/quotes/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicAuthHooksPasswordCheckRoute =
+  ApiPublicAuthHooksPasswordCheckRouteImport.update({
+    id: '/api/public/auth-hooks/password-check',
+    path: '/api/public/auth-hooks/password-check',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -136,7 +157,10 @@ export interface FileRoutesByFullPath {
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/portal/': typeof AuthenticatedPortalIndexRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
+  '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
+  '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -155,7 +179,10 @@ export interface FileRoutesByTo {
   '/portfolio': typeof PortfolioIndexRoute
   '/resources': typeof ResourcesIndexRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/portal': typeof AuthenticatedPortalIndexRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
+  '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
+  '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -176,7 +203,10 @@ export interface FileRoutesById {
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
   '/_authenticated/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
+  '/_authenticated/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
+  '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -197,7 +227,10 @@ export interface FileRouteTypes {
     | '/portfolio/'
     | '/resources/'
     | '/admin/'
+    | '/portal/'
     | '/admin/quotes/$id'
+    | '/portal/quotes/$id'
+    | '/api/public/auth-hooks/password-check'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -216,7 +249,10 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/resources'
     | '/admin'
+    | '/portal'
     | '/admin/quotes/$id'
+    | '/portal/quotes/$id'
+    | '/api/public/auth-hooks/password-check'
   id:
     | '__root__'
     | '/'
@@ -236,7 +272,10 @@ export interface FileRouteTypes {
     | '/portfolio/'
     | '/resources/'
     | '/_authenticated/admin/'
+    | '/_authenticated/portal/'
     | '/_authenticated/admin/quotes/$id'
+    | '/_authenticated/portal/quotes/$id'
+    | '/api/public/auth-hooks/password-check'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -256,6 +295,7 @@ export interface RootRouteChildren {
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
+  ApiPublicAuthHooksPasswordCheckRoute: typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -379,6 +419,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/portal/': {
+      id: '/_authenticated/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/quotes/$id': {
       id: '/_authenticated/admin/quotes/$id'
       path: '/admin/quotes/$id'
@@ -386,17 +433,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminQuotesIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/portal/quotes/$id': {
+      id: '/_authenticated/portal/quotes/$id'
+      path: '/portal/quotes/$id'
+      fullPath: '/portal/quotes/$id'
+      preLoaderRoute: typeof AuthenticatedPortalQuotesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/auth-hooks/password-check': {
+      id: '/api/public/auth-hooks/password-check'
+      path: '/api/public/auth-hooks/password-check'
+      fullPath: '/api/public/auth-hooks/password-check'
+      preLoaderRoute: typeof ApiPublicAuthHooksPasswordCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
   AuthenticatedAdminQuotesIdRoute: typeof AuthenticatedAdminQuotesIdRoute
+  AuthenticatedPortalQuotesIdRoute: typeof AuthenticatedPortalQuotesIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
   AuthenticatedAdminQuotesIdRoute: AuthenticatedAdminQuotesIdRoute,
+  AuthenticatedPortalQuotesIdRoute: AuthenticatedPortalQuotesIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -419,6 +484,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
+  ApiPublicAuthHooksPasswordCheckRoute: ApiPublicAuthHooksPasswordCheckRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
