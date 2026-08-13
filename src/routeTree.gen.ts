@@ -27,6 +27,7 @@ import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
+import { Route as ApiPublicAuthHooksPasswordCheckRouteImport } from './routes/api/public/auth-hooks/password-check'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -118,6 +119,12 @@ const AuthenticatedAdminQuotesIdRoute =
     path: '/admin/quotes/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicAuthHooksPasswordCheckRoute =
+  ApiPublicAuthHooksPasswordCheckRouteImport.update({
+    id: '/api/public/auth-hooks/password-check',
+    path: '/api/public/auth-hooks/password-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/resources/': typeof ResourcesIndexRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
+  '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -156,6 +164,7 @@ export interface FileRoutesByTo {
   '/resources': typeof ResourcesIndexRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
+  '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -177,6 +186,7 @@ export interface FileRoutesById {
   '/resources/': typeof ResourcesIndexRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
+  '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/admin/'
     | '/admin/quotes/$id'
+    | '/api/public/auth-hooks/password-check'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/admin'
     | '/admin/quotes/$id'
+    | '/api/public/auth-hooks/password-check'
   id:
     | '__root__'
     | '/'
@@ -237,6 +249,7 @@ export interface FileRouteTypes {
     | '/resources/'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/quotes/$id'
+    | '/api/public/auth-hooks/password-check'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -256,6 +269,7 @@ export interface RootRouteChildren {
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
+  ApiPublicAuthHooksPasswordCheckRoute: typeof ApiPublicAuthHooksPasswordCheckRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -386,6 +400,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminQuotesIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/auth-hooks/password-check': {
+      id: '/api/public/auth-hooks/password-check'
+      path: '/api/public/auth-hooks/password-check'
+      fullPath: '/api/public/auth-hooks/password-check'
+      preLoaderRoute: typeof ApiPublicAuthHooksPasswordCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -419,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
+  ApiPublicAuthHooksPasswordCheckRoute: ApiPublicAuthHooksPasswordCheckRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
