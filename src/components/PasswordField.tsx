@@ -44,17 +44,17 @@ export function PasswordField({
       return;
     }
     void (async () => {
-      const [{ zxcvbn, zxcvbnOptions }, common, en] = await Promise.all([
+      const [{ ZxcvbnFactory }, common, en] = await Promise.all([
         import("@zxcvbn-ts/core"),
         import("@zxcvbn-ts/language-common"),
         import("@zxcvbn-ts/language-en"),
       ]);
-      zxcvbnOptions.setOptions({
+      const zxcvbn = new ZxcvbnFactory({
         dictionary: { ...common.dictionary, ...en.dictionary },
         graphs: common.adjacencyGraphs,
         translations: en.translations,
       });
-      const result = zxcvbn(value);
+      const result = zxcvbn.check(value);
       if (cancelled) return;
       setScore(result.score);
       setSuggestion(result.feedback.warning || result.feedback.suggestions[0] || null);
