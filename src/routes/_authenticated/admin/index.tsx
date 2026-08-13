@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
+import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
 import { Badge } from "@/components/ui/badge";
@@ -51,13 +52,18 @@ function AdminDashboard() {
       <>
         <PageHero
           eyebrow="Team portal"
-          title="No portal access"
-          description="Your account is signed in but has not been granted the admin role."
+          title="No team access"
+          description="This account isn't a BLEXware team account."
         />
         <Section>
-          <Button variant="outline" onClick={signOut}>
-            Sign out
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="shadow-cta">
+              <Link to="/portal">Go to your client portal</Link>
+            </Button>
+            <Button variant="outline" onClick={signOut}>
+              Sign out
+            </Button>
+          </div>
         </Section>
       </>
     );
