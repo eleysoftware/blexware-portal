@@ -254,8 +254,9 @@ function QuoteDetailPage() {
             </div>
 
             <p className="mt-3 text-sm text-slate">
-              AI drafts are always reviewed by a human before they reach a client. Sending copies a
-              secure review link to your clipboard.
+              AI drafts are always reviewed by a human before they reach a client. Use "Send to client"
+              to mark the proposal as sent and copy the link, or use "Copy review link" to share it
+              manually.
             </p>
 
             {proposal ? (
