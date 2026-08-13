@@ -167,6 +167,8 @@ function AdminDashboard() {
             </tbody>
           </table>
         </div>
+
+        <CreateTeamMemberCard />
       </Section>
     </>
   );
