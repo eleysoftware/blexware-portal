@@ -238,7 +238,15 @@ function QuoteDetailPage() {
                       onClick={() => sendMutation.mutate()}
                       disabled={sendMutation.isPending}
                     >
-                      Send to client
+                      {sendMutation.isPending ? "Sending…" : "Send to client"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={copyReviewLink}
+                      disabled={!proposal?.review_token}
+                    >
+                      Copy review link
                     </Button>
                   </>
                 ) : null}
