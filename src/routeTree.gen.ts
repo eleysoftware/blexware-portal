@@ -20,6 +20,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as InvoiceTokenRouteImport } from './routes/invoice.$token'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
 import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
 import { Route as ProposalTokenRouteImport } from './routes/proposal.$token'
@@ -30,6 +31,8 @@ import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
 import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authenticated/portal/quotes/$id'
 import { Route as ApiPublicAuthHooksPasswordCheckRouteImport } from './routes/api/public/auth-hooks/password-check'
+import { Route as ApiPublicCronEngagementRouteImport } from './routes/api/public/cron/engagement'
+import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -83,6 +86,11 @@ const ServicesRoute = ServicesRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvoiceTokenRoute = InvoiceTokenRouteImport.update({
+  id: '/invoice/$token',
+  path: '/invoice/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIndexRoute = PortfolioIndexRouteImport.update({
@@ -139,6 +147,16 @@ const ApiPublicAuthHooksPasswordCheckRoute =
     path: '/api/public/auth-hooks/password-check',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronEngagementRoute = ApiPublicCronEngagementRouteImport.update({
+  id: '/api/public/cron/engagement',
+  path: '/api/public/cron/engagement',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
+  id: '/api/public/stripe/webhook',
+  path: '/api/public/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -151,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/invoice/$token': typeof InvoiceTokenRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
@@ -161,6 +180,8 @@ export interface FileRoutesByFullPath {
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
   '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
+  '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -173,6 +194,7 @@ export interface FileRoutesByTo {
   '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/invoice/$token': typeof InvoiceTokenRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
@@ -183,6 +205,8 @@ export interface FileRoutesByTo {
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
   '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
+  '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -197,6 +221,7 @@ export interface FileRoutesById {
   '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/invoice/$token': typeof InvoiceTokenRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/proposal/$token': typeof ProposalTokenRoute
   '/resources/$slug': typeof ResourcesSlugRoute
@@ -207,6 +232,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
   '/_authenticated/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
+  '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,6 +248,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/services'
     | '/terms'
+    | '/invoice/$token'
     | '/portfolio/$slug'
     | '/proposal/$token'
     | '/resources/$slug'
@@ -231,6 +259,8 @@ export interface FileRouteTypes {
     | '/admin/quotes/$id'
     | '/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
+    | '/api/public/cron/engagement'
+    | '/api/public/stripe/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -243,6 +273,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/services'
     | '/terms'
+    | '/invoice/$token'
     | '/portfolio/$slug'
     | '/proposal/$token'
     | '/resources/$slug'
@@ -253,6 +284,8 @@ export interface FileRouteTypes {
     | '/admin/quotes/$id'
     | '/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
+    | '/api/public/cron/engagement'
+    | '/api/public/stripe/webhook'
   id:
     | '__root__'
     | '/'
@@ -266,6 +299,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/services'
     | '/terms'
+    | '/invoice/$token'
     | '/portfolio/$slug'
     | '/proposal/$token'
     | '/resources/$slug'
@@ -276,6 +310,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/quotes/$id'
     | '/_authenticated/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
+    | '/api/public/cron/engagement'
+    | '/api/public/stripe/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -290,12 +326,15 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
+  InvoiceTokenRoute: typeof InvoiceTokenRoute
   PortfolioSlugRoute: typeof PortfolioSlugRoute
   ProposalTokenRoute: typeof ProposalTokenRoute
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
   ApiPublicAuthHooksPasswordCheckRoute: typeof ApiPublicAuthHooksPasswordCheckRoute
+  ApiPublicCronEngagementRoute: typeof ApiPublicCronEngagementRoute
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -377,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invoice/$token': {
+      id: '/invoice/$token'
+      path: '/invoice/$token'
+      fullPath: '/invoice/$token'
+      preLoaderRoute: typeof InvoiceTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portfolio/': {
       id: '/portfolio/'
       path: '/portfolio'
@@ -447,6 +493,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAuthHooksPasswordCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/engagement': {
+      id: '/api/public/cron/engagement'
+      path: '/api/public/cron/engagement'
+      fullPath: '/api/public/cron/engagement'
+      preLoaderRoute: typeof ApiPublicCronEngagementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/stripe/webhook': {
+      id: '/api/public/stripe/webhook'
+      path: '/api/public/stripe/webhook'
+      fullPath: '/api/public/stripe/webhook'
+      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -479,12 +539,15 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
+  InvoiceTokenRoute: InvoiceTokenRoute,
   PortfolioSlugRoute: PortfolioSlugRoute,
   ProposalTokenRoute: ProposalTokenRoute,
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
   ApiPublicAuthHooksPasswordCheckRoute: ApiPublicAuthHooksPasswordCheckRoute,
+  ApiPublicCronEngagementRoute: ApiPublicCronEngagementRoute,
+  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

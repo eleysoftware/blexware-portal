@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
 import { PageHero } from "@/components/PageHero";
@@ -11,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminStatus, listQuotes } from "@/lib/admin.functions";
+import { seedWellnessProject } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
+
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   head: () => ({ meta: [{ title: "Quote queue — BLEXware team" }, { name: "robots", content: "noindex" }] }),
@@ -25,6 +28,8 @@ function AdminDashboard() {
   const fetchQuotes = useServerFn(listQuotes);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [seeding, setSeeding] = useState(false);
+  const seed = useServerFn(seedWellnessProject);
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
   const quotes = useQuery({
@@ -83,7 +88,27 @@ function AdminDashboard() {
           <Button variant="outline" size="sm" onClick={signOut}>
             Sign out
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={seeding}
+            onClick={async () => {
+              setSeeding(true);
+              try {
+                const result = await seed({ data: {} });
+                toast.success(`Build Financial Wellness ready (${result.quoteNumber})`);
+                void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+              } catch (error) {
+                toast.error((error as Error).message);
+              } finally {
+                setSeeding(false);
+              }
+            }}
+          >
+            {seeding ? "Loading…" : "Load Build Financial Wellness"}
+          </Button>
         </div>
+
       </PageHero>
 
       <Section tone="surface">
