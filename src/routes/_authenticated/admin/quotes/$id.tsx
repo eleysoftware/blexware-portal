@@ -4,7 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
 import { Section } from "@/components/Section";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -283,7 +285,10 @@ function QuoteDetailPage() {
               <p className="mt-4 text-slate">No draft yet.</p>
             )}
           </div>
+
+          <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} />
         </div>
+
 
         <div className="space-y-6">
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
