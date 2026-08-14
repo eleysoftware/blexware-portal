@@ -85,7 +85,11 @@ function QuoteDetailPage() {
       return send({ data: { id: proposal!.id } });
     },
     onSuccess: (result) => {
-      toast.success("Proposal marked as sent");
+      toast.success(
+        result.emailed
+          ? "Proposal emailed to the client"
+          : "Proposal marked as sent — email could not be delivered, share the link manually",
+      );
       void navigator.clipboard
         ?.writeText(`${window.location.origin}${result.reviewPath}`)
         .then(() => toast.success("Review link copied to clipboard"))
@@ -254,9 +258,9 @@ function QuoteDetailPage() {
             </div>
 
             <p className="mt-3 text-sm text-slate">
-              AI drafts are always reviewed by a human before they reach a client. Use "Send to client"
-              to mark the proposal as sent and copy the link, or use "Copy review link" to share it
-              manually.
+              AI drafts are always reviewed by a human before they reach a client. "Send to client"
+              emails the review link from quote@blexware.com and copies it for you; "Copy review link"
+              shares it manually without sending mail.
             </p>
 
             {proposal ? (
