@@ -247,6 +247,7 @@ export type Database = {
         Returns: boolean
       }
       next_quote_number: { Args: never; Returns: string }
+      viewer_email: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "admin" | "staff" | "user"
