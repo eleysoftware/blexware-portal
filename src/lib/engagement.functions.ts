@@ -234,6 +234,8 @@ export const sendEstimate = createServerFn({ method: "POST" })
       .select("id, quote_number, contact_name, contact_email")
       .eq("id", estimate.quote_id)
       .single();
+    if (!quote) throw new Error("Quote not found");
+
 
     await storeDocument({
       quoteId: estimate.quote_id as string,
@@ -293,6 +295,8 @@ export const createAgreement = createServerFn({ method: "POST" })
       .select("id, quote_number, contact_name, contact_email")
       .eq("id", estimate.quote_id)
       .single();
+    if (!quote) throw new Error("Quote not found");
+
 
     const { data: agreement, error } = await db
       .from("agreements")
