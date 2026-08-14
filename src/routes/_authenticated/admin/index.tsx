@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { getAdminStatus, listQuotes } from "@/lib/admin.functions";
-import { seedWellnessEngagement } from "@/lib/engagement.functions";
+import { seedWellnessProject } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
 
 
@@ -28,6 +28,8 @@ function AdminDashboard() {
   const fetchQuotes = useServerFn(listQuotes);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [seeding, setSeeding] = useState(false);
+  const seed = useServerFn(seedWellnessProject);
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
   const quotes = useQuery({
