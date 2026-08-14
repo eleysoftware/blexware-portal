@@ -85,7 +85,11 @@ function QuoteDetailPage() {
       return send({ data: { id: proposal!.id } });
     },
     onSuccess: (result) => {
-      toast.success("Proposal marked as sent");
+      toast.success(
+        result.emailed
+          ? "Proposal emailed to the client"
+          : "Proposal marked as sent — email could not be delivered, share the link manually",
+      );
       void navigator.clipboard
         ?.writeText(`${window.location.origin}${result.reviewPath}`)
         .then(() => toast.success("Review link copied to clipboard"))
