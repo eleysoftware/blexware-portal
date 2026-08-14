@@ -272,7 +272,12 @@ export const sendProposal = createServerFn({ method: "POST" })
 
     const { data: proposal, error } = await db
       .from("proposals")
-      .update({ status: "sent", sent_at: new Date().toISOString(), reviewed_by: context.userId })
+      .update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+        reviewed_by: context.userId,
+      })
       .eq("id", data.id)
       .select("review_token, quote_id")
       .single();
