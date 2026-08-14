@@ -279,17 +279,50 @@ export const sendProposal = createServerFn({ method: "POST" })
     if (error || !proposal) throw new Error(error?.message ?? "Could not send");
 
     await db.from("quotes").update({ status: "proposal_sent" }).eq("id", proposal.quote_id);
+
+    const { data: quote } = await db
+      .from("quotes")
+      .select("quote_number, contact_name, contact_email, project_name")
+      .eq("id", proposal.quote_id)
+      .single();
+
+    const reviewPath = `/proposal/${proposal.review_token as string}`;
+    const { SITE_URL } = await import("@/content/site");
+    const reviewUrl = `${SITE_URL}${reviewPath}`;
+
+    let emailed = false;
+    if (quote?.contact_email) {
+      const { sendEmail, renderEmail } = await import("@/lib/email.server");
+      const rendered = renderEmail({
+        heading: "Your BLEXware proposal is ready",
+        paragraphs: [
+          `Hi ${String(quote.contact_name ?? "there")},`,
+          `We've prepared the proposal for ${String(quote.project_name || "your project")} (${String(quote.quote_number)}).`,
+          "Open the secure review link below to read it and let us know whether you'd like to approve it, request changes, or decline.",
+        ],
+        cta: { label: "Review your proposal", url: reviewUrl },
+        footnote: "This link is private to you — please don't forward it.",
+      });
+      const result = await sendEmail({
+        to: String(quote.contact_email),
+        toName: String(quote.contact_name ?? ""),
+        subject: `Your BLEXware proposal — ${String(quote.quote_number)}`,
+        html: rendered.html,
+        text: rendered.text,
+      });
+      emailed = result.sent;
+    }
+
     await writeAudit({
       actorId: context.userId,
       actorLabel: String(context.claims['email'] ?? context.userId),
       action: "proposal.sent",
       entity: "quote",
       entityId: proposal.quote_id as string,
+      metadata: { emailed },
     });
 
-    // Email delivery needs a verified sending domain (Resend or similar).
-    // Until that is connected, sending produces a shareable review link.
-    return { reviewPath: `/proposal/${proposal.review_token as string}` };
+    return { reviewPath, emailed };
   });
 
 export const getAdminStatus = createServerFn({ method: "POST" })
