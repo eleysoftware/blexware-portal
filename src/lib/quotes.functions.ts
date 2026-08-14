@@ -108,5 +108,42 @@ export const submitQuote = createServerFn({ method: "POST" })
       metadata: { files: prepared.length, quote_number: quote.quote_number },
     });
 
+    // Confirmation to the prospect + internal notification. Neither can block
+    // the submission itself, so failures are logged inside the helper only.
+    const { sendEmail, renderEmail } = await import("@/lib/email.server");
+    const confirmation = renderEmail({
+      heading: "We received your request",
+      paragraphs: [
+        `Hi ${input.name},`,
+        `Thanks for reaching out to BLEXware. Your request is logged as ${String(quote.quote_number)} and a member of our team is reviewing it now.`,
+        "We'll follow up within one business day with questions or a proposal. Just reply to this email if anything changes in the meantime.",
+      ],
+      footnote: `Reference: ${String(quote.quote_number)}`,
+    });
+    await sendEmail({
+      to: input.email,
+      toName: input.name,
+      subject: `We received your request — ${String(quote.quote_number)}`,
+      html: confirmation.html,
+      text: confirmation.text,
+    });
+
+    const internal = renderEmail({
+      heading: `New quote request — ${String(quote.quote_number)}`,
+      paragraphs: [
+        `${input.name} (${input.email}) submitted a ${input.projectType} request.`,
+        `Industry: ${input.industry}. Budget: ${input.budget}. Timeline: ${input.timeline}.`,
+        `Attachments: ${prepared.length}.`,
+      ],
+    });
+    await sendEmail({
+      to: "hello@blexware.com",
+      toName: "BLEXware",
+      subject: `New quote request — ${String(quote.quote_number)}`,
+      html: internal.html,
+      text: internal.text,
+      replyTo: input.email,
+    });
+
     return { quoteNumber: quote.quote_number as string };
   });
