@@ -4,7 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { EngagementPanel } from "@/components/EngagementPanel";
 import { Section } from "@/components/Section";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -177,7 +179,10 @@ function PortalQuoteDetail() {
               No proposal has been released for this project yet. We'll email you when it's ready.
             </div>
           )}
+
+          <EngagementPanel quoteId={id} />
         </div>
+
 
         <aside className="space-y-6">
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
