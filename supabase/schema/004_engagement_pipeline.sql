@@ -293,4 +293,4 @@ create policy "No client writes on documents" on public.documents
 -- Deny-by-default for the documents storage bucket (service role bypasses RLS).
 drop policy if exists "documents bucket is service-role only" on storage.objects;
 create policy "documents bucket is service-role only" on storage.objects
-  for select to anon, authenticated using (false);
+  for select to anon, authenticated using (bucket_id = 'documents' and false);
