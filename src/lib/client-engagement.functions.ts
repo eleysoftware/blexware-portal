@@ -1,6 +1,13 @@
-import { createServerFn, getRequestHeader } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+/** The generated Database type predates these tables (schema applied by hand). */
+function viewerDb(supabase: unknown): SupabaseClient {
+  return supabase as unknown as SupabaseClient;
+}
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -16,7 +23,7 @@ export const getMyEngagement = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
-    const db = context.supabase;
+    const db = viewerDb(context.supabase);
 
     const [estimates, agreements, invoices, documents] = await Promise.all([
       db
@@ -56,7 +63,7 @@ export const getMyDocumentUrl = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
-    const { data: doc } = await context.supabase
+    const { data: doc } = await viewerDb(context.supabase)
       .from("documents")
       .select("id, storage_path, format")
       .eq("id", data.documentId)
@@ -64,7 +71,7 @@ export const getMyDocumentUrl = createServerFn({ method: "POST" })
     if (!doc) throw new Error("Document not found");
 
     const { signedDocumentUrl } = await import("@/lib/engagement.server");
-    return { url: await signedDocumentUrl((doc as { storage_path: string }).storage_path) };
+    return { url: await signedDocumentUrl(doc.storage_path as string) };
   });
 
 /** Approve, request changes on, or decline the proposal from the portal. */
@@ -84,7 +91,7 @@ export const respondToMyProposal = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: visible } = await context.supabase
+    const { data: visible } = await viewerDb(context.supabase)
       .from("proposals")
       .select("id, quote_id, status")
       .eq("id", data.proposalId)
@@ -155,7 +162,7 @@ export const respondToMyEstimate = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: visible } = await context.supabase
+    const { data: visible } = await viewerDb(context.supabase)
       .from("estimates")
       .select("id, quote_id, status")
       .eq("id", data.estimateId)
@@ -227,7 +234,7 @@ export const signMyAgreement = createServerFn({ method: "POST" })
     return { ...data, fullName: data.fullName.trim().slice(0, 120) };
   })
   .handler(async ({ data, context }) => {
-    const { data: visible } = await context.supabase
+    const { data: visible } = await viewerDb(context.supabase)
       .from("agreements")
       .select("id, quote_id, status, doc, agreement_number")
       .eq("id", data.agreementId)
@@ -242,11 +249,12 @@ export const signMyAgreement = createServerFn({ method: "POST" })
     const db = adminDb();
 
     const signedAt = new Date();
+    const headers = getRequest().headers;
     const ip =
-      getRequestHeader("cf-connecting-ip") ??
-      getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim() ??
+      headers.get("cf-connecting-ip") ??
+      headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       null;
-    const userAgent = getRequestHeader("user-agent") ?? null;
+    const userAgent = headers.get("user-agent") ?? null;
 
     const signedDoc = {
       ...(visible.doc as Record<string, unknown>),
