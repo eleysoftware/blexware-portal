@@ -26,6 +26,13 @@ export const quoteStatuses = [
   "proposal_draft",
   "proposal_sent",
   "approved",
+  "estimate_draft",
+  "estimate_sent",
+  "estimate_approved",
+  "contract_sent",
+  "signed",
+  "invoicing",
+  "completed",
   "declined",
 ] as const;
 
@@ -36,9 +43,17 @@ export const quoteStatusLabels: Record<QuoteStatus, string> = {
   reviewing: "Reviewing",
   proposal_draft: "Proposal draft",
   proposal_sent: "Proposal sent",
-  approved: "Approved",
+  approved: "Proposal approved",
+  estimate_draft: "Estimate draft",
+  estimate_sent: "Estimate sent",
+  estimate_approved: "Estimate approved",
+  contract_sent: "SOW sent",
+  signed: "SOW signed",
+  invoicing: "Invoicing",
+  completed: "Completed",
   declined: "Declined",
 };
+
 
 export type QuoteRecord = {
   id: string;
