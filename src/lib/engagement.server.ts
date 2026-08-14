@@ -9,8 +9,10 @@ export const DOCUMENT_BUCKET = "documents";
 export const PROPOSAL_REVIEW_DAYS = 5;
 export const PROPOSAL_REMINDER_DAYS = 3;
 
+import { SITE_URL } from "@/content/site";
+
 export function siteUrl(): string {
-  return (process.env["PUBLIC_SITE_URL"] ?? "https://blexware.com").replace(/\/$/, "");
+  return SITE_URL.replace(/\/$/, "");
 }
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
