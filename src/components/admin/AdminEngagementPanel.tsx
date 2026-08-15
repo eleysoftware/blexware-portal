@@ -40,6 +40,9 @@ export function AdminEngagementPanel({
   const docUrl = useServerFn(getDocumentUrl);
   const sendInvoice = useServerFn(sendInvoiceNow);
   const regenerate = useServerFn(regenerateProposal);
+  const issueRefund = useServerFn(refundPayment);
+  const recordOffline = useServerFn(recordOfflinePaymentFn);
+  const reconcile = useServerFn(reconcilePayment);
 
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
@@ -51,6 +54,8 @@ export function AdminEngagementPanel({
   const [discountLabel, setDiscountLabel] = useState("Discount");
   const [durationNote, setDurationNote] = useState("");
   const [changeRequest, setChangeRequest] = useState("");
+  const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
+  const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
 
   const estimate = (engagement.data?.estimates ?? [])[0] as
     | {
