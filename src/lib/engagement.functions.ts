@@ -37,11 +37,31 @@ export const getEngagement = createServerFn({ method: "POST" })
         .limit(20),
     ]);
 
+    const invoiceIds = (invoices.data ?? []).map((invoice) => invoice.id as string);
+    const { data: payments } = invoiceIds.length
+      ? await db
+          .from("invoice_payments")
+          .select("*")
+          .in("invoice_id", invoiceIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
+    const paymentIds = (payments ?? []).map((payment) => payment.id as string);
+    const { data: refunds } = paymentIds.length
+      ? await db
+          .from("refunds")
+          .select("*")
+          .in("invoice_payment_id", paymentIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
     return {
       proposals: proposals.data ?? [],
       estimates: estimates.data ?? [],
       agreements: agreements.data ?? [],
       invoices: invoices.data ?? [],
+      payments: payments ?? [],
+      refunds: refunds ?? [],
       documents: documents.data ?? [],
       versions: versions.data ?? [],
     };
