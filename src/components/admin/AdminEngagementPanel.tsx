@@ -163,6 +163,35 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const refundMutation = useMutation({
+    mutationFn: (input: { invoicePaymentId: string; amountCents: number }) => issueRefund({ data: input }),
+    onSuccess: (result) => {
+      toast.success(`Refund ${result.status} — it completes once the processor confirms it`);
+      setRefundAmounts({});
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const offlineMutation = useMutation({
+    mutationFn: (input: { invoiceId: string; amountCents: number }) => recordOffline({ data: input }),
+    onSuccess: () => {
+      toast.success("Offline payment recorded");
+      setOfflineAmounts({});
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: (providerPaymentId: string) => reconcile({ data: { providerPaymentId } }),
+    onSuccess: () => {
+      toast.success("Payment reconciled with the payment service");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const openDoc = async (documentId: string) => {
     try {
       const { url } = await docUrl({ data: { documentId } });
@@ -182,8 +211,22 @@ export function AdminEngagementPanel({
     invoice_number: string;
     sequence: number;
     amount_cents: number;
+    amount_paid_cents?: number;
     status: string;
     due_date: string | null;
+  }[];
+  const payments = (engagement.data?.payments ?? []) as {
+    id: string;
+    invoice_id: string;
+    payment_reference: string;
+    hyperswitch_payment_id: string | null;
+    hyperswitch_connector: string | null;
+    amount_cents: number;
+    payment_method: string | null;
+    status: string;
+    processor_transaction_id: string | null;
+    failure_message: string | null;
+    paid_at: string | null;
   }[];
   const documents = (engagement.data?.documents ?? []) as {
     id: string;
