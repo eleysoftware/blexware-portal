@@ -577,9 +577,37 @@ export async function runScheduledWork() {
     });
   }
 
+  // Overdue sweep: unpaid invoices past their due date.
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: overdue } = await db
+    .from("invoices")
+    .select("id")
+    .in("status", ["sent", "viewed", "partially_paid"])
+    .lt("due_date", today);
+  for (const invoice of overdue ?? []) {
+    await db.from("invoices").update({ status: "overdue" }).eq("id", invoice.id);
+  }
+
+  // Reconciliation: re-check payments still reported as processing.
+  const { data: pending } = await db
+    .from("invoice_payments")
+    .select("hyperswitch_payment_id")
+    .in("status", ["processing", "action_required"])
+    .not("hyperswitch_payment_id", "is", null)
+    .limit(50);
+  for (const payment of pending ?? []) {
+    try {
+      await syncPayment(payment.hyperswitch_payment_id as string);
+    } catch (error) {
+      console.error("[cron:reconcile]", error);
+    }
+  }
+
   return {
     invoicesSent: due?.length ?? 0,
     proposalsClosed: staleProposals?.length ?? 0,
     estimatesExpired: staleEstimates?.length ?? 0,
+    invoicesOverdue: overdue?.length ?? 0,
+    paymentsReconciled: pending?.length ?? 0,
   };
 }
