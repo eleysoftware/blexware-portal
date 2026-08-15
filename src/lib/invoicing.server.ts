@@ -93,119 +93,442 @@ export async function dispatchInvoice(invoiceId: string) {
   return { emailed: result.sent };
 }
 
-/** Creates a Stripe Checkout session for a single invoice. */
-export async function createCheckoutSession(payToken: string): Promise<string> {
+type InvoiceRow = Record<string, unknown>;
+
+const OPEN_STATUSES = ["draft", "scheduled", "sent", "viewed", "partially_paid", "overdue"];
+
+function balanceOf(invoice: InvoiceRow): number {
+  return Math.max(0, Number(invoice["amount_cents"]) - Number(invoice["amount_paid_cents"] ?? 0));
+}
+
+/** Loads an invoice by its public pay token together with the client details. */
+export async function loadInvoiceByToken(payToken: string) {
   const db = adminDb();
   const { data: invoice } = await db
     .from("invoices")
-    .select("id, invoice_number, amount_cents, status, quote_id")
+    .select(
+      "id, quote_id, invoice_number, sequence, amount_cents, amount_paid_cents, currency, status, due_date, issue_date, description, sent_at, paid_at, viewed_at",
+    )
     .eq("pay_token", payToken)
     .maybeSingle();
-  if (!invoice) throw new Error("Invoice not found");
-  if (invoice.status === "paid") throw new Error("This invoice is already paid.");
+  if (!invoice) return null;
 
   const { data: quote } = await db
     .from("quotes")
-    .select("contact_email")
+    .select("quote_number, contact_name, contact_email, company")
     .eq("id", invoice.quote_id)
     .maybeSingle();
 
-  const response = await fetch(`${STRIPE_API}/checkout/sessions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${stripeKey()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: formEncode({
-      mode: "payment",
-      success_url: `${siteUrl()}/invoice/${payToken}?paid=1`,
-      cancel_url: `${siteUrl()}/invoice/${payToken}`,
-      "line_items[0][quantity]": "1",
-      "line_items[0][price_data][currency]": "usd",
-      "line_items[0][price_data][unit_amount]": String(invoice.amount_cents),
-      "line_items[0][price_data][product_data][name]": `BLEXware ${invoice.invoice_number as string}`,
-      "metadata[invoice_id]": invoice.id as string,
-      ...(quote?.contact_email ? { customer_email: String(quote.contact_email) } : {}),
-    }),
-  });
-
-  if (!response.ok) {
-    console.error("[stripe:checkout]", response.status, await response.text());
-    throw new Error("Could not start the payment. Please try again.");
-  }
-  const session = (await response.json()) as { id: string; url: string };
-
-  await db.from("invoices").update({ stripe_session_id: session.id }).eq("id", invoice.id);
-  return session.url;
+  return { invoice: invoice as InvoiceRow, quote: (quote ?? null) as InvoiceRow | null };
 }
 
-/** Idempotently records a payment and schedules follow-up work. */
-export async function markInvoicePaid(input: {
-  invoiceId: string;
-  amountCents: number;
-  providerRef: string;
+/** Records the first view of an invoice (audit + status transition). */
+export async function markInvoiceViewed(invoiceId: string, status: string, viewedAt: unknown) {
+  if (viewedAt) return;
+  const db = adminDb();
+  const patch: Record<string, unknown> = { viewed_at: new Date().toISOString() };
+  if (status === "sent") patch["status"] = "viewed";
+  await db.from("invoices").update(patch).eq("id", invoiceId);
+}
+
+/**
+ * Creates a Hyperswitch payment for an invoice. The amount is always computed
+ * server-side from the stored invoice; the browser cannot influence it.
+ */
+export async function startInvoicePayment(payToken: string) {
+  const { PaymentService } = await import("@/lib/payments/service.server");
+  const db = adminDb();
+  const loaded = await loadInvoiceByToken(payToken);
+  if (!loaded) throw new Error("Invoice not found");
+
+  const { invoice, quote } = loaded;
+  const status = String(invoice["status"]);
+  if (!OPEN_STATUSES.includes(status)) {
+    throw new Error("This invoice is not open for payment.");
+  }
+  const amountCents = balanceOf(invoice);
+  if (amountCents <= 0) throw new Error("This invoice is already paid in full.");
+
+  const { data: attempt, error: attemptError } = await db
+    .from("invoice_payments")
+    .insert({
+      invoice_id: invoice["id"],
+      amount_cents: amountCents,
+      currency: String(invoice["currency"] ?? "usd"),
+      status: "created",
+    })
+    .select("id, payment_reference")
+    .single();
+  if (attemptError || !attempt) throw new Error("Could not start the payment. Please try again.");
+
+  const snapshot = await PaymentService.createPayment({
+    amountCents,
+    currency: String(invoice["currency"] ?? "usd"),
+    reference: attempt.payment_reference as string,
+    description: `BLEXware ${String(invoice["invoice_number"])}`,
+    customerEmail: (quote?.["contact_email"] as string | undefined) ?? null,
+    customerName: (quote?.["contact_name"] as string | undefined) ?? null,
+    returnUrl: `${siteUrl()}/invoice/${payToken}?ref=${attempt.payment_reference as string}`,
+    metadata: { invoice_payment_id: attempt.id as string, invoice_number: String(invoice["invoice_number"]) },
+  });
+
+  await db
+    .from("invoice_payments")
+    .update({
+      hyperswitch_payment_id: snapshot.providerPaymentId,
+      hyperswitch_connector: snapshot.connector,
+      status: snapshot.status,
+    })
+    .eq("id", attempt.id);
+
+  await writeAudit({
+    actorLabel: "client",
+    action: "payment.created",
+    entity: "invoice",
+    entityId: invoice["id"] as string,
+    metadata: { amount_cents: amountCents, reference: attempt.payment_reference },
+  });
+
+  const config = PaymentService.publicConfig();
+  return {
+    clientSecret: snapshot.clientSecret,
+    publishableKey: config.publishableKey,
+    profileId: config.profileId,
+    environment: config.environment,
+    amountCents,
+    reference: attempt.payment_reference as string,
+  };
+}
+
+/**
+ * Applies an authoritative payment status to BLEXware records. Idempotent:
+ * duplicate or out-of-order deliveries never double-credit an invoice.
+ */
+export async function applyPaymentStatus(input: {
+  providerPaymentId: string;
+  status: import("@/lib/payments/service.server").PaymentStatus;
+  amountCents?: number;
+  paymentMethod?: string | null;
+  connector?: string | null;
+  processorTransactionId?: string | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
 }) {
   const db = adminDb();
+  const { data: attempt } = await db
+    .from("invoice_payments")
+    .select("id, invoice_id, amount_cents, status, currency")
+    .eq("hyperswitch_payment_id", input.providerPaymentId)
+    .maybeSingle();
+  if (!attempt) return { applied: false as const };
+
+  const previous = String(attempt.status);
+  const alreadySucceeded = previous === "succeeded";
+
+  await db
+    .from("invoice_payments")
+    .update({
+      status: input.status,
+      payment_method: input.paymentMethod ?? null,
+      hyperswitch_connector: input.connector ?? null,
+      processor_transaction_id: input.processorTransactionId ?? null,
+      failure_code: input.failureCode ?? null,
+      failure_message: input.failureMessage ?? null,
+      ...(input.status === "succeeded" && !alreadySucceeded ? { paid_at: new Date().toISOString() } : {}),
+    })
+    .eq("id", attempt.id);
+
   const { data: invoice } = await db
     .from("invoices")
-    .select("id, quote_id, invoice_number, status, sequence")
-    .eq("id", input.invoiceId)
+    .select("id, quote_id, invoice_number, amount_cents, amount_paid_cents, status, sequence, pay_token")
+    .eq("id", attempt.invoice_id)
+    .maybeSingle();
+  if (!invoice) return { applied: false as const };
+
+  const { data: quote } = await db
+    .from("quotes")
+    .select("contact_name, contact_email")
+    .eq("id", invoice.quote_id)
+    .maybeSingle();
+  const url = `${siteUrl()}/invoice/${invoice.pay_token as string}`;
+  const { emailPaymentUpdate, emailReceipt, notifyTeam } = await import("@/lib/engagement.server");
+
+  if (input.status === "succeeded" && !alreadySucceeded) {
+    const credited = Number(input.amountCents ?? attempt.amount_cents);
+    const paid = Number(invoice.amount_paid_cents ?? 0) + credited;
+    const balance = Math.max(0, Number(invoice.amount_cents) - paid);
+    const nextStatus = balance === 0 ? "paid" : "partially_paid";
+
+    await db
+      .from("invoices")
+      .update({
+        amount_paid_cents: paid,
+        status: nextStatus,
+        ...(balance === 0 ? { paid_at: new Date().toISOString() } : {}),
+      })
+      .eq("id", invoice.id);
+
+    if (quote) {
+      await emailReceipt({
+        to: quote.contact_email as string,
+        name: quote.contact_name as string,
+        invoiceNumber: invoice.invoice_number as string,
+        amountCents: credited,
+      });
+      if (balance > 0) {
+        await emailPaymentUpdate({
+          to: quote.contact_email as string,
+          name: quote.contact_name as string,
+          invoiceNumber: invoice.invoice_number as string,
+          amountCents: credited,
+          kind: "submitted",
+          balanceCents: balance,
+          url,
+        });
+      } else {
+        await emailPaymentUpdate({
+          to: quote.contact_email as string,
+          name: quote.contact_name as string,
+          invoiceNumber: invoice.invoice_number as string,
+          amountCents: credited,
+          kind: "paid_in_full",
+        });
+      }
+      await notifyTeam(`Payment received — ${invoice.invoice_number as string}`, [
+        `${quote.contact_name as string} (${quote.contact_email as string}) paid ${invoice.invoice_number as string}.`,
+        Number(invoice.sequence) === 1 && balance === 0 ? "This was the first invoice — work can begin." : "",
+      ].filter(Boolean));
+    }
+
+    if (balance === 0) {
+      const { data: outstanding } = await db
+        .from("invoices")
+        .select("id")
+        .eq("quote_id", invoice.quote_id)
+        .not("status", "in", "(paid,void,cancelled)");
+      if (!outstanding?.length) {
+        await db.from("quotes").update({ status: "completed" }).eq("id", invoice.quote_id);
+      }
+    }
+  }
+
+  if (input.status === "processing" && previous !== "processing" && quote) {
+    await emailPaymentUpdate({
+      to: quote.contact_email as string,
+      name: quote.contact_name as string,
+      invoiceNumber: invoice.invoice_number as string,
+      amountCents: Number(attempt.amount_cents),
+      kind: "processing",
+      url,
+    });
+  }
+
+  if (input.status === "failed" && previous !== "failed" && quote) {
+    await emailPaymentUpdate({
+      to: quote.contact_email as string,
+      name: quote.contact_name as string,
+      invoiceNumber: invoice.invoice_number as string,
+      amountCents: Number(attempt.amount_cents),
+      kind: "failed",
+      url,
+    });
+  }
+
+  await writeAudit({
+    actorLabel: "payments",
+    action: `payment.${input.status}`,
+    entity: "invoice",
+    entityId: invoice.id as string,
+    metadata: {
+      invoice: invoice.invoice_number,
+      provider_payment_id: input.providerPaymentId,
+      amount_cents: input.amountCents ?? attempt.amount_cents,
+    },
+  });
+
+  return { applied: true as const, invoicePaymentId: attempt.id as string };
+}
+
+/** Pulls the authoritative status from the payment service and applies it. */
+export async function syncPayment(providerPaymentId: string) {
+  const { PaymentService } = await import("@/lib/payments/service.server");
+  const snapshot = await PaymentService.getPayment(providerPaymentId);
+  return applyPaymentStatus({
+    providerPaymentId: snapshot.providerPaymentId,
+    status: snapshot.status,
+    amountCents: snapshot.amountCents,
+    paymentMethod: snapshot.paymentMethod,
+    connector: snapshot.connector,
+    processorTransactionId: snapshot.processorTransactionId,
+    failureCode: snapshot.failureCode,
+    failureMessage: snapshot.failureMessage,
+  });
+}
+
+/** Issues a full or partial refund against a recorded payment. */
+export async function refundInvoicePayment(input: {
+  invoicePaymentId: string;
+  amountCents: number;
+  reason?: string | null;
+  actorId?: string | null;
+}) {
+  const { PaymentService } = await import("@/lib/payments/service.server");
+  const db = adminDb();
+  const { data: attempt } = await db
+    .from("invoice_payments")
+    .select("id, invoice_id, amount_cents, status, hyperswitch_payment_id")
+    .eq("id", input.invoicePaymentId)
+    .maybeSingle();
+  if (!attempt || attempt.status !== "succeeded" || !attempt.hyperswitch_payment_id) {
+    throw new Error("Only settled payments can be refunded.");
+  }
+  if (input.amountCents <= 0 || input.amountCents > Number(attempt.amount_cents)) {
+    throw new Error("Refund amount is outside the payment amount.");
+  }
+
+  const refund = await PaymentService.refundPayment({
+    providerPaymentId: attempt.hyperswitch_payment_id as string,
+    amountCents: input.amountCents,
+    reason: input.reason ?? null,
+  });
+
+  await db.from("refunds").insert({
+    invoice_payment_id: attempt.id,
+    amount_cents: input.amountCents,
+    reason: input.reason ?? null,
+    initiated_by: input.actorId ?? null,
+    initiated_label: "admin",
+    hyperswitch_refund_id: refund.refundId,
+    status: refund.status,
+  });
+
+  await writeAudit({
+    actorId: input.actorId ?? null,
+    actorLabel: "admin",
+    action: "payment.refund_requested",
+    entity: "invoice",
+    entityId: attempt.invoice_id as string,
+    metadata: { amount_cents: input.amountCents, refund_id: refund.refundId, status: refund.status },
+  });
+
+  return { status: refund.status, refundId: refund.refundId };
+}
+
+/** Applies a confirmed refund status coming from a webhook. */
+export async function applyRefundStatus(input: {
+  refundId: string;
+  status: string;
+  amountCents: number;
+  processorRefundId?: string | null;
+}) {
+  const db = adminDb();
+  const { data: refund } = await db
+    .from("refunds")
+    .select("id, invoice_payment_id, status")
+    .eq("hyperswitch_refund_id", input.refundId)
+    .maybeSingle();
+  if (!refund) return;
+  if (refund.status === input.status) return;
+
+  await db
+    .from("refunds")
+    .update({ status: input.status, processor_refund_id: input.processorRefundId ?? null })
+    .eq("id", refund.id);
+
+  if (input.status !== "succeeded") return;
+
+  const { data: attempt } = await db
+    .from("invoice_payments")
+    .select("id, invoice_id, amount_cents")
+    .eq("id", refund.invoice_payment_id)
+    .maybeSingle();
+  if (!attempt) return;
+
+  const refunded = input.amountCents >= Number(attempt.amount_cents) ? "refunded" : "partially_refunded";
+  await db.from("invoice_payments").update({ status: refunded }).eq("id", attempt.id);
+
+  const { data: invoice } = await db
+    .from("invoices")
+    .select("id, quote_id, invoice_number, amount_cents, amount_paid_cents")
+    .eq("id", attempt.invoice_id)
     .maybeSingle();
   if (!invoice) return;
 
-  const { error: paymentError } = await db.from("payments").insert({
-    invoice_id: invoice.id,
-    amount_cents: input.amountCents,
-    provider: "stripe",
-    provider_ref: input.providerRef,
-    status: "succeeded",
-  });
-  if (paymentError && !paymentError.message.includes("duplicate")) {
-    console.error("[stripe:payment]", paymentError.message);
-  }
-  if (invoice.status === "paid") return;
-
+  const paid = Math.max(0, Number(invoice.amount_paid_cents ?? 0) - input.amountCents);
   await db
     .from("invoices")
-    .update({ status: "paid", paid_at: new Date().toISOString(), stripe_payment_intent: input.providerRef })
+    .update({ amount_paid_cents: paid, status: paid > 0 ? "partially_paid" : "sent", paid_at: null })
     .eq("id", invoice.id);
 
   const { data: quote } = await db
     .from("quotes")
-    .select("quote_number, contact_name, contact_email")
+    .select("contact_name, contact_email")
     .eq("id", invoice.quote_id)
     .maybeSingle();
-
   if (quote) {
-    await emailReceipt({
+    const { emailPaymentUpdate } = await import("@/lib/engagement.server");
+    await emailPaymentUpdate({
       to: quote.contact_email as string,
       name: quote.contact_name as string,
       invoiceNumber: invoice.invoice_number as string,
       amountCents: input.amountCents,
+      kind: "refunded",
     });
-    await notifyTeam(`Payment received — ${invoice.invoice_number as string}`, [
-      `${quote.contact_name as string} (${quote.contact_email as string}) paid ${invoice.invoice_number as string}.`,
-      Number(invoice.sequence) === 1 ? "This was the first invoice — work can begin." : "",
-    ].filter(Boolean));
-  }
-
-  const { data: outstanding } = await db
-    .from("invoices")
-    .select("id")
-    .eq("quote_id", invoice.quote_id)
-    .neq("status", "paid")
-    .neq("status", "void");
-  if (!outstanding?.length) {
-    await db.from("quotes").update({ status: "completed" }).eq("id", invoice.quote_id);
   }
 
   await writeAudit({
-    actorLabel: "stripe",
-    action: "invoice.paid",
-    entity: "quote",
-    entityId: invoice.quote_id as string,
-    metadata: { invoice: invoice.invoice_number, amount_cents: input.amountCents },
+    actorLabel: "payments",
+    action: "payment.refunded",
+    entity: "invoice",
+    entityId: invoice.id as string,
+    metadata: { amount_cents: input.amountCents, refund_id: input.refundId },
   });
+}
+
+/** Records a payment BLEXware received outside the platform (check, transfer). */
+export async function recordOfflinePayment(input: {
+  invoiceId: string;
+  amountCents: number;
+  note?: string | null;
+  actorId?: string | null;
+}) {
+  const db = adminDb();
+  const { data: attempt, error } = await db
+    .from("invoice_payments")
+    .insert({
+      invoice_id: input.invoiceId,
+      amount_cents: input.amountCents,
+      status: "created",
+      payment_method: "offline",
+      metadata: { note: input.note ?? null },
+    })
+    .select("id, payment_reference")
+    .single();
+  if (error || !attempt) throw new Error("Could not record the payment.");
+
+  const providerPaymentId = `offline_${attempt.payment_reference as string}`;
+  await db
+    .from("invoice_payments")
+    .update({ hyperswitch_payment_id: providerPaymentId })
+    .eq("id", attempt.id);
+
+  await applyPaymentStatus({
+    providerPaymentId,
+    status: "succeeded",
+    amountCents: input.amountCents,
+    paymentMethod: "offline",
+  });
+
+  await writeAudit({
+    actorId: input.actorId ?? null,
+    actorLabel: "admin",
+    action: "payment.offline_recorded",
+    entity: "invoice",
+    entityId: input.invoiceId,
+    metadata: { amount_cents: input.amountCents, note: input.note ?? null },
+  });
+
+  return { ok: true };
 }
 
 /** Cron worker: send due invoices and close expired proposals/estimates. */
