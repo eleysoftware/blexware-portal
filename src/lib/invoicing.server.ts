@@ -1,19 +1,8 @@
-// Server-only invoicing + Stripe payment helpers.
+// Server-only invoicing helpers. Payments are processor-agnostic: everything
+// goes through PaymentService (Hyperswitch), never a processor SDK.
 import { adminDb, writeAudit } from "@/lib/blex.server";
 import { computeInvoicePlan } from "@/lib/documents/compose";
-import { emailInvoice, emailReceipt, notifyTeam, siteUrl } from "@/lib/engagement.server";
-
-const STRIPE_API = "https://api.stripe.com/v1";
-
-function stripeKey(): string {
-  const key = process.env["STRIPE_SECRET_KEY"];
-  if (!key) throw new Error("Online payments are not configured yet.");
-  return key;
-}
-
-function formEncode(payload: Record<string, string>): string {
-  return new URLSearchParams(payload).toString();
-}
+import { emailInvoice, siteUrl } from "@/lib/engagement.server";
 
 /** Builds the $600 installment schedule for a signed agreement. */
 export async function createInvoiceSchedule(agreementId: string) {
