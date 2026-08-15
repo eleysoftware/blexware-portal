@@ -37,11 +37,31 @@ export const getEngagement = createServerFn({ method: "POST" })
         .limit(20),
     ]);
 
+    const invoiceIds = (invoices.data ?? []).map((invoice) => invoice.id as string);
+    const { data: payments } = invoiceIds.length
+      ? await db
+          .from("invoice_payments")
+          .select("*")
+          .in("invoice_id", invoiceIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
+    const paymentIds = (payments ?? []).map((payment) => payment.id as string);
+    const { data: refunds } = paymentIds.length
+      ? await db
+          .from("refunds")
+          .select("*")
+          .in("invoice_payment_id", paymentIds)
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
     return {
       proposals: proposals.data ?? [],
       estimates: estimates.data ?? [],
       agreements: agreements.data ?? [],
       invoices: invoices.data ?? [],
+      payments: payments ?? [],
+      refunds: refunds ?? [],
       documents: documents.data ?? [],
       versions: versions.data ?? [],
     };
@@ -377,6 +397,61 @@ export const sendInvoiceNow = createServerFn({ method: "POST" })
     const result = await dispatchInvoice(data.invoiceId);
     return result;
   });
+
+/** Issues a full or partial refund against a settled payment. */
+export const refundPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { invoicePaymentId: string; amountCents: number; reason?: string }) => {
+    if (!Number.isInteger(data.amountCents) || data.amountCents <= 0) {
+      throw new Error("Enter a refund amount greater than zero.");
+    }
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { requireAdmin } = await import("@/lib/blex.server");
+    await requireAdmin(context.supabase, context.userId);
+    const { refundInvoicePayment } = await import("@/lib/invoicing.server");
+    return refundInvoicePayment({
+      invoicePaymentId: data.invoicePaymentId,
+      amountCents: data.amountCents,
+      reason: data.reason ?? null,
+      actorId: context.userId,
+    });
+  });
+
+/** Records a payment received outside the platform (check, bank transfer). */
+export const recordOfflinePaymentFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { invoiceId: string; amountCents: number; note?: string }) => {
+    if (!Number.isInteger(data.amountCents) || data.amountCents <= 0) {
+      throw new Error("Enter an amount greater than zero.");
+    }
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { requireAdmin } = await import("@/lib/blex.server");
+    await requireAdmin(context.supabase, context.userId);
+    const { recordOfflinePayment } = await import("@/lib/invoicing.server");
+    return recordOfflinePayment({
+      invoiceId: data.invoiceId,
+      amountCents: data.amountCents,
+      note: data.note ?? null,
+      actorId: context.userId,
+    });
+  });
+
+/** Re-reads the authoritative status from the payment service. */
+export const reconcilePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { providerPaymentId: string }) => data)
+  .handler(async ({ data, context }) => {
+    const { requireAdmin } = await import("@/lib/blex.server");
+    await requireAdmin(context.supabase, context.userId);
+    const { syncPayment } = await import("@/lib/invoicing.server");
+    return syncPayment(data.providerPaymentId);
+  });
+
+
 
 /** Seeds the live Build Financial Wellness engagement at the estimate stage. */
 export const seedWellnessProject = createServerFn({ method: "POST" })

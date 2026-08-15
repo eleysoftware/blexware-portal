@@ -12,6 +12,9 @@ import {
   createAgreement,
   getDocumentUrl,
   getEngagement,
+  reconcilePayment,
+  recordOfflinePaymentFn,
+  refundPayment,
   regenerateProposal,
   saveEstimate,
   sendEstimate,
@@ -37,6 +40,9 @@ export function AdminEngagementPanel({
   const docUrl = useServerFn(getDocumentUrl);
   const sendInvoice = useServerFn(sendInvoiceNow);
   const regenerate = useServerFn(regenerateProposal);
+  const issueRefund = useServerFn(refundPayment);
+  const recordOffline = useServerFn(recordOfflinePaymentFn);
+  const reconcile = useServerFn(reconcilePayment);
 
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
@@ -48,6 +54,8 @@ export function AdminEngagementPanel({
   const [discountLabel, setDiscountLabel] = useState("Discount");
   const [durationNote, setDurationNote] = useState("");
   const [changeRequest, setChangeRequest] = useState("");
+  const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
+  const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
 
   const estimate = (engagement.data?.estimates ?? [])[0] as
     | {
@@ -155,6 +163,35 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const refundMutation = useMutation({
+    mutationFn: (input: { invoicePaymentId: string; amountCents: number }) => issueRefund({ data: input }),
+    onSuccess: (result) => {
+      toast.success(`Refund ${result.status} — it completes once the processor confirms it`);
+      setRefundAmounts({});
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const offlineMutation = useMutation({
+    mutationFn: (input: { invoiceId: string; amountCents: number }) => recordOffline({ data: input }),
+    onSuccess: () => {
+      toast.success("Offline payment recorded");
+      setOfflineAmounts({});
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: (providerPaymentId: string) => reconcile({ data: { providerPaymentId } }),
+    onSuccess: () => {
+      toast.success("Payment reconciled with the payment service");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const openDoc = async (documentId: string) => {
     try {
       const { url } = await docUrl({ data: { documentId } });
@@ -174,8 +211,22 @@ export function AdminEngagementPanel({
     invoice_number: string;
     sequence: number;
     amount_cents: number;
+    amount_paid_cents?: number;
     status: string;
     due_date: string | null;
+  }[];
+  const payments = (engagement.data?.payments ?? []) as {
+    id: string;
+    invoice_id: string;
+    payment_reference: string;
+    hyperswitch_payment_id: string | null;
+    hyperswitch_connector: string | null;
+    amount_cents: number;
+    payment_method: string | null;
+    status: string;
+    processor_transaction_id: string | null;
+    failure_message: string | null;
+    paid_at: string | null;
   }[];
   const documents = (engagement.data?.documents ?? []) as {
     id: string;
@@ -324,33 +375,125 @@ export function AdminEngagementPanel({
 
       {invoices.length ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
-          <h2 className="text-xl">Invoices</h2>
-          <ul className="mt-4 space-y-2 text-sm">
-            {invoices.map((invoice) => (
-              <li
-                key={invoice.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3"
-              >
-                <span>
-                  {invoice.invoice_number} · #{invoice.sequence}
-                  {invoice.due_date ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}` : ""}
-                </span>
-                <span className="flex items-center gap-3">
-                  <span className="font-semibold">{formatMoney(Number(invoice.amount_cents))}</span>
-                  <Badge variant={invoice.status === "paid" ? "secondary" : "outline"}>
-                    {invoice.status}
-                  </Badge>
-                  {invoice.status === "scheduled" ? (
-                    <Button size="sm" variant="outline" onClick={() => invoiceMutation.mutate(invoice.id)}>
-                      Send now
-                    </Button>
+          <h2 className="text-xl">Invoices &amp; payments</h2>
+          <ul className="mt-4 space-y-4 text-sm">
+            {invoices.map((invoice) => {
+              const paid = Number(invoice.amount_paid_cents ?? 0);
+              const balance = Math.max(0, Number(invoice.amount_cents) - paid);
+              const attempts = payments.filter((payment) => payment.invoice_id === invoice.id);
+              return (
+                <li key={invoice.id} className="rounded-xl border border-border px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>
+                      {invoice.invoice_number} · #{invoice.sequence}
+                      {invoice.due_date ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}` : ""}
+                    </span>
+                    <span className="flex flex-wrap items-center gap-3">
+                      <span className="font-semibold">{formatMoney(Number(invoice.amount_cents))}</span>
+                      <span className="text-slate">
+                        paid {formatMoney(paid)} · balance {formatMoney(balance)}
+                      </span>
+                      <Badge variant={invoice.status === "paid" ? "secondary" : "outline"}>{invoice.status}</Badge>
+                      {invoice.status === "scheduled" ? (
+                        <Button size="sm" variant="outline" onClick={() => invoiceMutation.mutate(invoice.id)}>
+                          Send now
+                        </Button>
+                      ) : null}
+                    </span>
+                  </div>
+
+                  {attempts.length ? (
+                    <ul className="mt-3 space-y-2 border-t border-border pt-3">
+                      {attempts.map((payment) => (
+                        <li key={payment.id} className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="text-slate">
+                            {formatMoney(Number(payment.amount_cents))} · {payment.payment_method ?? "—"} ·{" "}
+                            {payment.hyperswitch_connector ?? "unassigned connector"}
+                            {payment.processor_transaction_id ? ` · ${payment.processor_transaction_id}` : ""}
+                            {payment.paid_at ? ` · ${new Date(payment.paid_at).toLocaleDateString()}` : ""}
+                            {payment.failure_message ? ` · ${payment.failure_message}` : ""}
+                          </span>
+                          <span className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline">{payment.status}</Badge>
+                            {payment.hyperswitch_payment_id ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  reconcileMutation.mutate(payment.hyperswitch_payment_id as string)
+                                }
+                              >
+                                Reconcile
+                              </Button>
+                            ) : null}
+                            {payment.status === "succeeded" ? (
+                              <>
+                                <Input
+                                  className="h-8 w-24"
+                                  inputMode="decimal"
+                                  aria-label={`Refund amount for payment ${payment.payment_reference}`}
+                                  placeholder="0.00"
+                                  value={refundAmounts[payment.id] ?? ""}
+                                  onChange={(event) =>
+                                    setRefundAmounts((current) => ({
+                                      ...current,
+                                      [payment.id]: event.target.value,
+                                    }))
+                                  }
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    refundMutation.mutate({
+                                      invoicePaymentId: payment.id,
+                                      amountCents: Math.round(Number(refundAmounts[payment.id] ?? 0) * 100),
+                                    })
+                                  }
+                                >
+                                  Refund
+                                </Button>
+                              </>
+                            ) : null}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
-                </span>
-              </li>
-            ))}
+
+                  {balance > 0 ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                      <Input
+                        className="h-8 w-28"
+                        inputMode="decimal"
+                        aria-label={`Offline payment amount for ${invoice.invoice_number}`}
+                        placeholder="Offline $"
+                        value={offlineAmounts[invoice.id] ?? ""}
+                        onChange={(event) =>
+                          setOfflineAmounts((current) => ({ ...current, [invoice.id]: event.target.value }))
+                        }
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          offlineMutation.mutate({
+                            invoiceId: invoice.id,
+                            amountCents: Math.round(Number(offlineAmounts[invoice.id] ?? 0) * 100),
+                          })
+                        }
+                      >
+                        Record offline payment
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}
+
 
       {documents.length ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">

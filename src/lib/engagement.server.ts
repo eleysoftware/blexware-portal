@@ -216,6 +216,65 @@ export async function emailReceipt(input: {
   });
 }
 
+/** Payment lifecycle notifications (submitted / processing / failed / refunded / paid in full). */
+export async function emailPaymentUpdate(input: {
+  to: string;
+  name: string;
+  invoiceNumber: string;
+  amountCents: number;
+  kind: "submitted" | "processing" | "failed" | "refunded" | "paid_in_full";
+  balanceCents?: number;
+  url?: string;
+}) {
+  const money = formatMoney(input.amountCents);
+  const copy: Record<typeof input.kind, { subject: string; heading: string; body: string[] }> = {
+    submitted: {
+      subject: `Payment submitted — ${input.invoiceNumber}`,
+      heading: "Your payment has been submitted",
+      body: [`We've received your ${money} payment request for ${input.invoiceNumber} and will confirm once it settles.`],
+    },
+    processing: {
+      subject: `Bank payment processing — ${input.invoiceNumber}`,
+      heading: "Your bank payment is processing",
+      body: [
+        `Your bank account has been securely connected and your ${money} payment for ${input.invoiceNumber} has been submitted.`,
+        "Bank payments may take additional time to process. We'll email you as soon as it's confirmed.",
+      ],
+    },
+    failed: {
+      subject: `Payment unsuccessful — ${input.invoiceNumber}`,
+      heading: "We were unable to process your payment",
+      body: [
+        `The ${money} payment for ${input.invoiceNumber} did not go through. No money has left your account.`,
+        "You can retry the payment at any time using the link below.",
+      ],
+    },
+    refunded: {
+      subject: `Refund issued — ${input.invoiceNumber}`,
+      heading: "Your payment has been refunded",
+      body: [`A refund of ${money} for ${input.invoiceNumber} has been issued and should appear within a few business days.`],
+    },
+    paid_in_full: {
+      subject: `Invoice paid in full — ${input.invoiceNumber}`,
+      heading: "This invoice is paid in full",
+      body: [`Thank you — ${input.invoiceNumber} is now paid in full.`],
+    },
+  };
+
+  const entry = copy[input.kind];
+  const paragraphs = [`Hi ${input.name},`, ...entry.body];
+  if (typeof input.balanceCents === "number" && input.balanceCents > 0) {
+    paragraphs.push(`Remaining balance on this invoice: ${formatMoney(input.balanceCents)}.`);
+  }
+
+  const mail = renderEmail({
+    heading: entry.heading,
+    paragraphs,
+    ...(input.url ? { cta: { label: "View invoice", url: input.url } } : {}),
+  });
+  return sendEmail({ to: input.to, toName: input.name, subject: entry.subject, ...mail });
+}
+
 export async function notifyTeam(subject: string, paragraphs: string[], replyTo?: string) {
   const mail = renderEmail({ heading: subject, paragraphs });
   return sendEmail({
