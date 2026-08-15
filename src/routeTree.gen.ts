@@ -32,6 +32,7 @@ import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authenticated/portal/quotes/$id'
 import { Route as ApiPublicAuthHooksPasswordCheckRouteImport } from './routes/api/public/auth-hooks/password-check'
 import { Route as ApiPublicCronEngagementRouteImport } from './routes/api/public/cron/engagement'
+import { Route as ApiPublicHyperswitchWebhookRouteImport } from './routes/api/public/hyperswitch/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -151,6 +152,12 @@ const ApiPublicCronEngagementRoute = ApiPublicCronEngagementRouteImport.update({
   path: '/api/public/cron/engagement',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHyperswitchWebhookRoute =
+  ApiPublicHyperswitchWebhookRouteImport.update({
+    id: '/api/public/hyperswitch/webhook',
+    path: '/api/public/hyperswitch/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
   '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
+  '/api/public/hyperswitch/webhook': typeof ApiPublicHyperswitchWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -199,6 +207,7 @@ export interface FileRoutesByTo {
   '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
   '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
+  '/api/public/hyperswitch/webhook': typeof ApiPublicHyperswitchWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -225,6 +234,7 @@ export interface FileRoutesById {
   '/_authenticated/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
   '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
+  '/api/public/hyperswitch/webhook': typeof ApiPublicHyperswitchWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
     | '/api/public/cron/engagement'
+    | '/api/public/hyperswitch/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
     | '/api/public/cron/engagement'
+    | '/api/public/hyperswitch/webhook'
   id:
     | '__root__'
     | '/'
@@ -300,6 +312,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
     | '/api/public/cron/engagement'
+    | '/api/public/hyperswitch/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -322,6 +335,7 @@ export interface RootRouteChildren {
   ResourcesIndexRoute: typeof ResourcesIndexRoute
   ApiPublicAuthHooksPasswordCheckRoute: typeof ApiPublicAuthHooksPasswordCheckRoute
   ApiPublicCronEngagementRoute: typeof ApiPublicCronEngagementRoute
+  ApiPublicHyperswitchWebhookRoute: typeof ApiPublicHyperswitchWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -487,6 +501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronEngagementRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hyperswitch/webhook': {
+      id: '/api/public/hyperswitch/webhook'
+      path: '/api/public/hyperswitch/webhook'
+      fullPath: '/api/public/hyperswitch/webhook'
+      preLoaderRoute: typeof ApiPublicHyperswitchWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -527,6 +548,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesIndexRoute: ResourcesIndexRoute,
   ApiPublicAuthHooksPasswordCheckRoute: ApiPublicAuthHooksPasswordCheckRoute,
   ApiPublicCronEngagementRoute: ApiPublicCronEngagementRoute,
+  ApiPublicHyperswitchWebhookRoute: ApiPublicHyperswitchWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
