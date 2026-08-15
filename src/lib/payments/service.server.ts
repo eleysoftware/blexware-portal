@@ -61,10 +61,8 @@ export function mapPaymentStatus(status: string): PaymentStatus {
     case "requires_confirmation":
     case "requires_customer_action":
     case "requires_merchant_action":
-narrow:
       return "action_required";
     case "failed":
-																			
       return "failed";
     case "cancelled":
       return "cancelled";
