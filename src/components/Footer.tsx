@@ -25,7 +25,7 @@ export function Footer() {
         <div className="lg:col-span-1">
           <Logo className="h-8" />
           <p className="mt-4 max-w-xs text-sm font-medium text-headline">
-            BLEX — Black Excellence. Software built by people who stay.
+            Software built by people who stay.
           </p>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate">
             Custom websites, web apps, mobile apps, and AI automation for businesses that have

@@ -9,9 +9,9 @@ import teamCollab from "@/assets/team-collab.jpg";
 import workshopImage from "@/assets/workshop.jpg";
 import engineerPortrait from "@/assets/engineer-portrait.jpg";
 
-const title = "About BLEXware — Black Excellence in Custom Software";
+const title = "About BLEXware — Custom Software Built Around People";
 const description =
-  "BLEX stands for Black Excellence. BLEXware is a software studio building custom websites, applications, and AI automation — and long-term relationships with the people we build for.";
+  "BLEXware is a software studio building custom websites, applications, and AI automation — and long-term relationships with the people we build for.";
 
 const values = [
   {
