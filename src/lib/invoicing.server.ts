@@ -58,7 +58,11 @@ export async function dispatchInvoice(invoiceId: string) {
 
   await db
     .from("invoices")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .update({
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      issue_date: new Date().toISOString().slice(0, 10),
+    })
     .eq("id", invoice.id);
 
   const result = await emailInvoice({
