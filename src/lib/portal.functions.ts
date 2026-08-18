@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { ProposalRecord, QuoteFileRecord, QuoteRecord } from "@/lib/quote-schema";
+
+function viewerDb(supabase: unknown): SupabaseClient {
+  return supabase as unknown as SupabaseClient;
+}
 
 /**
  * Client-portal reads. Every query runs through the caller's own Supabase
@@ -41,7 +46,7 @@ export const getMyQuote = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    if (!quote) return { quote: null, files: [], proposal: null };
+    if (!quote) return { quote: null, files: [], proposal: null, documents: [] };
 
     const { data: files } = await context.supabase
       .from("quote_files")
@@ -50,12 +55,22 @@ export const getMyQuote = createServerFn({ method: "POST" })
 
     const { data: proposal } = await context.supabase
       .from("proposals")
-      .select("id, status, content, sent_at, responded_at, client_response_note, review_token")
+      .select("id, status, content, sent_at, responded_at, client_response_note, review_token, doc")
       .eq("quote_id", data.id)
       .neq("status", "draft")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    const { data: documents } = proposal
+      ? await viewerDb(context.supabase)
+          .from("documents")
+          .select("id, entity, entity_id, kind, format")
+          .eq("quote_id", data.id)
+          .eq("entity", "proposal")
+          .eq("entity_id", (proposal as unknown as { id: string }).id)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
     return {
       quote: quote as unknown as Partial<QuoteRecord>,
@@ -69,7 +84,15 @@ export const getMyQuote = createServerFn({ method: "POST" })
         | "responded_at"
         | "client_response_note"
         | "review_token"
+        | "doc"
       > | null,
+      documents: (documents ?? []) as unknown as {
+        id: string;
+        entity: string;
+        entity_id: string;
+        kind: string;
+        format: string;
+      }[],
     };
   });
 

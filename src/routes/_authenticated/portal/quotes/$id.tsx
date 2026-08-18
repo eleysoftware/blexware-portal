@@ -5,11 +5,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EngagementPanel } from "@/components/EngagementPanel";
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { Section } from "@/components/Section";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { getMyDocumentUrl } from "@/lib/client-engagement.functions";
 import { respondToProposal } from "@/lib/proposals.functions";
 import { getMyQuote, getMyQuoteFileUrl } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
@@ -26,6 +29,7 @@ function PortalQuoteDetail() {
   const queryClient = useQueryClient();
   const fetchQuote = useServerFn(getMyQuote);
   const fetchFileUrl = useServerFn(getMyQuoteFileUrl);
+  const fetchDocUrl = useServerFn(getMyDocumentUrl);
   const respond = useServerFn(respondToProposal);
   const [note, setNote] = useState("");
 
@@ -51,6 +55,15 @@ function PortalQuoteDetail() {
   const download = async (fileId: string) => {
     try {
       const { url } = await fetchFileUrl({ data: { fileId } });
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
+  const openDoc = async (documentId: string) => {
+    try {
+      const { url } = await fetchDocUrl({ data: { documentId } });
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       toast.error((error as Error).message);
@@ -124,9 +137,16 @@ function PortalQuoteDetail() {
                 </h2>
                 <Badge variant="outline">{proposal.status.replace("_", " ")}</Badge>
               </div>
-              <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                {proposal.content}
+              <div className="mt-4 overflow-hidden rounded-xl border border-border">
+                {proposal.doc ? (
+                  <DocumentPreview doc={proposal.doc} />
+                ) : (
+                  <div className="whitespace-pre-wrap p-4 text-sm leading-relaxed text-foreground">
+                    {proposal.content}
+                  </div>
+                )}
               </div>
+              <DocumentDownloads docs={detail.data?.documents ?? []} onOpen={openDoc} />
 
               {answered ? (
                 <p className="mt-6 text-sm text-slate">

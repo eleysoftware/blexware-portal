@@ -1,15 +1,16 @@
 // Server-only invoicing helpers. Payments are processor-agnostic: everything
 // goes through PaymentService (Hyperswitch), never a processor SDK.
 import { adminDb, writeAudit } from "@/lib/blex.server";
-import { computeInvoicePlan } from "@/lib/documents/compose";
+import { paymentPlanToInvoiceEntries, buildPaymentPlan } from "@/lib/documents/compose";
+import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
 import { emailInvoice, siteUrl } from "@/lib/engagement.server";
 
-/** Builds the $600 installment schedule for a signed agreement. */
+/** Builds the invoice schedule from the agreement's payment plan. */
 export async function createInvoiceSchedule(agreementId: string) {
   const db = adminDb();
   const { data: agreement } = await db
     .from("agreements")
-    .select("id, quote_id, total_cents")
+    .select("id, quote_id, total_cents, doc")
     .eq("id", agreementId)
     .maybeSingle();
   if (!agreement) throw new Error("Agreement not found");
@@ -17,7 +18,10 @@ export async function createInvoiceSchedule(agreementId: string) {
   const { data: existing } = await db.from("invoices").select("id").eq("agreement_id", agreementId).limit(1);
   if (existing?.length) return { created: 0 };
 
-  const plan = computeInvoicePlan(Number(agreement.total_cents));
+  const totalCents = Number(agreement.total_cents);
+  const stored = (agreement.doc as ProjectDocument | null)?.paymentPlan;
+  const paymentPlan: PaymentPlan = stored?.rows?.length ? stored : buildPaymentPlan("installments", totalCents);
+  const plan = paymentPlanToInvoiceEntries(paymentPlan);
   const rows = plan.map((entry) => ({
     quote_id: agreement.quote_id,
     agreement_id: agreement.id,
@@ -32,8 +36,10 @@ export async function createInvoiceSchedule(agreementId: string) {
 
   await db.from("quotes").update({ status: "invoicing" }).eq("id", agreement.quote_id);
 
-  const first = (inserted ?? []).find((row) => row.sequence === 1);
-  if (first) await dispatchInvoice(first.id as string);
+  for (const entry of plan.filter((item) => item.send === "on_sign")) {
+    const row = (inserted ?? []).find((invoice) => invoice.sequence === entry.sequence);
+    if (row) await dispatchInvoice(row.id as string);
+  }
 
   return { created: rows.length };
 }

@@ -1,9 +1,10 @@
 import {
-  BLEX_PREPARED_BY,
   formatMoney,
   type EstimateLineItem,
+  type PaymentPlan,
   type ProjectDocument,
 } from "@/lib/documents/types";
+import { buildPaymentPlan } from "@/lib/documents/compose";
 
 /**
  * The real Build Financial Wellness engagement, transcribed from the signed-off
@@ -17,6 +18,13 @@ export const BFW_CLIENT = {
   phone: "(317) 551-0737",
 };
 
+export const BFW_PREPARED_BY = {
+  name: "Kam Eley",
+  company: "BLEXware",
+  phone: "(260) 433-8734",
+  email: "eleysoftware@gmail.com",
+};
+
 export const BFW_LINE_ITEMS: EstimateLineItem[] = [
   { label: "Phase 1 – Navigation Enhancements", amountCents: 10000, durationLabel: "2–3 days" },
   {
@@ -28,17 +36,19 @@ export const BFW_LINE_ITEMS: EstimateLineItem[] = [
   {
     label: "Phase 4 – Newsletter Module",
     amountCents: 30000,
-    note: "$0 – previously paid",
+    note: "$0 – Previously Paid",
     durationLabel: "5–7 days",
   },
   { label: "Phase 5 – Financial Tools Library", amountCents: 25000, durationLabel: "5–7 days" },
-  { label: "Phase 6 – Contact Section Enhancements", amountCents: 12500, durationLabel: "2–3 days" },
+  { label: "Phase 6 – Contact Section Enhancements", amountCents: 12500, durationLabel: "4–6 days" },
   { label: "Phase 7 – Website Administration", amountCents: 32500, durationLabel: "5–7 days" },
 ];
 
 export const BFW_SUBTOTAL_CENTS = 130000;
-export const BFW_DISCOUNT_CENTS = 26000; // Preferred Client Loyalty Discount (20%)
+export const BFW_DISCOUNT_CENTS = 26000;
 export const BFW_TOTAL_CENTS = 104000;
+export const BFW_DOCUMENT_TITLE = "Website Enhancement Proposal";
+export const BFW_PAYMENT_PLAN: PaymentPlan = buildPaymentPlan("fifty_fifty", BFW_TOTAL_CENTS);
 
 export const BFW_QUOTE_INTAKE = {
   projectType: "Website enhancement",
@@ -52,15 +62,33 @@ export const BFW_QUOTE_INTAKE = {
   timeline: "24–36 business days",
 };
 
+function phase(
+  heading: string,
+  objective: string,
+  features: Omit<ProjectDocument["sections"][number], "heading" | "level">,
+): ProjectDocument["sections"][number] {
+  return {
+    heading,
+    level: 2,
+    children: [
+      { heading: "Objective", level: 3, body: [objective] },
+      { heading: "Features Included", level: 3, ...features },
+    ],
+  };
+}
+
 export function buildBfwProposalDoc(): ProjectDocument {
   return {
     kind: "proposal",
     title: "BUILD FINANCIAL WELLNESS",
     subtitle: "Website Enhancement Proposal & Project Estimate",
+    documentTitle: BFW_DOCUMENT_TITLE,
+    projectLabel: "Website Enhancement Project",
     clientName: BFW_CLIENT.company,
     date: "August 2026",
     preparedFor: BFW_CLIENT,
-    preparedBy: BLEX_PREPARED_BY,
+    preparedBy: BFW_PREPARED_BY,
+    paymentPlan: BFW_PAYMENT_PLAN,
     facts: [
       { label: "Total Project Investment", value: formatMoney(BFW_TOTAL_CENTS) },
       { label: "Estimated Start", value: "August 24–30, 2026" },
@@ -95,101 +123,162 @@ export function buildBfwProposalDoc(): ProjectDocument {
         ],
       },
       {
-        heading: "Phase 1 – Navigation Enhancements",
-        level: 2,
-        body: [
-          "Objective: improve website navigation to better reflect the evolving structure and functionality of the Build Financial Wellness website.",
-        ],
-        bullets: [
-          "Rename Support to Resources",
-          "Rename the Resources submenu to Resource Library",
-          "Replace the Book a Free Consultation navigation CTA with Client Login",
-          "Update NuvolaSoft branding to BLEXware",
-          "Update associated routing and navigation logic",
-        ],
-      },
-      {
-        heading: "Phase 2 – Services Section Redesign & Hero Optimization",
-        level: 2,
-        body: [
-          "Objective: update the Services section to better reflect current services and the coaching platform, and improve visitor understanding of the Financial Check-In.",
-        ],
-        bullets: [
-          "Remove Build Journey, Budget Build and Budget Mixer",
-          "Replace with Individuals / Households and Employees / Organizations",
-          "Update CTA links and replace Acuity scheduling with Simply Coach",
-          'Replace the "Get Started" button with "Get Your Free Financial Check-In"',
-          'Add supporting text: "Receive your free five-minute Financial Check-In to help you reflect, gain clarity, and discover your next financial step."',
-          "Maintain the existing clean design and visual balance of the Hero section",
-        ],
-      },
-      {
-        heading: "Phase 3 – Resource Center Redesign",
-        level: 2,
-        body: [
-          "Objective: redesign the Resources page to support two primary resource types while maintaining the clean, professional appearance of the current website.",
-        ],
-        bullets: [
-          "New Resources landing page",
-          "Tab navigation: Tools | Newsletters, with Tools as the default view",
-          "Fully responsive layout",
-          "Pagination for Newsletters",
-          "Resource thumbnails",
-          "Individual resource detail pages",
-          "Updated navigation",
-        ],
-      },
-      {
-        heading: "Phase 4 – Newsletter Module",
-        level: 2,
-        body: ["Objective: replace the original Blog concept with a dedicated Newsletter system."],
-        bullets: [
-          "Public newsletter listing with pagination and thumbnails",
-          "Newsletter detail page",
-          "Create, edit and delete newsletters",
-          "Publish / unpublish newsletters",
-        ],
-        note: "Previously paid under an earlier project agreement. Original estimated value $300 | Additional cost $0 | Estimated duration 5–7 days.",
-      },
-      {
-        heading: "Phase 5 – Financial Tools Library",
-        level: 2,
-        body: [
-          "Objective: provide downloadable financial resources through an organized and user-friendly resource library.",
-        ],
-        bullets: [
-          "Four downloadable financial tools",
-          "Download confirmation workflow",
-          "Download management",
-          "Administrative upload capability",
-        ],
-        note: "The downloadable financial tools will not be used as lead generators; the previously proposed lead-capture functionality has been removed from this phase.",
-      },
-      {
-        heading: "Phase 6 – Contact Section Enhancements",
-        level: 2,
-        body: [
-          "Objective: improve the website's Contact section while supporting the distribution of the Savings Reset Kit.",
-        ],
-        bullets: [
-          "Replace the newsletter download with the Savings Reset Kit",
-          "Make First Name optional and remove Last Name",
-          "Require Email Address",
-          "Provide an administrator-managed downloadable PDF",
-          "Update the business phone number from toll-free to the new local number",
-        ],
-      },
-      {
-        heading: "Phase 7 – Website Administration",
-        level: 2,
-        body: [
-          "Objective: provide a secure administrative area allowing ongoing management of website content and downloadable resources.",
-        ],
-        bullets: [
-          "Newsletter management",
-          "Financial Tools management",
-          "Downloadable PDF management",
-          "Hidden administrator login",
+        heading: "Scope of Work",
+        children: [
+          phase(
+            "Phase 1 – Navigation Enhancements",
+            "Improve website navigation to better reflect the evolving structure and functionality of the Build Financial Wellness website.",
+            {
+              bullets: [
+                "Rename Support to Resources",
+                "Rename the Resources submenu to Resource Library",
+                "Replace the Book a Free Consultation navigation CTA with Client Login",
+                "Update NuvolaSoft branding to BLEXware",
+                "Update associated routing and navigation logic",
+              ],
+            },
+          ),
+          {
+            heading: "Phase 2 – Services Section Redesign",
+            level: 2,
+            children: [
+              {
+                heading: "Objective",
+                level: 3,
+                body: [
+                  "Update the Services section to better reflect Build Financial Wellness' current services and coaching platform.",
+                ],
+              },
+              {
+                heading: "Features Included",
+                level: 3,
+                groups: [
+                  { heading: "Remove", bullets: ["Build Journey", "Budget Build", "Budget Mixer"] },
+                  {
+                    heading: "Replace With",
+                    bullets: ["Individuals / Households", "Employees / Organizations"],
+                  },
+                  {
+                    heading: "Additional Updates",
+                    bullets: ["Update CTA links", "Replace Acuity scheduling with Simply Coach"],
+                  },
+                ],
+              },
+            ],
+          },
+          phase(
+            "Homepage Hero Section Optimization",
+            "Improve visitor understanding and engagement by clearly communicating what the Financial Check-In is and what visitors can expect when they take the first step.",
+            {
+              bullets: [
+                'Replace the existing "Get Started" button with: Get Your Free Financial Check-In',
+                'Add the following supporting text: "Receive your free five-minute Financial Check-In to help you reflect, gain clarity, and discover your next financial step."',
+                "Implement the updated messaging while maintaining the existing clean design and visual balance of the Hero section.",
+                "Adjust spacing, layout, or supporting elements as necessary to accommodate the revised call-to-action and supporting message.",
+              ],
+              body: [
+                "The final implementation will be designed to clearly communicate the purpose of the Financial Check-In without unnecessarily increasing visual clutter or compromising the existing Hero-section design.",
+              ],
+            },
+          ),
+          phase(
+            "Phase 3 – Resource Center Redesign",
+            "Redesign the existing Resources page to support two primary resource types while maintaining the clean, professional appearance of the current website.",
+            {
+              bullets: [
+                "New Resources landing page",
+                "Tab navigation: Tools | Newsletters",
+                "Tools tab displayed as the default view",
+                "Fully responsive layout",
+                "Pagination for Newsletters",
+                "Resource thumbnails",
+                "Individual resource detail pages",
+                "Updated navigation",
+              ],
+            },
+          ),
+          {
+            heading: "Phase 4 – Newsletter Module",
+            level: 2,
+            children: [
+              {
+                heading: "Objective",
+                level: 3,
+                body: ["Replace the original Blog concept with a dedicated Newsletter system."],
+              },
+              {
+                heading: "Features Included",
+                level: 3,
+                groups: [
+                  {
+                    heading: "Public Features",
+                    bullets: [
+                      "Newsletter listing",
+                      "Pagination",
+                      "Thumbnail images",
+                      "Newsletter detail page",
+                    ],
+                  },
+                  {
+                    heading: "Administrative Features",
+                    bullets: [
+                      "Create newsletters",
+                      "Edit newsletters",
+                      "Delete newsletters",
+                      "Publish / unpublish newsletters",
+                    ],
+                  },
+                ],
+              },
+              {
+                heading: "Previously Paid — Work Remaining",
+                callout: "success",
+                body: [
+                  "The Newsletter Module was previously paid for under an earlier project agreement. It is included in this proposal to document the complete enhancement scope and will not result in an additional charge. The remaining development work for this module is estimated and scheduled as part of this project.",
+                ],
+                note: "Original Estimated Value: $300    |    Additional Cost: $0    |    Estimated Duration: 5–7 days",
+              },
+            ],
+          },
+          phase(
+            "Phase 5 – Financial Tools Library",
+            "Provide downloadable financial resources through an organized and user-friendly resource library.",
+            {
+              bullets: [
+                "Four downloadable financial tools",
+                "Download confirmation workflow",
+                "Download management",
+                "Administrative upload capability",
+              ],
+              note: "The downloadable financial tools will not be used as lead generators. The previously proposed lead-capture functionality has therefore been removed from this phase.",
+            },
+          ),
+          phase(
+            "Phase 6 – Contact Section Enhancements",
+            "Improve the website's Contact section while supporting the distribution of the Savings Reset Kit.",
+            {
+              bullets: [
+                "Replace the newsletter download with the Savings Reset Kit",
+                "Make First Name optional",
+                "Remove Last Name",
+                "Require Email Address",
+                "Provide an administrator-managed downloadable PDF",
+                "Update the business phone number from the existing toll-free number to the new local phone number",
+              ],
+            },
+          ),
+          phase(
+            "Phase 7 – Website Administration",
+            "Provide a secure administrative area allowing ongoing management of website content and downloadable resources.",
+            {
+              bullets: [
+                "Newsletter management",
+                "Financial Tools management",
+                "Downloadable PDF management",
+                "Hidden administrator login",
+              ],
+            },
+          ),
         ],
       },
       {
@@ -201,26 +290,89 @@ export function buildBfwProposalDoc(): ProjectDocument {
           columns: ["Project Phase", "Investment"],
           numeric: true,
           rows: [
-            ...BFW_LINE_ITEMS.map((item) => [
-              item.note ? `${item.label} (${item.note})` : item.label,
-              formatMoney(item.amountCents),
-            ]),
+            ["Phase 1 – Navigation Enhancements", formatMoney(10000)],
+            ["Phase 2 – Services Section Redesign & Hero Optimization", formatMoney(15000)],
+            ["Phase 3 – Resource Center Redesign", formatMoney(35000)],
+            ["Phase 4 – Newsletter Module  $0 – Previously Paid", formatMoney(30000)],
+            ["Phase 5 – Financial Tools Library", formatMoney(25000)],
+            ["Phase 6 – Contact Section Enhancements", formatMoney(12500)],
+            ["Phase 7 – Website Administration", formatMoney(32500)],
             ["Project Subtotal", formatMoney(BFW_SUBTOTAL_CENTS)],
             ["Preferred Client Loyalty Discount (20%)", `–${formatMoney(BFW_DISCOUNT_CENTS)}`],
             ["Total Project Investment", formatMoney(BFW_TOTAL_CENTS)],
+          ],
+          rowTones: [
+            "default",
+            "default",
+            "default",
+            "default",
+            "default",
+            "default",
+            "default",
+            "muted",
+            "discount",
+            "total",
           ],
         },
         note: "The $300 Newsletter Module value is shown for reference and has been credited in full because that module was previously paid for. The remaining work is included in the schedule at no additional charge.",
       },
       {
         heading: "Project Schedule",
+        children: [
+          {
+            heading: "Project Availability",
+            level: 3,
+            body: [
+              "Due to previously scheduled client commitments, development is anticipated to begin between August 24 and August 30, 2026, assuming acceptance of this proposal and completion of the required project-start requirements.",
+            ],
+          },
+          {
+            heading: "Estimated Project Duration",
+            level: 3,
+            body: [
+              "The project is estimated to require 24–40 business days from project kickoff, assuming:",
+            ],
+            bullets: [
+              "Requirements are approved before development begins.",
+              "Feedback and approvals are provided within 2–3 business days.",
+              "Requested changes remain within the agreed project scope.",
+              "Third-party services, including Simply Coach and other required integrations, are available and functioning as expected.",
+            ],
+          },
+          {
+            heading: "Estimated Timeline by Phase",
+            level: 3,
+            table: {
+              columns: ["Project Phase", "Estimated Duration"],
+              rows: [
+                ["Navigation Enhancements", "2–3 days"],
+                ["Services Section Redesign & Hero Optimization", "2–3 days"],
+                ["Resource Center Redesign", "5–7 days"],
+                ["Newsletter Module", "5–7 days"],
+                ["Financial Tools Library", "5–7 days"],
+                ["Contact Section Enhancements", "4–6 days"],
+                ["Website Administration", "5–7 days"],
+              ],
+            },
+            note: "Estimated Total Project Duration: 24–36 business days",
+          },
+        ],
+      },
+      {
+        heading: "Payment Terms",
         body: [
-          "Due to previously scheduled client commitments, development is anticipated to begin between August 24 and August 30, 2026, assuming acceptance of this proposal and completion of the required project-start requirements.",
-          "The project is estimated to require 24–36 business days from kickoff, assuming requirements are approved before development begins, feedback and approvals are provided within 2–3 business days, requested changes remain within the agreed scope, and third-party services are available and functioning as expected.",
+          "The project investment will be paid according to the following schedule:",
+          "The final payment is due upon completion of the approved project scope and prior to final deployment of the completed enhancements.",
+          "Any work requested outside the approved scope of this proposal may require a separate estimate and written approval before implementation.",
         ],
         table: {
-          columns: ["Project Phase", "Estimated Duration"],
-          rows: BFW_LINE_ITEMS.map((item) => [item.label, item.durationLabel ?? "—"]),
+          columns: ["", "Amount"],
+          numeric: true,
+          rows: [
+            ["50% Upon Proposal Acceptance", formatMoney(52000)],
+            ["50% Upon Project Completion", formatMoney(52000)],
+          ],
+          rowTones: ["fill", "fill"],
         },
       },
       {

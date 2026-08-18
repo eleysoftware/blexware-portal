@@ -5,19 +5,24 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { Section } from "@/components/Section";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   generateProposal,
   getQuoteDetail,
   getQuoteFileUrl,
+  refreshProposalDocuments,
   saveProposal,
   sendProposal,
   updateQuoteStatus,
 } from "@/lib/admin.functions";
+import { getDocumentUrl } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses, type QuoteStatus } from "@/lib/quote-schema";
 
 export const Route = createFileRoute("/_authenticated/admin/quotes/$id")({
@@ -39,6 +44,8 @@ function QuoteDetailPage() {
   const draft = useServerFn(generateProposal);
   const save = useServerFn(saveProposal);
   const send = useServerFn(sendProposal);
+  const refreshDocs = useServerFn(refreshProposalDocuments);
+  const docUrl = useServerFn(getDocumentUrl);
 
   const detail = useQuery({
     queryKey: ["quote", id],
@@ -46,11 +53,14 @@ function QuoteDetailPage() {
   });
 
   const [content, setContent] = useState("");
+  const [documentTitle, setDocumentTitle] = useState("");
   const proposal = detail.data?.proposals[0] ?? null;
 
   useEffect(() => {
     if (proposal) setContent(proposal.content);
-  }, [proposal?.id, proposal?.content]);
+    const title = proposal?.doc?.documentTitle ?? detail.data?.quote.project_type;
+    if (title) setDocumentTitle(title.endsWith("Proposal") ? title : `${title} Proposal`);
+  }, [proposal?.id, proposal?.content, proposal?.doc, detail.data?.quote.project_type]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["quote", id] });
 
@@ -73,7 +83,7 @@ function QuoteDetailPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: () => save({ data: { id: proposal!.id, content } }),
+    mutationFn: () => save({ data: { id: proposal!.id, content, documentTitle } }),
     onSuccess: () => {
       toast.success("Draft saved");
       void invalidate();
@@ -83,7 +93,7 @@ function QuoteDetailPage() {
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      await save({ data: { id: proposal!.id, content } });
+      await save({ data: { id: proposal!.id, content, documentTitle } });
       return send({ data: { id: proposal!.id } });
     },
     onSuccess: (result) => {
@@ -93,6 +103,17 @@ function QuoteDetailPage() {
         .then(() => toast.success("Review link copied to clipboard"))
         .catch(() => undefined);
       void invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["engagement-admin", id] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshDocs({ data: { quoteId: id } }),
+    onSuccess: () => {
+      toast.success("Formatted documents refreshed");
+      void invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["engagement-admin", id] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -111,6 +132,15 @@ function QuoteDetailPage() {
   const openFile = async (fileId: string) => {
     try {
       const { url } = await fileUrl({ data: { fileId } });
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
+  const openDoc = async (documentId: string) => {
+    try {
+      const { url } = await docUrl({ data: { documentId } });
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       toast.error((error as Error).message);
@@ -252,6 +282,15 @@ function QuoteDetailPage() {
                     >
                       Copy review link
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-testid="proposal-refresh-docs"
+                      onClick={() => refreshMutation.mutate()}
+                      disabled={refreshMutation.isPending}
+                    >
+                      {refreshMutation.isPending ? "Refreshing…" : "Refresh formatted documents"}
+                    </Button>
                   </>
                 ) : null}
               </div>
@@ -265,6 +304,37 @@ function QuoteDetailPage() {
 
             {proposal ? (
               <>
+                <label className="mt-4 block text-sm font-medium">
+                  Document title
+                  <Input
+                    className="mt-1"
+                    value={documentTitle}
+                    onChange={(event) => setDocumentTitle(event.target.value)}
+                    placeholder="Website Enhancement Proposal"
+                    aria-label="Document title used in the header"
+                  />
+                </label>
+                <p className="mt-1 text-xs text-slate">
+                  Appears in the running header as{" "}
+                  <span className="font-medium text-foreground">
+                    {detail.data?.quote.company || detail.data?.quote.contact_name} | {documentTitle || "…"}
+                  </span>
+                </p>
+                {proposal.doc ? (
+                  <div className="mt-4 max-h-[32rem] overflow-y-auto rounded-xl border border-border">
+                    <DocumentPreview doc={{ ...proposal.doc, documentTitle: documentTitle || proposal.doc.documentTitle }} />
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate">
+                    This proposal is still markdown-only. Refresh formatted documents to generate the letter layout, PDF, and Word file.
+                  </p>
+                )}
+                <DocumentDownloads
+                  docs={(detail.data?.documents ?? []).filter(
+                    (doc) => doc.entity === "proposal" && doc.entity_id === proposal.id,
+                  )}
+                  onOpen={openDoc}
+                />
                 <Textarea
                   value={content}
                   onChange={(event) => setContent(event.target.value)}

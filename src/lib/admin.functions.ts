@@ -8,6 +8,92 @@ import type {
   QuoteStatus,
 } from "@/lib/quote-schema";
 import { quoteStatuses } from "@/lib/quote-schema";
+import type { ProjectDocument } from "@/lib/documents/types";
+
+type AdminDb = ReturnType<(typeof import("@/lib/blex.server"))["adminDb"]>;
+
+type ProposalPersistRow = {
+  id: string;
+  quote_id: string;
+  content: string | null;
+  doc: unknown;
+  model: string | null;
+};
+
+type QuotePartyRow = {
+  quote_number: string;
+  contact_name: string;
+  contact_email: string;
+  project_type: string;
+  company?: string | null;
+  phone?: string | null;
+};
+
+async function proposalFileFormats(db: AdminDb, proposalId: string) {
+  const { data } = await db
+    .from("documents")
+    .select("format")
+    .eq("entity", "proposal")
+    .eq("entity_id", proposalId);
+  return new Set((data ?? []).map((row: { format: string }) => row.format));
+}
+
+async function storeProposalFiles(
+  quoteId: string,
+  proposalId: string,
+  quoteNumber: string,
+  doc: ProjectDocument,
+) {
+  const { storeDocument } = await import("@/lib/engagement.server");
+  return storeDocument({
+    quoteId,
+    entity: "proposal",
+    entityId: proposalId,
+    kind: "proposal",
+    doc,
+    slug: quoteNumber,
+  });
+}
+
+async function persistProposalDocument(
+  db: AdminDb,
+  proposal: ProposalPersistRow,
+  quote: QuotePartyRow,
+  options: { storeFiles: boolean; onlyIfFilesMissing?: boolean },
+) {
+  const {
+    shouldRebuildProposalDoc,
+    composeProposalDocFromQuote,
+    hasStructuredProposalDoc,
+  } = await import("@/lib/documents/proposal");
+
+  let doc = hasStructuredProposalDoc(proposal.doc) ? proposal.doc : null;
+  if (shouldRebuildProposalDoc(proposal.model, proposal.doc)) {
+    doc = composeProposalDocFromQuote(
+      {
+        contact_name: quote.contact_name,
+        company: quote.company ?? null,
+        contact_email: quote.contact_email,
+        phone: quote.phone ?? null,
+        project_type: quote.project_type,
+        quote_number: quote.quote_number,
+      },
+      proposal.content ?? "",
+    );
+    const { error } = await db.from("proposals").update({ doc }).eq("id", proposal.id);
+    if (error) throw new Error(error.message);
+  }
+  if (!doc) throw new Error("Proposal has no formatted document");
+
+  if (options.storeFiles) {
+    if (options.onlyIfFilesMissing) {
+      const formats = await proposalFileFormats(db, proposal.id);
+      if (formats.has("pdf") && formats.has("docx")) return doc;
+    }
+    await storeProposalFiles(proposal.quote_id, proposal.id, quote.quote_number, doc);
+  }
+  return doc;
+}
 
 export const listQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -73,7 +159,13 @@ export const getQuoteDetail = createServerFn({ method: "POST" })
 
     const { data: proposals } = await db
       .from("proposals")
-      .select("id, status, content, review_token, sent_at, client_response_note, created_at")
+      .select("id, status, content, review_token, sent_at, client_response_note, created_at, doc, model")
+      .eq("quote_id", data.id)
+      .order("created_at", { ascending: false });
+
+    const { data: documents } = await db
+      .from("documents")
+      .select("id, entity, entity_id, kind, format, created_at")
       .eq("quote_id", data.id)
       .order("created_at", { ascending: false });
 
@@ -88,6 +180,14 @@ export const getQuoteDetail = createServerFn({ method: "POST" })
       quote: quote as QuoteRecord,
       files: (files ?? []) as QuoteFileRecord[],
       proposals: (proposals ?? []) as ProposalRecord[],
+      documents: (documents ?? []) as {
+        id: string;
+        entity: string;
+        entity_id: string;
+        kind: string;
+        format: string;
+        created_at: string;
+      }[],
       audit: (audit ?? []) as {
         id: string;
         action: string;
@@ -220,9 +320,22 @@ export const generateProposal = createServerFn({ method: "POST" })
     const content = payload.choices?.[0]?.message?.content?.trim();
     if (!content) throw new Error("The AI returned an empty draft.");
 
+    const { composeProposalDocFromQuote } = await import("@/lib/documents/proposal");
+    const doc = composeProposalDocFromQuote(
+      {
+        contact_name: quote.contact_name as string,
+        company: (quote.company as string | null) ?? null,
+        contact_email: quote.contact_email as string,
+        phone: (quote.phone as string | null) ?? null,
+        project_type: quote.project_type as string,
+        quote_number: quote.quote_number as string,
+      },
+      content,
+    );
+
     const { data: proposal, error } = await db
       .from("proposals")
-      .insert({ quote_id: data.quoteId, model, prompt, content })
+      .insert({ quote_id: data.quoteId, model, prompt, content, doc })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -242,15 +355,45 @@ export const generateProposal = createServerFn({ method: "POST" })
 
 export const saveProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { id: string; content: string }) => data)
+  .validator((data: { id: string; content: string; documentTitle?: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
+    const db = adminDb();
 
-    const { error } = await adminDb()
+    const { data: existing } = await db
       .from("proposals")
-      .update({ content: data.content })
-      .eq("id", data.id);
+      .select("model, doc, quote_id")
+      .eq("id", data.id)
+      .single();
+    if (!existing) throw new Error("Proposal not found");
+
+    const { data: quote } = await db
+      .from("quotes")
+      .select("contact_name, company, contact_email, phone, project_type, quote_number")
+      .eq("id", existing.quote_id)
+      .single();
+
+    const { isImportedProposal, composeProposalDocFromQuote } = await import("@/lib/documents/proposal");
+    let doc = existing.doc as import("@/lib/documents/types").ProjectDocument | null;
+    if (isImportedProposal(existing.model as string) && doc) {
+      if (data.documentTitle?.trim()) doc = { ...doc, documentTitle: data.documentTitle.trim() };
+    } else if (quote) {
+      doc = composeProposalDocFromQuote(
+        {
+          contact_name: quote.contact_name as string,
+          company: (quote.company as string | null) ?? null,
+          contact_email: quote.contact_email as string,
+          phone: (quote.phone as string | null) ?? null,
+          project_type: quote.project_type as string,
+          quote_number: quote.quote_number as string,
+        },
+        data.content,
+        data.documentTitle,
+      );
+    }
+
+    const { error } = await db.from("proposals").update({ content: data.content, doc }).eq("id", data.id);
     if (error) throw new Error(error.message);
 
     await writeAudit({
@@ -272,20 +415,26 @@ export const sendProposal = createServerFn({ method: "POST" })
 
     const { data: proposal, error } = await db
       .from("proposals")
-      .select("review_token, quote_id")
+      .select("id, review_token, quote_id, content, doc, model")
       .eq("id", data.id)
       .single();
     if (error || !proposal) throw new Error(error?.message ?? "Proposal not found");
 
     const { data: quote, error: quoteError } = await db
       .from("quotes")
-      .select("quote_number, contact_name, contact_email, project_type")
+      .select("quote_number, contact_name, contact_email, project_type, company, phone")
       .eq("id", proposal.quote_id)
       .single();
     if (quoteError || !quote) throw new Error(quoteError?.message ?? "Quote not found");
 
     const contactEmail = String(quote.contact_email ?? "").trim();
     if (!contactEmail) throw new Error("This quote has no contact email");
+
+    const { isImportedProposal } = await import("@/lib/documents/proposal");
+    await persistProposalDocument(db, proposal as ProposalPersistRow, quote as QuotePartyRow, {
+      storeFiles: true,
+      onlyIfFilesMissing: isImportedProposal(proposal.model as string),
+    });
 
     const reviewPath = `/proposal/${proposal.review_token as string}`;
     const { SITE_URL } = await import("@/content/site");
@@ -349,4 +498,91 @@ export const getAdminStatus = createServerFn({ method: "POST" })
       _role: "admin",
     });
     return { isAdmin: data === true, email: String(context.claims['email'] ?? "") };
+  });
+
+const UUID = /^[0-9a-f-]{36}$/i;
+
+async function loadQuoteParty(db: AdminDb, quoteId: string) {
+  const { data: quote, error } = await db
+    .from("quotes")
+    .select("quote_number, contact_name, contact_email, project_type, company, phone")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!quote) throw new Error("Quote not found");
+  return quote as QuotePartyRow;
+}
+
+async function refreshLatestProposalForQuote(db: AdminDb, quoteId: string, onlyEmptyDoc: boolean) {
+  const { data: proposal } = await db
+    .from("proposals")
+    .select("id, quote_id, content, doc, model")
+    .eq("quote_id", quoteId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!proposal) return null;
+
+  const { hasStructuredProposalDoc, isImportedProposal } = await import("@/lib/documents/proposal");
+  if (onlyEmptyDoc) {
+    if (isImportedProposal(proposal.model as string)) return null;
+    if (hasStructuredProposalDoc(proposal.doc)) return null;
+    if (!proposal.content) return null;
+  }
+
+  const quote = await loadQuoteParty(db, quoteId);
+  const doc = await persistProposalDocument(db, proposal as ProposalPersistRow, quote, {
+    storeFiles: true,
+  });
+  return { ...proposal, doc };
+}
+
+export const refreshProposalDocuments = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId?: string } = {}) => {
+    if (data.quoteId && !UUID.test(data.quoteId)) throw new Error("Unknown quote");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+    await requireAdmin(context.supabase, context.userId);
+    const db = adminDb();
+
+    if (data.quoteId) {
+      const proposal = await refreshLatestProposalForQuote(db, data.quoteId, false);
+      if (!proposal) throw new Error("No proposal found for this quote");
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? context.userId),
+        action: "proposal.documents_refreshed",
+        entity: "quote",
+        entityId: data.quoteId,
+      });
+      return { converted: 1, proposal };
+    }
+
+    const { data: rows } = await db
+      .from("proposals")
+      .select("quote_id")
+      .order("created_at", { ascending: false });
+
+    const seen = new Set<string>();
+    let converted = 0;
+    for (const row of rows ?? []) {
+      const quoteId = row.quote_id as string;
+      if (seen.has(quoteId)) continue;
+      seen.add(quoteId);
+      const result = await refreshLatestProposalForQuote(db, quoteId, true);
+      if (result) converted += 1;
+    }
+
+    await writeAudit({
+      actorId: context.userId,
+      actorLabel: String(context.claims["email"] ?? context.userId),
+      action: "proposal.documents_converted",
+      entity: "proposal",
+      metadata: { converted },
+    });
+
+    return { converted };
   });

@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatMoney, type EstimateLineItem } from "@/lib/documents/types";
+import { formatMoney, type EstimateLineItem, type PaymentPlanKind, type ProjectDocument } from "@/lib/documents/types";
+import { buildPaymentPlan } from "@/lib/documents/compose";
 import {
   createAgreement,
   getDocumentUrl,
@@ -53,6 +54,11 @@ export function AdminEngagementPanel({
   const [discount, setDiscount] = useState("0");
   const [discountLabel, setDiscountLabel] = useState("Discount");
   const [durationNote, setDurationNote] = useState("");
+  const [paymentKind, setPaymentKind] = useState<PaymentPlanKind>("installments");
+  const [customPayments, setCustomPayments] = useState<{ label: string; amount: string }[]>([
+    { label: "Invoice 1", amount: "" },
+    { label: "Invoice 2", amount: "" },
+  ]);
   const [changeRequest, setChangeRequest] = useState("");
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
@@ -65,6 +71,7 @@ export function AdminEngagementPanel({
         discount_cents: number;
         total_cents: number;
         duration_note: string | null;
+        doc?: ProjectDocument | null;
       }
     | undefined;
 
@@ -80,6 +87,17 @@ export function AdminEngagementPanel({
     );
     setDiscount((Number(estimate.discount_cents) / 100).toString());
     setDurationNote(estimate.duration_note ?? "");
+    if (estimate.doc?.paymentPlan?.kind) {
+      setPaymentKind(estimate.doc.paymentPlan.kind);
+      if (estimate.doc.paymentPlan.kind === "custom") {
+        setCustomPayments(
+          estimate.doc.paymentPlan.rows.map((row) => ({
+            label: row.label,
+            amount: (row.amountCents / 100).toString(),
+          })),
+        );
+      }
+    }
   }, [estimate?.id]);
 
   const invalidate = () => {
@@ -97,17 +115,23 @@ export function AdminEngagementPanel({
         ...(row.note.trim() ? { note: row.note.trim() } : {}),
       }));
 
+  const estimatePayload = () => ({
+    quoteId,
+    lineItems: lineItems(),
+    discountCents: Math.round(Number(discount || 0) * 100),
+    discountLabel,
+    durationNote,
+    paymentKind,
+    customPayments:
+      paymentKind === "custom"
+        ? customPayments
+            .filter((row) => row.label.trim() && row.amount.trim())
+            .map((row) => ({ label: row.label.trim(), amountCents: Math.round(Number(row.amount) * 100) }))
+        : undefined,
+  });
+
   const saveMutation = useMutation({
-    mutationFn: () =>
-      persistEstimate({
-        data: {
-          quoteId,
-          lineItems: lineItems(),
-          discountCents: Math.round(Number(discount || 0) * 100),
-          discountLabel,
-          durationNote,
-        },
-      }),
+    mutationFn: () => persistEstimate({ data: estimatePayload() }),
     onSuccess: () => {
       toast.success("Estimate saved as a draft");
       invalidate();
@@ -117,15 +141,7 @@ export function AdminEngagementPanel({
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      const saved = await persistEstimate({
-        data: {
-          quoteId,
-          lineItems: lineItems(),
-          discountCents: Math.round(Number(discount || 0) * 100),
-          discountLabel,
-          durationNote,
-        },
-      });
+      const saved = await persistEstimate({ data: estimatePayload() });
       return release({ data: { estimateId: saved.estimateId } });
     },
     onSuccess: () => {
@@ -204,6 +220,16 @@ export function AdminEngagementPanel({
 
   const subtotal = lineItems().reduce((sum, item) => sum + item.amountCents, 0);
   const total = Math.max(0, subtotal - Math.round(Number(discount || 0) * 100));
+  const previewPlan = buildPaymentPlan(
+    paymentKind,
+    total,
+    paymentKind === "custom"
+      ? customPayments.map((row) => ({
+          label: row.label,
+          amountCents: Math.round(Number(row.amount || 0) * 100),
+        }))
+      : undefined,
+  );
   const agreement = (engagement.data?.agreements ?? [])[0] as
     | { id: string; agreement_number: string; status: string; signed_at: string | null; signer_name: string | null }
     | undefined;
@@ -337,9 +363,85 @@ export function AdminEngagementPanel({
 
         <p className="mt-4 text-sm text-slate">
           Subtotal {formatMoney(subtotal)} · Total{" "}
-          <span className="font-semibold text-foreground">{formatMoney(total)}</span> · Invoices of $600
-          with the remainder on the first
+          <span className="font-semibold text-foreground">{formatMoney(total)}</span>
         </p>
+
+        <div className="mt-4 space-y-3">
+          <label className="block text-sm font-medium">
+            Payment schedule
+            <select
+              className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              value={paymentKind}
+              onChange={(event) => setPaymentKind(event.target.value as PaymentPlanKind)}
+              data-testid="payment-split"
+            >
+              <option value="fifty_fifty">50 / 50 — half on signature, half on completion</option>
+              <option value="installments">$600 installments (remainder on first invoice)</option>
+              <option value="full">Pay in full on signature</option>
+              <option value="custom">Custom amounts</option>
+            </select>
+          </label>
+          {paymentKind === "custom" ? (
+            <div className="space-y-2">
+              {customPayments.map((row, index) => (
+                <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]">
+                  <Input
+                    aria-label="Invoice label"
+                    value={row.label}
+                    onChange={(event) =>
+                      setCustomPayments(
+                        customPayments.map((item, i) =>
+                          i === index ? { ...item, label: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    aria-label="Invoice amount"
+                    inputMode="decimal"
+                    value={row.amount}
+                    onChange={(event) =>
+                      setCustomPayments(
+                        customPayments.map((item, i) =>
+                          i === index ? { ...item, amount: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCustomPayments(customPayments.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCustomPayments([
+                    ...customPayments,
+                    { label: `Invoice ${customPayments.length + 1}`, amount: "" },
+                  ])
+                }
+              >
+                Add invoice
+              </Button>
+            </div>
+          ) : null}
+          <ul className="text-sm text-slate">
+            {previewPlan.rows.map((row) => (
+              <li key={row.label}>
+                {row.label}: {formatMoney(row.amountCents)}
+                {row.send === "manual" ? " — send when you mark complete" : ""}
+                {row.send === "interval" ? " — every 14 days" : ""}
+                {row.send === "on_sign" ? " — sent when the SOW is signed" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button

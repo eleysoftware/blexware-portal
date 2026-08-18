@@ -100,4 +100,5 @@ export type ProposalRecord = {
   sent_at: string | null;
   responded_at: string | null;
   created_at: string;
+  doc?: import("@/lib/documents/types").ProjectDocument | null;
 };

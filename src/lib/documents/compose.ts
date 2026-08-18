@@ -3,6 +3,9 @@ import {
   formatMoney,
   type DocSection,
   type EstimateLineItem,
+  type PaymentPlan,
+  type PaymentPlanKind,
+  type PaymentPlanRow,
   type ProjectDocument,
 } from "@/lib/documents/types";
 
@@ -12,8 +15,10 @@ export const INVOICE_INTERVAL_DAYS = 14;
 export type InvoicePlanEntry = {
   sequence: number;
   amountCents: number;
-  dueDate: string; // YYYY-MM-DD
-  scheduledSendAt: string; // ISO
+  dueDate: string | null;
+  scheduledSendAt: string | null;
+  send: PaymentPlanRow["send"];
+  label: string;
 };
 
 /**
@@ -21,24 +26,106 @@ export type InvoicePlanEntry = {
  * issued immediately; the rest go out every 14 days.
  */
 export function computeInvoicePlan(totalCents: number, from = new Date()): InvoicePlanEntry[] {
-  const safeTotal = Math.max(0, Math.round(totalCents));
-  if (safeTotal === 0) return [];
+  const plan = buildPaymentPlan("installments", totalCents);
+  return paymentPlanToInvoiceEntries(plan, from);
+}
 
+export function splitFiftyFifty(totalCents: number): [number, number] {
+  const first = Math.floor(Math.max(0, Math.round(totalCents)) / 2);
+  return [first, Math.max(0, Math.round(totalCents)) - first];
+}
+
+export function buildPaymentPlan(
+  kind: PaymentPlanKind,
+  totalCents: number,
+  custom?: { label: string; amountCents: number }[],
+): PaymentPlan {
+  const total = Math.max(0, Math.round(totalCents));
+
+  if (kind === "full") {
+    return {
+      kind,
+      rows: [{ label: "Due upon proposal acceptance", amountCents: total, send: "on_sign" }],
+    };
+  }
+
+  if (kind === "fifty_fifty") {
+    const [first, second] = splitFiftyFifty(total);
+    return {
+      kind,
+      rows: [
+        { label: "50% Upon Proposal Acceptance", amountCents: first, send: "on_sign" },
+        { label: "50% Upon Project Completion", amountCents: second, send: "manual" },
+      ],
+    };
+  }
+
+  if (kind === "custom") {
+    const rows = (custom ?? []).filter((row) => Number.isFinite(row.amountCents) && row.amountCents > 0);
+    return {
+      kind,
+      rows: rows.map((row, index) => ({
+        label: row.label.trim() || `Invoice ${index + 1}`,
+        amountCents: Math.round(row.amountCents),
+        send: index === 0 ? "on_sign" : "manual",
+      })),
+    };
+  }
+
+  const safeTotal = total;
+  if (safeTotal === 0) return { kind: "installments", rows: [] };
   const count = Math.max(1, Math.floor(safeTotal / INSTALLMENT_CENTS));
   const remainder = safeTotal - count * INSTALLMENT_CENTS;
-
-  const entries: InvoicePlanEntry[] = [];
+  const rows: PaymentPlanRow[] = [];
   for (let index = 0; index < count; index += 1) {
-    const sendAt = new Date(from.getTime() + index * INVOICE_INTERVAL_DAYS * 86_400_000);
-    const due = new Date(sendAt.getTime() + 7 * 86_400_000);
-    entries.push({
-      sequence: index + 1,
+    rows.push({
+      label: index === 0 ? "Invoice 1 — due at project start" : `Invoice ${index + 1}`,
       amountCents: INSTALLMENT_CENTS + (index === 0 ? remainder : 0),
-      dueDate: due.toISOString().slice(0, 10),
-      scheduledSendAt: sendAt.toISOString(),
+      send: index === 0 ? "on_sign" : "interval",
     });
   }
-  return entries;
+  return { kind: "installments", rows };
+}
+
+export function paymentPlanToInvoiceEntries(plan: PaymentPlan, from = new Date()): InvoicePlanEntry[] {
+  return plan.rows.map((row, index) => {
+    if (row.send === "interval") {
+      const sendAt = new Date(from.getTime() + index * INVOICE_INTERVAL_DAYS * 86_400_000);
+      const due = new Date(sendAt.getTime() + 7 * 86_400_000);
+      return {
+        sequence: index + 1,
+        amountCents: row.amountCents,
+        dueDate: due.toISOString().slice(0, 10),
+        scheduledSendAt: sendAt.toISOString(),
+        send: row.send,
+        label: row.label,
+      };
+    }
+    if (row.send === "on_sign") {
+      const due = new Date(from.getTime() + 7 * 86_400_000);
+      return {
+        sequence: index + 1,
+        amountCents: row.amountCents,
+        dueDate: due.toISOString().slice(0, 10),
+        scheduledSendAt: from.toISOString(),
+        send: row.send,
+        label: row.label,
+      };
+    }
+    return {
+      sequence: index + 1,
+      amountCents: row.amountCents,
+      dueDate: null,
+      scheduledSendAt: null,
+      send: row.send,
+      label: row.label,
+    };
+  });
+}
+
+function paymentPlanFromDoc(doc: ProjectDocument | undefined, totalCents: number): PaymentPlan {
+  if (doc?.paymentPlan?.rows?.length) return doc.paymentPlan;
+  return buildPaymentPlan("installments", totalCents);
 }
 
 /** Turns markdown-ish AI output into the structured document model. */
@@ -52,7 +139,11 @@ export function markdownToSections(markdown: string): DocSection[] {
     const heading = /^(#{1,3})\s+(.*)$/.exec(line);
     if (heading) {
       if (current) sections.push(current);
-      current = { heading: heading[2]!.replace(/[*_`]/g, ""), level: heading[1]!.length >= 3 ? 2 : 1 };
+      const hashes = heading[1]!.length;
+      current = {
+        heading: heading[2]!.replace(/[*_`]/g, ""),
+        level: hashes >= 3 ? 3 : hashes === 2 ? 2 : 1,
+      };
       continue;
     }
     if (!current) current = { heading: "Overview" };
@@ -67,6 +158,26 @@ export function markdownToSections(markdown: string): DocSection[] {
   return sections;
 }
 
+export function sectionsToMarkdown(sections: DocSection[], depth = 2): string {
+  return sections
+    .map((section) => {
+      const hashes = "#".repeat(Math.min(3, (section.level ?? 1) + depth - 1));
+      const parts = [
+        `${hashes} ${section.heading}`,
+        ...(section.body ?? []),
+        ...(section.groups ?? []).flatMap((group) => [
+          `**${group.heading}**`,
+          ...group.bullets.map((bullet) => `- ${bullet}`),
+        ]),
+        ...(section.bullets ?? []).map((bullet) => `- ${bullet}`),
+        section.note ?? "",
+        section.children ? sectionsToMarkdown(section.children, depth + 1) : "",
+      ];
+      return parts.filter(Boolean).join("\n\n");
+    })
+    .join("\n\n");
+}
+
 export function buildProposalDocFromMarkdown(input: {
   markdown: string;
   clientName: string;
@@ -75,12 +186,15 @@ export function buildProposalDocFromMarkdown(input: {
   clientPhone?: string | null;
   projectType: string;
   quoteNumber: string;
+  documentTitle?: string;
 }): ProjectDocument {
+  const documentTitle = input.documentTitle?.trim() || `${input.projectType} Proposal`;
   return {
     kind: "proposal",
     documentNumber: input.quoteNumber,
     title: (input.clientCompany || input.clientName).toUpperCase(),
-    subtitle: `${input.projectType} Proposal`,
+    subtitle: documentTitle,
+    documentTitle,
     clientName: input.clientCompany || input.clientName,
     date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
     preparedFor: {
@@ -109,6 +223,7 @@ export type EstimateTotals = {
   totalCents: number;
   discountLabel?: string;
   durationNote?: string;
+  paymentPlan?: PaymentPlan;
 };
 
 export function calculateTotals(
@@ -121,6 +236,7 @@ export function calculateTotals(
 }
 
 function pricingSection(totals: EstimateTotals): DocSection {
+  const discountRow = totals.discountCents > 0;
   return {
     heading: "Project Investment & Pricing",
     body: ["The pricing below reflects the estimated effort required to complete each phase of work."],
@@ -129,14 +245,18 @@ function pricingSection(totals: EstimateTotals): DocSection {
       numeric: true,
       rows: [
         ...totals.lineItems.map((item) => [
-          item.note ? `${item.label} (${item.note})` : item.label,
+          item.note ? `${item.label}  ${item.note}` : item.label,
           formatMoney(item.amountCents),
         ]),
         ["Project Subtotal", formatMoney(totals.subtotalCents)],
-        ...(totals.discountCents > 0
-          ? [[totals.discountLabel ?? "Discount", `–${formatMoney(totals.discountCents)}`]]
-          : []),
+        ...(discountRow ? [[totals.discountLabel ?? "Discount", `–${formatMoney(totals.discountCents)}`]] : []),
         ["Total Project Investment", formatMoney(totals.totalCents)],
+      ],
+      rowTones: [
+        ...totals.lineItems.map(() => "default" as const),
+        "muted",
+        ...(discountRow ? (["discount"] as const) : []),
+        "total",
       ],
     },
   };
@@ -145,53 +265,94 @@ function pricingSection(totals: EstimateTotals): DocSection {
 function scheduleSection(totals: EstimateTotals): DocSection | null {
   const rows = totals.lineItems
     .filter((item) => item.durationLabel)
-    .map((item) => [item.label, item.durationLabel!]);
+    .map((item) => [item.label.replace(/^Phase \d+\s+[–-]\s+/, ""), item.durationLabel!]);
   if (!rows.length && !totals.durationNote) return null;
   return {
     heading: "Project Schedule",
-    body: totals.durationNote ? [totals.durationNote] : [],
-    ...(rows.length ? { table: { columns: ["Project Phase", "Estimated Duration"], rows } } : {}),
+    children: [
+      ...(totals.durationNote
+        ? [
+            {
+              heading: "Estimated Project Duration",
+              level: 3 as const,
+              body: [totals.durationNote],
+            },
+          ]
+        : []),
+      ...(rows.length
+        ? [
+            {
+              heading: "Estimated Timeline by Phase",
+              level: 3 as const,
+              table: { columns: ["Project Phase", "Estimated Duration"], rows },
+            },
+          ]
+        : []),
+    ],
   };
 }
 
-function paymentSection(totalCents: number): DocSection {
-  const plan = computeInvoicePlan(totalCents);
+export function paymentSection(plan: PaymentPlan, totalCents: number): DocSection {
+  const body =
+    plan.kind === "fifty_fifty"
+      ? [
+          "The project investment will be paid according to the following schedule:",
+          "The final payment is due upon completion of the approved project scope and prior to final deployment of the completed enhancements.",
+          "Any work requested outside the approved scope of this proposal may require a separate estimate and written approval before implementation.",
+        ]
+      : plan.kind === "full"
+        ? [
+            `The project investment of ${formatMoney(totalCents)} is due in full upon proposal acceptance.`,
+            "Work begins once the invoice is paid. Invoices are payable online by card through the BLEXware client portal.",
+          ]
+        : [
+            `The project investment of ${formatMoney(totalCents)} is invoiced in installments of ${formatMoney(
+              INSTALLMENT_CENTS,
+            )}, with any remainder added to the first invoice. Work begins once the first invoice is paid; subsequent invoices are issued every ${INVOICE_INTERVAL_DAYS} days until the balance is paid in full.`,
+            "Invoices are payable online by card through the BLEXware client portal.",
+          ];
+
   return {
     heading: "Payment Terms",
-    body: [
-      `The project investment of ${formatMoney(totalCents)} is invoiced in installments of ${formatMoney(
-        INSTALLMENT_CENTS,
-      )}, with any remainder added to the first invoice. Work begins once the first invoice is paid; subsequent invoices are issued every ${INVOICE_INTERVAL_DAYS} days until the balance is paid in full.`,
-      "Invoices are payable online by card through the BLEXware client portal.",
-    ],
+    body,
     table: {
-      columns: ["Invoice", "Amount"],
+      columns: ["", "Amount"],
       numeric: true,
-      rows: plan.map((entry) => [
-        entry.sequence === 1 ? "Invoice 1 — due at project start" : `Invoice ${entry.sequence}`,
-        formatMoney(entry.amountCents),
-      ]),
+      rows: plan.rows.map((row) => [row.label, formatMoney(row.amountCents)]),
+      rowTones: plan.rows.map(() => (plan.kind === "fifty_fifty" ? "fill" : "default")),
     },
   };
 }
 
+function replaceOrAppendSection(sections: DocSection[], heading: RegExp, next: DocSection | null): DocSection[] {
+  const without = sections.filter((section) => !heading.test(section.heading));
+  return next ? [...without, next] : without;
+}
+
 /** Proposal document + priced/scheduled sections = estimated proposal. */
 export function buildEstimateDoc(base: ProjectDocument, totals: EstimateTotals): ProjectDocument {
+  const paymentPlan = totals.paymentPlan ?? paymentPlanFromDoc(base, totals.totalCents);
   const keep = base.sections.filter(
-    (section) =>
-      !/investment|pricing|payment terms|project schedule/i.test(section.heading),
+    (section) => !/investment|pricing|payment terms|project schedule/i.test(section.heading),
   );
   const schedule = scheduleSection(totals);
 
   return {
     ...base,
     kind: "estimate",
-    subtitle: `${base.subtitle ?? "Project Proposal"} — Cost & Schedule Estimate`,
+    documentTitle: base.documentTitle,
+    subtitle: `${base.subtitle ?? base.documentTitle ?? "Project Proposal"} — Cost & Schedule Estimate`,
+    paymentPlan,
     facts: [
       { label: "Total Project Investment", value: formatMoney(totals.totalCents) },
       ...(totals.durationNote ? [{ label: "Estimated Duration", value: totals.durationNote }] : []),
     ],
-    sections: [...keep, pricingSection(totals), ...(schedule ? [schedule] : []), paymentSection(totals.totalCents)],
+    sections: [
+      ...keep,
+      pricingSection(totals),
+      ...(schedule ? [schedule] : []),
+      paymentSection(paymentPlan, totals.totalCents),
+    ],
     acceptance: {
       intro: [
         "This estimated proposal represents the agreed scope, cost and schedule for the project.",
@@ -205,34 +366,38 @@ export function buildEstimateDoc(base: ProjectDocument, totals: EstimateTotals):
 /** Estimated proposal + contractual terms = SOW agreement. */
 export function buildSowDoc(
   estimateDoc: ProjectDocument,
-  input: { agreementNumber: string; totalCents: number },
+  input: { agreementNumber: string; totalCents: number; paymentPlan?: PaymentPlan },
 ): ProjectDocument {
-  const terms: DocSection[] = [
-    {
-      heading: "Agreement Terms",
-      body: [
-        `This Statement of Work ("SOW") is entered into between BLEXware ("Provider") and ${estimateDoc.preparedFor.company ?? estimateDoc.preparedFor.name} ("Client") and incorporates the scope, schedule and pricing described above.`,
-      ],
-      bullets: [
-        `Total contract value: ${formatMoney(input.totalCents)}, invoiced per the payment schedule above.`,
-        "Work begins after the first invoice is paid in full.",
-        "Requests outside the approved scope require a separate written estimate and approval.",
-        "Client provides timely feedback, approvals, content and third-party access needed to complete the work.",
-        "Deliverables are owned by the Client upon receipt of final payment; BLEXware retains rights to its pre-existing tools and components.",
-        "Either party may terminate with written notice; the Client pays for work completed to the termination date.",
-        "Each party keeps the other's non-public information confidential.",
-        "Provider warrants professional workmanship; the Provider's total liability is limited to fees paid under this SOW.",
-        "This SOW is governed by the laws of the State of Indiana.",
-      ],
-    },
-  ];
+  const paymentPlan = input.paymentPlan ?? paymentPlanFromDoc(estimateDoc, input.totalCents);
+  const terms: DocSection = {
+    heading: "Agreement Terms",
+    body: [
+      `This Statement of Work ("SOW") is entered into between BLEXware ("Provider") and ${estimateDoc.preparedFor.company ?? estimateDoc.preparedFor.name} ("Client") and incorporates the scope, schedule and pricing described above.`,
+    ],
+    bullets: [
+      `Total contract value: ${formatMoney(input.totalCents)}, invoiced per the payment schedule above.`,
+      "Work begins after the first invoice is paid in full.",
+      "Requests outside the approved scope require a separate written estimate and approval.",
+      "Client provides timely feedback, approvals, content and third-party access needed to complete the work.",
+      "Deliverables are owned by the Client upon receipt of final payment; BLEXware retains rights to its pre-existing tools and components.",
+      "Either party may terminate with written notice; the Client pays for work completed to the termination date.",
+      "Each party keeps the other's non-public information confidential.",
+      "Provider warrants professional workmanship; the Provider's total liability is limited to fees paid under this SOW.",
+      "This SOW is governed by the laws of the State of Indiana.",
+    ],
+  };
+
+  const withoutTerms = estimateDoc.sections.filter((section) => !/agreement terms/i.test(section.heading));
+  const sections = replaceOrAppendSection(withoutTerms, /payment terms/i, paymentSection(paymentPlan, input.totalCents));
 
   return {
     ...estimateDoc,
     kind: "sow",
     documentNumber: input.agreementNumber,
+    documentTitle: "Statement of Work Agreement",
     subtitle: "Statement of Work Agreement",
-    sections: [...estimateDoc.sections, ...terms],
+    paymentPlan,
+    sections: [...sections, terms],
     acceptance: {
       intro: [
         "By signing below, the Client accepts this Statement of Work and authorizes BLEXware to begin work according to the scope, schedule and payment terms described herein.",

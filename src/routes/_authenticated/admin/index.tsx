@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { getAdminStatus, listQuotes } from "@/lib/admin.functions";
+import { getAdminStatus, listQuotes, refreshProposalDocuments } from "@/lib/admin.functions";
 import { seedWellnessProject } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
 
@@ -29,7 +29,9 @@ function AdminDashboard() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [seeding, setSeeding] = useState(false);
+  const [converting, setConverting] = useState(false);
   const seed = useServerFn(seedWellnessProject);
+  const convertProposals = useServerFn(refreshProposalDocuments);
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
   const quotes = useQuery({
@@ -106,6 +108,29 @@ function AdminDashboard() {
             }}
           >
             {seeding ? "Loading…" : "Load Build Financial Wellness"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={converting}
+            onClick={async () => {
+              setConverting(true);
+              try {
+                const result = await convertProposals({ data: {} });
+                toast.success(
+                  result.converted
+                    ? `Converted ${result.converted} proposal${result.converted === 1 ? "" : "s"}`
+                    : "No markdown-only proposals left to convert",
+                );
+                void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+              } catch (error) {
+                toast.error((error as Error).message);
+              } finally {
+                setConverting(false);
+              }
+            }}
+          >
+            {converting ? "Converting…" : "Convert existing proposals"}
           </Button>
         </div>
 

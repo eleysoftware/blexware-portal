@@ -13,23 +13,32 @@ export const getProposalByToken = createServerFn({ method: "POST" })
 
     const { data: proposal } = await db
       .from("proposals")
-      .select("id, status, content, sent_at, client_response_note, quote_id")
+      .select("id, status, content, sent_at, client_response_note, quote_id, doc")
       .eq("review_token", data.token)
       .maybeSingle();
 
-    if (!proposal || proposal.status === "draft") return { proposal: null };
+    if (!proposal || proposal.status === "draft") return { proposal: null, documents: [] };
 
-    const { data: quote } = await db
-      .from("quotes")
-      .select("quote_number, contact_name, project_type")
-      .eq("id", proposal.quote_id)
-      .maybeSingle();
+    const [{ data: quote }, { data: documents }] = await Promise.all([
+      db
+        .from("quotes")
+        .select("quote_number, contact_name, project_type")
+        .eq("id", proposal.quote_id)
+        .maybeSingle(),
+      db
+        .from("documents")
+        .select("id, entity, entity_id, kind, format")
+        .eq("entity", "proposal")
+        .eq("entity_id", proposal.id)
+        .order("created_at", { ascending: false }),
+    ]);
 
     return {
       proposal: {
         id: proposal.id as string,
         status: proposal.status as ProposalRecord["status"],
         content: proposal.content as string,
+        doc: (proposal.doc as import("@/lib/documents/types").ProjectDocument | null) ?? null,
         sentAt: (proposal.sent_at as string | null) ?? null,
         note: (proposal.client_response_note as string | null) ?? null,
       },
@@ -40,7 +49,44 @@ export const getProposalByToken = createServerFn({ method: "POST" })
             projectType: quote.project_type as string,
           }
         : null,
+      documents: (documents ?? []) as {
+        id: string;
+        entity: string;
+        entity_id: string;
+        kind: string;
+        format: string;
+      }[],
     };
+  });
+
+export const getProposalDocumentUrl = createServerFn({ method: "POST" })
+  .validator((data: { token: string; documentId: string }) => {
+    if (!/^[a-f0-9]{16,96}$/i.test(data.token)) throw new Error("Invalid link");
+    if (!/^[0-9a-f-]{36}$/i.test(data.documentId)) throw new Error("Unknown document");
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const { adminDb } = await import("@/lib/blex.server");
+    const db = adminDb();
+
+    const { data: proposal } = await db
+      .from("proposals")
+      .select("id, status")
+      .eq("review_token", data.token)
+      .maybeSingle();
+    if (!proposal || proposal.status === "draft") throw new Error("This link is no longer active.");
+
+    const { data: doc } = await db
+      .from("documents")
+      .select("id, storage_path")
+      .eq("id", data.documentId)
+      .eq("entity", "proposal")
+      .eq("entity_id", proposal.id)
+      .maybeSingle();
+    if (!doc) throw new Error("Document not found");
+
+    const { signedDocumentUrl } = await import("@/lib/engagement.server");
+    return { url: await signedDocumentUrl(doc.storage_path as string) };
   });
 
 export const respondToProposal = createServerFn({ method: "POST" })

@@ -6,9 +6,11 @@ import { toast } from "sonner";
 
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
+import { DocumentDownloads } from "@/components/DocumentDownloads";
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getProposalByToken, respondToProposal } from "@/lib/proposals.functions";
+import { getProposalByToken, getProposalDocumentUrl, respondToProposal } from "@/lib/proposals.functions";
 
 const title = "Your BLEXware proposal";
 const description = "Review, approve, or request changes to the proposal drafted for your project.";
@@ -31,6 +33,7 @@ export const Route = createFileRoute("/proposal/$token")({
 function ProposalReviewPage() {
   const { token } = Route.useParams();
   const fetchProposal = useServerFn(getProposalByToken);
+  const fetchDocUrl = useServerFn(getProposalDocumentUrl);
   const respond = useServerFn(respondToProposal);
   const [note, setNote] = useState("");
 
@@ -73,6 +76,15 @@ function ProposalReviewPage() {
   const { proposal, quote } = query.data;
   const responded = proposal.status !== "sent";
 
+  const openDoc = async (documentId: string) => {
+    try {
+      const { url } = await fetchDocUrl({ data: { token, documentId } });
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  };
+
   return (
     <>
       <PageHero
@@ -83,9 +95,16 @@ function ProposalReviewPage() {
         }
       />
       <Section tone="surface">
-        <article className="mx-auto max-w-3xl whitespace-pre-wrap rounded-2xl border border-border bg-background p-8 leading-relaxed shadow-card">
-          {proposal.content}
-        </article>
+        <div className="mx-auto max-w-[8.5in] overflow-hidden rounded-2xl border border-border bg-background shadow-card">
+          {proposal.doc ? (
+            <DocumentPreview doc={proposal.doc} />
+          ) : (
+            <article className="whitespace-pre-wrap p-8 leading-relaxed">{proposal.content}</article>
+          )}
+        </div>
+        <div className="mx-auto max-w-[8.5in]">
+          <DocumentDownloads docs={query.data.documents ?? []} onOpen={openDoc} />
+        </div>
 
         <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-border bg-background p-8 shadow-card">
           {responded ? (

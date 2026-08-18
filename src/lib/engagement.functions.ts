@@ -9,6 +9,9 @@ export type EstimateInput = {
   discountCents: number;
   discountLabel?: string;
   durationNote?: string;
+  paymentKind?: import("@/lib/documents/types").PaymentPlanKind;
+  customPayments?: { label: string; amountCents: number }[];
+  documentTitle?: string;
 };
 
 /** Everything downstream of the quote: proposal, estimate, SOW, invoices. */
@@ -81,7 +84,7 @@ export const regenerateProposal = createServerFn({ method: "POST" })
 
     const { data: proposal } = await db
       .from("proposals")
-      .select("id, quote_id, content, doc, version, prompt")
+      .select("id, quote_id, content, doc, version, prompt, model")
       .eq("id", data.proposalId)
       .maybeSingle();
     if (!proposal) throw new Error("Proposal not found");
@@ -122,11 +125,34 @@ export const regenerateProposal = createServerFn({ method: "POST" })
     const content = payload.choices?.[0]?.message?.content?.trim();
     if (!content) throw new Error("The AI returned an empty revision.");
 
+    const { data: quote } = await db
+      .from("quotes")
+      .select("contact_name, company, contact_email, phone, project_type, quote_number")
+      .eq("id", proposal.quote_id)
+      .single();
+    const { composeProposalDocFromQuote, isImportedProposal } = await import("@/lib/documents/proposal");
+    const doc =
+      isImportedProposal(proposal.model as string) && proposal.doc
+        ? proposal.doc
+        : quote
+          ? composeProposalDocFromQuote(
+              {
+                contact_name: quote.contact_name as string,
+                company: (quote.company as string | null) ?? null,
+                contact_email: quote.contact_email as string,
+                phone: (quote.phone as string | null) ?? null,
+                project_type: quote.project_type as string,
+                quote_number: quote.quote_number as string,
+              },
+              content,
+            )
+          : null;
+
     await db
       .from("proposals")
       .update({
         content,
-        doc: null,
+        doc,
         status: "draft",
         version: ((proposal.version as number) ?? 1) + 1,
         responded_at: null,
@@ -155,7 +181,7 @@ export const saveEstimate = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
-    const { calculateTotals, buildEstimateDoc, buildProposalDocFromMarkdown } = await import(
+    const { calculateTotals, buildEstimateDoc, buildProposalDocFromMarkdown, buildPaymentPlan } = await import(
       "@/lib/documents/compose"
     );
     const db = adminDb();
@@ -184,9 +210,20 @@ export const saveEstimate = createServerFn({ method: "POST" })
       });
 
     const totals = calculateTotals(data.lineItems, data.discountCents ?? 0);
+    const paymentKind =
+      data.paymentKind ?? baseDoc.paymentPlan?.kind ?? "installments";
+    if (paymentKind === "custom") {
+      const sum = (data.customPayments ?? []).reduce((value, row) => value + row.amountCents, 0);
+      if (sum !== totals.totalCents) {
+        throw new Error("Custom invoice amounts must add up to the project total.");
+      }
+    }
+    const paymentPlan = buildPaymentPlan(paymentKind, totals.totalCents, data.customPayments);
+    if (data.documentTitle?.trim()) baseDoc.documentTitle = data.documentTitle.trim();
     const doc = buildEstimateDoc(baseDoc, {
       lineItems: data.lineItems,
       ...totals,
+      paymentPlan,
       ...(data.discountLabel ? { discountLabel: data.discountLabel } : {}),
       ...(data.durationNote ? { durationNote: data.durationNote } : {}),
     });
@@ -365,6 +402,7 @@ export const createAgreement = createServerFn({ method: "POST" })
     const doc = buildSowDoc(estimate.doc as never, {
       agreementNumber: agreement.agreement_number as string,
       totalCents: Number(estimate.total_cents),
+      paymentPlan: (estimate.doc as { paymentPlan?: import("@/lib/documents/types").PaymentPlan } | null)?.paymentPlan,
     });
 
     await storeDocument({
