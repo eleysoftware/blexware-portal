@@ -22,3 +22,11 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Run Tests - Unit, Integraton, and E2E
+
+```sh
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+```

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -109,6 +109,7 @@ export const Route = createFileRoute("/free-quote")({
 
 function FreeQuotePage() {
   const [step, setStep] = useState(0);
+  const [hydrated, setHydrated] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
 
   const [values, setValues] = useState<QuoteForm>(initial);
@@ -117,6 +118,10 @@ function FreeQuotePage() {
   const [sending, setSending] = useState(false);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
   const send = useServerFn(submitQuote);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const total = stepTitles.length;
   const progress = useMemo(() => Math.round(((step + 1) / total) * 100), [step, total]);
@@ -186,9 +191,12 @@ function FreeQuotePage() {
             scoped proposal to {values.email} within one business day.
           </p>
           {quoteNumber ? (
-            <p className="mt-4 text-sm text-slate">
+            <p className="mt-4 text-sm text-slate" data-testid="quote-confirmation">
               Your reference number is{" "}
-              <strong className="text-foreground">{quoteNumber}</strong>.
+              <strong className="text-foreground" data-testid="quote-number">
+                {quoteNumber}
+              </strong>
+              .
             </p>
           ) : null}
         </div>
@@ -217,6 +225,8 @@ function FreeQuotePage() {
           <form
             onSubmit={submit}
             noValidate
+            data-testid="quote-form"
+            data-hydrated={hydrated ? "true" : "false"}
             className="mt-8 rounded-2xl border border-border bg-background p-7 shadow-card sm:p-9"
           >
             <h2 className="text-xl">{stepTitles[step]}</h2>
@@ -261,6 +271,7 @@ function FreeQuotePage() {
                       return (
                         <label
                           key={service}
+                          data-testid={`quote-service-${service}`}
                           className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 text-sm text-headline transition-colors hover:border-mint"
                         >
                           <Checkbox
@@ -380,7 +391,10 @@ function FreeQuotePage() {
                     />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
-                    <label className="flex cursor-pointer items-start gap-3 text-sm text-slate">
+                    <label
+                      data-testid="quote-consent"
+                      className="flex cursor-pointer items-start gap-3 text-sm text-slate"
+                    >
                       <Checkbox
                         checked={values.consent}
                         onCheckedChange={(state) => set("consent", state === true)}
@@ -398,6 +412,7 @@ function FreeQuotePage() {
               <Button
                 type="button"
                 variant="ghost"
+                data-testid="quote-back"
                 onClick={() => setStep((s) => Math.max(0, s - 1))}
                 disabled={step === 0}
               >
@@ -406,12 +421,17 @@ function FreeQuotePage() {
               </Button>
 
               {step < total - 1 ? (
-                <Button type="button" onClick={next}>
+                <Button type="button" data-testid="quote-continue" onClick={next}>
                   Continue
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Button>
               ) : (
-                <Button type="submit" className="shadow-cta" disabled={sending}>
+                <Button
+                  type="submit"
+                  className="shadow-cta"
+                  data-testid="quote-submit"
+                  disabled={sending}
+                >
                   Submit request
                 </Button>
               )}
@@ -442,10 +462,14 @@ function Choices({
         {options.map((option) => (
           <Label
             key={option}
-            htmlFor={`${name}-${option}`}
+            data-testid={`quote-option-${name}-${option}`}
             className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-4 text-sm font-medium text-headline transition-colors hover:border-mint has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
           >
-            <RadioGroupItem id={`${name}-${option}`} value={option} />
+            <RadioGroupItem
+              id={`${name}-${option}`}
+              value={option}
+              data-testid={`quote-radio-${name}-${option}`}
+            />
             {option}
           </Label>
         ))}

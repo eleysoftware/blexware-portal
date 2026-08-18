@@ -13,7 +13,7 @@ type SignUpPayload = { email: string; password: string; role?: "user" | "staff" 
  * an authenticated admin caller (see createTeamMember).
  */
 export const signUpUser = createServerFn({ method: "POST" })
-  .inputValidator((data: SignUpPayload) => {
+  .validator((data: SignUpPayload) => {
     const parsed = signUpSchema.parse({ email: data.email, password: data.password });
     return { ...parsed, role: "user" as const };
   })
@@ -81,7 +81,7 @@ export const signUpUser = createServerFn({ method: "POST" })
 /** Admin-only creation of BLEXware team accounts. Same breach screening. */
 export const createTeamMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: SignUpPayload) => {
+  .validator((data: SignUpPayload) => {
     const parsed = signUpSchema.parse({ email: data.email, password: data.password });
     const role = data.role === "admin" ? "admin" : "staff";
     return { ...parsed, role } as const;
@@ -123,7 +123,7 @@ export const createTeamMember = createServerFn({ method: "POST" })
 /** Which surface the signed-in account belongs to. */
 export const getViewerRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: Record<string, never>) => data ?? {})
+  .validator((data: Record<string, never>) => data ?? {})
   .handler(async ({ context }) => {
     const { adminDb } = await import("@/lib/blex.server");
     const { data: rows } = await adminDb()

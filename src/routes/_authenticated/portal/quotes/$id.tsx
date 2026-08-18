@@ -151,6 +151,7 @@ function PortalQuoteDetail() {
                   <div className="flex flex-wrap gap-2">
                     <Button
                       className="shadow-cta"
+                      data-testid="proposal-approve"
                       disabled={respondMutation.isPending}
                       onClick={() => respondMutation.mutate("approved")}
                     >

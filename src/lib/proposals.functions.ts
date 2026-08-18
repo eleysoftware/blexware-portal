@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { ProposalRecord } from "@/lib/quote-schema";
 
 export const getProposalByToken = createServerFn({ method: "POST" })
-  .inputValidator((data: { token: string }) => {
+  .validator((data: { token: string }) => {
     if (!/^[a-f0-9]{16,96}$/i.test(data.token)) throw new Error("Invalid link");
     return data;
   })
@@ -44,7 +44,7 @@ export const getProposalByToken = createServerFn({ method: "POST" })
   });
 
 export const respondToProposal = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     (data: { token: string; action: "approved" | "changes_requested" | "declined"; note?: string }) => {
       if (!/^[a-f0-9]{16,96}$/i.test(data.token)) throw new Error("Invalid link");
       if (!["approved", "changes_requested", "declined"].includes(data.action)) {

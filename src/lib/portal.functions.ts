@@ -11,7 +11,7 @@ import type { ProposalRecord, QuoteFileRecord, QuoteRecord } from "@/lib/quote-s
  */
 export const listMyQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: Record<string, never>) => data ?? {})
+  .validator((data: Record<string, never>) => data ?? {})
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("quotes")
@@ -27,7 +27,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
 
 export const getMyQuote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => {
+  .validator((data: { id: string }) => {
     if (!/^[0-9a-f-]{36}$/i.test(data.id)) throw new Error("Unknown quote");
     return data;
   })
@@ -75,7 +75,7 @@ export const getMyQuote = createServerFn({ method: "POST" })
 
 export const getMyQuoteFileUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { fileId: string }) => {
+  .validator((data: { fileId: string }) => {
     if (!/^[0-9a-f-]{36}$/i.test(data.fileId)) throw new Error("Unknown file");
     return data;
   })

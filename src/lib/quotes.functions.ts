@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { MAX_FILES, MAX_FILE_BYTES, quoteSchema } from "@/lib/quote-schema";
 
 export const submitQuote = createServerFn({ method: "POST" })
-  .inputValidator((data: FormData) => {
+  .validator((data: FormData) => {
     if (!(data instanceof FormData)) throw new Error("Invalid submission");
     return data;
   })

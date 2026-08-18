@@ -18,7 +18,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
  */
 export const getMyEngagement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { quoteId: string }) => {
+  .validator((data: { quoteId: string }) => {
     if (!UUID.test(data.quoteId)) throw new Error("Unknown project");
     return data;
   })
@@ -58,7 +58,7 @@ export const getMyEngagement = createServerFn({ method: "POST" })
 
 export const getMyDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { documentId: string }) => {
+  .validator((data: { documentId: string }) => {
     if (!UUID.test(data.documentId)) throw new Error("Unknown document");
     return data;
   })
@@ -77,7 +77,7 @@ export const getMyDocumentUrl = createServerFn({ method: "POST" })
 /** Approve, request changes on, or decline the proposal from the portal. */
 export const respondToMyProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .validator(
     (data: {
       proposalId: string;
       action: "approved" | "changes_requested" | "declined";
@@ -154,7 +154,7 @@ export const respondToMyProposal = createServerFn({ method: "POST" })
 /** Approve or decline the priced estimate. */
 export const respondToMyEstimate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .validator(
     (data: { estimateId: string; action: "approved" | "declined"; note?: string }) => {
       if (!UUID.test(data.estimateId)) throw new Error("Unknown estimate");
       if (!["approved", "declined"].includes(data.action)) throw new Error("Unknown action");
@@ -227,7 +227,7 @@ export const respondToMyEstimate = createServerFn({ method: "POST" })
 /** Electronic signature on the SOW; triggers the invoice schedule. */
 export const signMyAgreement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { agreementId: string; fullName: string; agreed: boolean }) => {
+  .validator((data: { agreementId: string; fullName: string; agreed: boolean }) => {
     if (!UUID.test(data.agreementId)) throw new Error("Unknown agreement");
     if (!data.agreed) throw new Error("Please confirm you agree to sign electronically.");
     if (data.fullName.trim().length < 3) throw new Error("Type your full legal name to sign.");

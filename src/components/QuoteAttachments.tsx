@@ -79,6 +79,7 @@ export function QuoteAttachments({
         accept="application/pdf,.pdf"
         multiple
         className="sr-only"
+        data-testid="quote-attachments"
         onChange={(event) => addFiles(event.target.files)}
       />
 

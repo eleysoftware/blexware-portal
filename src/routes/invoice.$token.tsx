@@ -78,7 +78,9 @@ function InvoicePage() {
   if (!data) {
     return (
       <Section>
-        <h1 className="text-2xl font-bold">This invoice link isn't active</h1>
+        <h1 className="text-2xl font-bold" data-testid="invoice-inactive">
+          This invoice link isn't active
+        </h1>
         <p className="mt-2 text-slate">
           The link may have expired or been replaced. Email hello@blexware.com and we'll send a new one.
         </p>
@@ -101,11 +103,15 @@ function InvoicePage() {
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-background p-8 shadow-card">
           <div className="flex items-center justify-between gap-4">
             <Logo className="h-7 w-auto" />
-            <Badge variant={paid ? "secondary" : "outline"}>{statusLabel(data.status)}</Badge>
+            <Badge variant={paid ? "secondary" : "outline"} data-testid="invoice-status">
+              {statusLabel(data.status)}
+            </Badge>
           </div>
 
           <p className="mt-6 text-sm text-slate">Amount due</p>
-          <p className="text-3xl font-bold">{formatMoney(balance)}</p>
+          <p className="text-3xl font-bold" data-testid="invoice-balance">
+            {formatMoney(balance)}
+          </p>
 
           <dl className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
             <div className="flex justify-between">
@@ -197,6 +203,7 @@ function InvoicePage() {
             <>
               <Button
                 className="mt-8 w-full shadow-cta"
+                data-testid="invoice-pay"
                 disabled={start.isPending}
                 onClick={() => start.mutate()}
               >

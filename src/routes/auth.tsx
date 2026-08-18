@@ -117,6 +117,7 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => void | Promise<void> }) 
           id="signin-email"
           type="email"
           autoComplete="email"
+          data-testid="signin-email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -128,12 +129,13 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => void | Promise<void> }) 
           id="signin-password"
           type="password"
           autoComplete="current-password"
+          data-testid="signin-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
       </div>
-      <Button type="submit" className="w-full shadow-cta" disabled={busy}>
+      <Button type="submit" className="w-full shadow-cta" data-testid="signin-submit" disabled={busy}>
         {busy ? "Signing in…" : "Sign in"}
       </Button>
     </form>

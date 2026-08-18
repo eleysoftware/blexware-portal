@@ -131,6 +131,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
               <div className="flex flex-wrap gap-2">
                 <Button
                   className="shadow-cta"
+                  data-testid="estimate-approve"
                   disabled={estimateMutation.isPending}
                   onClick={() => estimateMutation.mutate("approved")}
                 >
@@ -180,6 +181,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
                 </label>
                 <Input
                   id="signature"
+                  data-testid="sow-signature"
                   value={signature}
                   onChange={(event) => setSignature(event.target.value)}
                   placeholder="Your full name"
@@ -191,6 +193,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
                   checked={agreed}
                   onCheckedChange={(value) => setAgreed(value === true)}
                   aria-label="Agree to sign electronically"
+                  data-testid="sow-consent"
                 />
                 <span>
                   I agree that typing my name constitutes a legally binding electronic signature on this
@@ -199,6 +202,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
               </label>
               <Button
                 className="shadow-cta"
+                data-testid="sow-sign"
                 disabled={signMutation.isPending || !agreed || signature.trim().length < 3}
                 onClick={() => signMutation.mutate()}
               >
@@ -232,6 +236,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
                   ) : (
                     <a
                       href={`/invoice/${invoice.pay_token}`}
+                      data-testid="invoice-pay-link"
                       className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
                     >
                       Pay now

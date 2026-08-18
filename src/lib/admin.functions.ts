@@ -11,7 +11,7 @@ import { quoteStatuses } from "@/lib/quote-schema";
 
 export const listQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { status?: string; search?: string }) => data ?? {})
+  .validator((data: { status?: string; search?: string }) => data ?? {})
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -51,7 +51,7 @@ export const listQuotes = createServerFn({ method: "POST" })
 
 export const getQuoteDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -99,7 +99,7 @@ export const getQuoteDetail = createServerFn({ method: "POST" })
 
 export const updateQuoteStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; status: QuoteStatus }) => {
+  .validator((data: { id: string; status: QuoteStatus }) => {
     if (!quoteStatuses.includes(data.status)) throw new Error("Unknown status");
     return data;
   })
@@ -126,7 +126,7 @@ export const updateQuoteStatus = createServerFn({ method: "POST" })
 
 export const getQuoteFileUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { fileId: string }) => data)
+  .validator((data: { fileId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit, QUOTE_BUCKET } = await import(
       "@/lib/blex.server"
@@ -160,7 +160,7 @@ export const getQuoteFileUrl = createServerFn({ method: "POST" })
 
 export const generateProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { quoteId: string }) => data)
+  .validator((data: { quoteId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -242,7 +242,7 @@ export const generateProposal = createServerFn({ method: "POST" })
 
 export const saveProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; content: string }) => data)
+  .validator((data: { id: string; content: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -264,7 +264,7 @@ export const saveProposal = createServerFn({ method: "POST" })
 
 export const sendProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string }) => data)
+  .validator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -272,51 +272,58 @@ export const sendProposal = createServerFn({ method: "POST" })
 
     const { data: proposal, error } = await db
       .from("proposals")
+      .select("review_token, quote_id")
+      .eq("id", data.id)
+      .single();
+    if (error || !proposal) throw new Error(error?.message ?? "Proposal not found");
+
+    const { data: quote, error: quoteError } = await db
+      .from("quotes")
+      .select("quote_number, contact_name, contact_email, project_type")
+      .eq("id", proposal.quote_id)
+      .single();
+    if (quoteError || !quote) throw new Error(quoteError?.message ?? "Quote not found");
+
+    const contactEmail = String(quote.contact_email ?? "").trim();
+    if (!contactEmail) throw new Error("This quote has no contact email");
+
+    const reviewPath = `/proposal/${proposal.review_token as string}`;
+    const { SITE_URL } = await import("@/content/site");
+    const reviewUrl = `${SITE_URL}${reviewPath}`;
+
+    const { sendEmail, renderEmail, requireEmailSent } = await import("@/lib/email.server");
+    const rendered = renderEmail({
+      heading: "Your BLEXware proposal is ready",
+      paragraphs: [
+        `Hi ${String(quote.contact_name ?? "there")},`,
+        `We've prepared the proposal for ${String(quote.project_type || "your project")} (${String(quote.quote_number)}).`,
+        "Open the secure review link below to read it and let us know whether you'd like to approve it, request changes, or decline.",
+      ],
+      cta: { label: "Review your proposal", url: reviewUrl },
+      footnote: "This link is private to you — please don't forward it.",
+    });
+    requireEmailSent(
+      await sendEmail({
+        to: contactEmail,
+        toName: String(quote.contact_name ?? ""),
+        subject: `Your BLEXware proposal — ${String(quote.quote_number)}`,
+        html: rendered.html,
+        text: rendered.text,
+      }),
+    );
+
+    const { error: updateError } = await db
+      .from("proposals")
       .update({
         status: "sent",
         sent_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 5 * 86_400_000).toISOString(),
         reviewed_by: context.userId,
       })
-      .eq("id", data.id)
-      .select("review_token, quote_id")
-      .single();
-    if (error || !proposal) throw new Error(error?.message ?? "Could not send");
+      .eq("id", data.id);
+    if (updateError) throw new Error(updateError.message);
 
     await db.from("quotes").update({ status: "proposal_sent" }).eq("id", proposal.quote_id);
-
-    const { data: quote } = await db
-      .from("quotes")
-      .select("quote_number, contact_name, contact_email, project_name")
-      .eq("id", proposal.quote_id)
-      .single();
-
-    const reviewPath = `/proposal/${proposal.review_token as string}`;
-    const { SITE_URL } = await import("@/content/site");
-    const reviewUrl = `${SITE_URL}${reviewPath}`;
-
-    let emailed = false;
-    if (quote?.contact_email) {
-      const { sendEmail, renderEmail } = await import("@/lib/email.server");
-      const rendered = renderEmail({
-        heading: "Your BLEXware proposal is ready",
-        paragraphs: [
-          `Hi ${String(quote.contact_name ?? "there")},`,
-          `We've prepared the proposal for ${String(quote.project_name || "your project")} (${String(quote.quote_number)}).`,
-          "Open the secure review link below to read it and let us know whether you'd like to approve it, request changes, or decline.",
-        ],
-        cta: { label: "Review your proposal", url: reviewUrl },
-        footnote: "This link is private to you — please don't forward it.",
-      });
-      const result = await sendEmail({
-        to: String(quote.contact_email),
-        toName: String(quote.contact_name ?? ""),
-        subject: `Your BLEXware proposal — ${String(quote.quote_number)}`,
-        html: rendered.html,
-        text: rendered.text,
-      });
-      emailed = result.sent;
-    }
 
     await writeAudit({
       actorId: context.userId,
@@ -324,15 +331,15 @@ export const sendProposal = createServerFn({ method: "POST" })
       action: "proposal.sent",
       entity: "quote",
       entityId: proposal.quote_id as string,
-      metadata: { emailed },
+      metadata: { emailed: true },
     });
 
-    return { reviewPath, emailed };
+    return { reviewPath, emailed: true };
   });
 
 export const getAdminStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: Record<string, never>) => data)
+  .validator((data: Record<string, never>) => data)
   .handler(async ({ context }) => {
     const client = context.supabase as unknown as {
       rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown }>;

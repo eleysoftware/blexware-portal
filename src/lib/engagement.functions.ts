@@ -14,7 +14,7 @@ export type EstimateInput = {
 /** Everything downstream of the quote: proposal, estimate, SOW, invoices. */
 export const getEngagement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { quoteId: string }) => data)
+  .validator((data: { quoteId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -70,7 +70,7 @@ export const getEngagement = createServerFn({ method: "POST" })
 /** Re-runs the AI draft with the client's requested changes, keeping history. */
 export const regenerateProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { proposalId: string; changeRequest: string }) => {
+  .validator((data: { proposalId: string; changeRequest: string }) => {
     if (!data.changeRequest.trim()) throw new Error("Describe the changes to make");
     return { ...data, changeRequest: data.changeRequest.slice(0, 4000) };
   })
@@ -148,7 +148,7 @@ export const regenerateProposal = createServerFn({ method: "POST" })
 /** Creates or replaces the draft cost + schedule estimate for an approved proposal. */
 export const saveEstimate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: EstimateInput) => {
+  .validator((data: EstimateInput) => {
     if (!data.lineItems?.length) throw new Error("Add at least one line item");
     return data;
   })
@@ -235,7 +235,7 @@ export const saveEstimate = createServerFn({ method: "POST" })
 
 export const sendEstimate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { estimateId: string }) => data)
+  .validator((data: { estimateId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -256,6 +256,8 @@ export const sendEstimate = createServerFn({ method: "POST" })
       .single();
     if (!quote) throw new Error("Quote not found");
 
+    const contactEmail = String(quote.contact_email ?? "").trim();
+    if (!contactEmail) throw new Error("This quote has no contact email");
 
     await storeDocument({
       quoteId: estimate.quote_id as string,
@@ -266,35 +268,38 @@ export const sendEstimate = createServerFn({ method: "POST" })
       slug: quote.quote_number as string,
     });
 
+    const { requireEmailSent } = await import("@/lib/email.server");
+    requireEmailSent(
+      await emailEstimateSent({
+        to: contactEmail,
+        name: quote.contact_name as string,
+        quoteNumber: quote.quote_number as string,
+        url: `${siteUrl()}/portal/quotes/${estimate.quote_id as string}`,
+        totalCents: Number(estimate.total_cents),
+      }),
+    );
+
     await db
       .from("estimates")
       .update({ status: "sent", sent_at: new Date().toISOString() })
       .eq("id", estimate.id);
     await db.from("quotes").update({ status: "estimate_sent" }).eq("id", estimate.quote_id);
 
-    const result = await emailEstimateSent({
-      to: quote.contact_email as string,
-      name: quote.contact_name as string,
-      quoteNumber: quote.quote_number as string,
-      url: `${siteUrl()}/portal/quotes/${estimate.quote_id as string}`,
-      totalCents: Number(estimate.total_cents),
-    });
-
     await writeAudit({
       actorId: context.userId,
       action: "estimate.sent",
       entity: "quote",
       entityId: estimate.quote_id as string,
-      metadata: { emailed: result.sent },
+      metadata: { emailed: true },
     });
 
-    return { emailed: result.sent };
+    return { emailed: true };
   });
 
 /** Turns an approved estimate into a SOW agreement and sends it for signature. */
 export const createAgreement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { estimateId: string }) => data)
+  .validator((data: { estimateId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -317,6 +322,8 @@ export const createAgreement = createServerFn({ method: "POST" })
       .single();
     if (!quote) throw new Error("Quote not found");
 
+    const contactEmail = String(quote.contact_email ?? "").trim();
+    if (!contactEmail) throw new Error("This quote has no contact email");
 
     const { data: agreement, error } = await db
       .from("agreements")
@@ -345,33 +352,36 @@ export const createAgreement = createServerFn({ method: "POST" })
       slug: agreement.agreement_number as string,
     });
 
+    const { requireEmailSent } = await import("@/lib/email.server");
+    requireEmailSent(
+      await emailAgreementSent({
+        to: contactEmail,
+        name: quote.contact_name as string,
+        agreementNumber: agreement.agreement_number as string,
+        url: `${siteUrl()}/portal/quotes/${estimate.quote_id as string}`,
+      }),
+    );
+
     await db
       .from("agreements")
       .update({ doc, status: "sent", sent_at: new Date().toISOString() })
       .eq("id", agreement.id);
     await db.from("quotes").update({ status: "contract_sent" }).eq("id", estimate.quote_id);
 
-    const result = await emailAgreementSent({
-      to: quote.contact_email as string,
-      name: quote.contact_name as string,
-      agreementNumber: agreement.agreement_number as string,
-      url: `${siteUrl()}/portal/quotes/${estimate.quote_id as string}`,
-    });
-
     await writeAudit({
       actorId: context.userId,
       action: "agreement.sent",
       entity: "quote",
       entityId: estimate.quote_id as string,
-      metadata: { agreement: agreement.agreement_number, emailed: result.sent },
+      metadata: { agreement: agreement.agreement_number, emailed: true },
     });
 
-    return { agreementId: agreement.id as string, emailed: result.sent };
+    return { agreementId: agreement.id as string, emailed: true };
   });
 
 export const getDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { documentId: string }) => data)
+  .validator((data: { documentId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -389,7 +399,7 @@ export const getDocumentUrl = createServerFn({ method: "POST" })
 /** Sends (or resends) the next scheduled invoice immediately. */
 export const sendInvoiceNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { invoiceId: string }) => data)
+  .validator((data: { invoiceId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -401,7 +411,7 @@ export const sendInvoiceNow = createServerFn({ method: "POST" })
 /** Issues a full or partial refund against a settled payment. */
 export const refundPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { invoicePaymentId: string; amountCents: number; reason?: string }) => {
+  .validator((data: { invoicePaymentId: string; amountCents: number; reason?: string }) => {
     if (!Number.isInteger(data.amountCents) || data.amountCents <= 0) {
       throw new Error("Enter a refund amount greater than zero.");
     }
@@ -422,7 +432,7 @@ export const refundPayment = createServerFn({ method: "POST" })
 /** Records a payment received outside the platform (check, bank transfer). */
 export const recordOfflinePaymentFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { invoiceId: string; amountCents: number; note?: string }) => {
+  .validator((data: { invoiceId: string; amountCents: number; note?: string }) => {
     if (!Number.isInteger(data.amountCents) || data.amountCents <= 0) {
       throw new Error("Enter an amount greater than zero.");
     }
@@ -443,7 +453,7 @@ export const recordOfflinePaymentFn = createServerFn({ method: "POST" })
 /** Re-reads the authoritative status from the payment service. */
 export const reconcilePayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { providerPaymentId: string }) => data)
+  .validator((data: { providerPaymentId: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -456,7 +466,7 @@ export const reconcilePayment = createServerFn({ method: "POST" })
 /** Seeds the live Build Financial Wellness engagement at the estimate stage. */
 export const seedWellnessProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: Record<string, never>) => data ?? {})
+  .validator((data: Record<string, never>) => data ?? {})
   .handler(async ({ context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);

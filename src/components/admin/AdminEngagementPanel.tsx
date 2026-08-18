@@ -128,8 +128,8 @@ export function AdminEngagementPanel({
       });
       return release({ data: { estimateId: saved.estimateId } });
     },
-    onSuccess: (result) => {
-      toast.success(result.emailed ? "Estimate emailed to the client" : "Estimate sent (email failed)");
+    onSuccess: () => {
+      toast.success("Estimate emailed to the client");
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -137,9 +137,10 @@ export function AdminEngagementPanel({
 
   const agreementMutation = useMutation({
     mutationFn: () => makeAgreement({ data: { estimateId: estimate!.id } }),
-    onSuccess: (result) =>
-      toast.success(result.emailed ? "SOW sent for signature" : "SOW created (email failed)") ||
-      invalidate(),
+    onSuccess: () => {
+      toast.success("SOW sent for signature");
+      invalidate();
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -272,6 +273,7 @@ export function AdminEngagementPanel({
             <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
               <Input
                 aria-label="Line item"
+                data-testid="estimate-line-label"
                 value={row.label}
                 placeholder="Phase or deliverable"
                 onChange={(event) =>
@@ -280,6 +282,7 @@ export function AdminEngagementPanel({
               />
               <Input
                 aria-label="Amount in dollars"
+                data-testid="estimate-line-amount"
                 value={row.amount}
                 inputMode="decimal"
                 placeholder="Amount ($)"
@@ -339,15 +342,26 @@ export function AdminEngagementPanel({
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="outline" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+          <Button
+            variant="outline"
+            data-testid="estimate-save"
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate()}
+          >
             Save draft
           </Button>
-          <Button className="shadow-cta" disabled={sendMutation.isPending} onClick={() => sendMutation.mutate()}>
+          <Button
+            className="shadow-cta"
+            data-testid="estimate-send"
+            disabled={sendMutation.isPending}
+            onClick={() => sendMutation.mutate()}
+          >
             Send estimate to client
           </Button>
           {estimate?.status === "approved" ? (
             <Button
               variant="secondary"
+              data-testid="sow-send"
               disabled={agreementMutation.isPending}
               onClick={() => agreementMutation.mutate()}
             >
@@ -395,7 +409,12 @@ export function AdminEngagementPanel({
                       </span>
                       <Badge variant={invoice.status === "paid" ? "secondary" : "outline"}>{invoice.status}</Badge>
                       {invoice.status === "scheduled" ? (
-                        <Button size="sm" variant="outline" onClick={() => invoiceMutation.mutate(invoice.id)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid="invoice-send-now"
+                          onClick={() => invoiceMutation.mutate(invoice.id)}
+                        >
                           Send now
                         </Button>
                       ) : null}

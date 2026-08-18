@@ -87,11 +87,7 @@ function QuoteDetailPage() {
       return send({ data: { id: proposal!.id } });
     },
     onSuccess: (result) => {
-      toast.success(
-        result.emailed
-          ? "Proposal emailed to the client"
-          : "Proposal marked as sent — email could not be delivered, share the link manually",
-      );
+      toast.success("Proposal emailed to the client");
       void navigator.clipboard
         ?.writeText(`${window.location.origin}${result.reviewPath}`)
         .then(() => toast.success("Review link copied to clipboard"))
@@ -233,6 +229,7 @@ function QuoteDetailPage() {
                     <Button
                       size="sm"
                       variant="outline"
+                      data-testid="proposal-save"
                       onClick={() => saveMutation.mutate()}
                       disabled={saveMutation.isPending}
                     >
@@ -241,6 +238,7 @@ function QuoteDetailPage() {
                     <Button
                       size="sm"
                       variant="outline"
+                      data-testid="proposal-send"
                       onClick={() => sendMutation.mutate()}
                       disabled={sendMutation.isPending}
                     >
@@ -273,6 +271,7 @@ function QuoteDetailPage() {
                   rows={24}
                   className="mt-4 font-mono text-sm"
                   aria-label="Proposal draft content"
+                  data-testid="proposal-content"
                 />
                 <p className="mt-2 text-xs text-slate">
                   Status: {proposal.status.replace("_", " ")}

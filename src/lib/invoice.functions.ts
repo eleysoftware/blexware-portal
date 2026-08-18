@@ -5,7 +5,7 @@ const TOKEN = /^[a-f0-9]{16,96}$/i;
 const HIDDEN_STATUSES = ["scheduled", "void", "cancelled"];
 
 export const getInvoiceByToken = createServerFn({ method: "POST" })
-  .inputValidator((data: { token: string }) => {
+  .validator((data: { token: string }) => {
     if (!TOKEN.test(data.token)) throw new Error("Invalid link");
     return data;
   })
@@ -54,7 +54,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
 
 /** Server creates the payment (amount computed server-side) and returns only client-safe data. */
 export const beginInvoicePayment = createServerFn({ method: "POST" })
-  .inputValidator((data: { token: string }) => {
+  .validator((data: { token: string }) => {
     if (!TOKEN.test(data.token)) throw new Error("Invalid link");
     return data;
   })
@@ -65,7 +65,7 @@ export const beginInvoicePayment = createServerFn({ method: "POST" })
 
 /** Backend-authoritative status check after the checkout widget finishes. */
 export const confirmInvoicePayment = createServerFn({ method: "POST" })
-  .inputValidator((data: { token: string; reference: string }) => {
+  .validator((data: { token: string; reference: string }) => {
     if (!TOKEN.test(data.token)) throw new Error("Invalid link");
     if (!/^[a-f0-9]{8,64}$/i.test(data.reference)) throw new Error("Invalid payment reference");
     return data;
