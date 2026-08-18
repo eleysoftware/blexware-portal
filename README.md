@@ -23,6 +23,8 @@ npm i
 npm run dev
 ```
 
+A Hyperswitch API key was committed historically. Rotate that key in the Hyperswitch dashboard, then store the new value only in the gitignored `.env` file as `HYPERSWITCH_API_KEY`.
+
 ## Run Tests - Unit, Integraton, and E2E
 
 ```sh

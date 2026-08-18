@@ -16,6 +16,8 @@ dist-ssr
 .nitro
 *.local
 .env
+*apiKey.txt
+Hyperswith_BLEXware_apiKey.txt
 test-results/
 playwright-report/
 blob-report/

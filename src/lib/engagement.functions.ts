@@ -325,18 +325,42 @@ export const createAgreement = createServerFn({ method: "POST" })
     const contactEmail = String(quote.contact_email ?? "").trim();
     if (!contactEmail) throw new Error("This quote has no contact email");
 
-    const { data: agreement, error } = await db
+    const { data: existing } = await db
       .from("agreements")
-      .insert({
-        quote_id: estimate.quote_id,
-        estimate_id: estimate.id,
-        total_cents: estimate.total_cents,
-        status: "draft",
-        doc: {},
-      })
-      .select("id, agreement_number")
-      .single();
-    if (error) throw new Error(error.message);
+      .select("id, agreement_number, status")
+      .eq("estimate_id", estimate.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing && existing.status !== "draft") {
+      throw new Error("A statement of work already exists for this estimate.");
+    }
+
+    let agreement: { id: string; agreement_number: string };
+    if (existing?.status === "draft") {
+      agreement = {
+        id: existing.id as string,
+        agreement_number: existing.agreement_number as string,
+      };
+    } else {
+      const { data: inserted, error } = await db
+        .from("agreements")
+        .insert({
+          quote_id: estimate.quote_id,
+          estimate_id: estimate.id,
+          total_cents: estimate.total_cents,
+          status: "draft",
+          doc: {},
+        })
+        .select("id, agreement_number")
+        .single();
+      if (error || !inserted) throw new Error(error?.message ?? "Could not create the agreement");
+      agreement = {
+        id: inserted.id as string,
+        agreement_number: inserted.agreement_number as string,
+      };
+    }
 
     const doc = buildSowDoc(estimate.doc as never, {
       agreementNumber: agreement.agreement_number as string,
@@ -364,7 +388,12 @@ export const createAgreement = createServerFn({ method: "POST" })
 
     await db
       .from("agreements")
-      .update({ doc, status: "sent", sent_at: new Date().toISOString() })
+      .update({
+        doc,
+        total_cents: estimate.total_cents,
+        status: "sent",
+        sent_at: new Date().toISOString(),
+      })
       .eq("id", agreement.id);
     await db.from("quotes").update({ status: "contract_sent" }).eq("id", estimate.quote_id);
 
