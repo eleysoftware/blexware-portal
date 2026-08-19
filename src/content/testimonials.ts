@@ -10,7 +10,7 @@ export type Testimonial = {
 export const testimonials: Testimonial[] = [
   {
     id: "t1",
-    clientName: "Tamara W.",
+    clientName: "T. West",
     company: "Build Financial Wellness",
     initials: "TW",
     rating: 5,
@@ -19,9 +19,9 @@ export const testimonials: Testimonial[] = [
   },
   {
     id: "t2",
-    clientName: "Keith C.",
-    company: "KYC Investments",
-    initials: "KC",
+    clientName: "K. E.",
+    company: "BLEX Investments",
+    initials: "KE",
     rating: 5,
     review:
       "We stopped emailing sensitive documents the week we launched. Secure links, access logs, and a platform our partners trust — exactly what we asked for.",
@@ -38,7 +38,7 @@ export const testimonials: Testimonial[] = [
   {
     id: "t4",
     clientName: "V. Daniels",
-    company: "Reyes Property Group",
+    company: "D&AMT, LLC",
     initials: "VD",
     rating: 5,
     review:
