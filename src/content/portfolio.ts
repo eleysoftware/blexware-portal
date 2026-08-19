@@ -42,14 +42,14 @@ export const portfolio: PortfolioProject[] = [
     featured: true,
   },
   {
-    slug: "kyc-investments",
-    name: "KYC Investments",
+    slug: "blex-investments",
+    name: "BLEX Investments",
     category: "Investment Firm",
     summary: "An investment firm platform spanning private credit, private equity, and real assets.",
     description:
-      "KYC Investments invests across private credit, private equity, and real assets. The platform presents each strategy clearly to prospective partners while handling sensitive documents through secure, access-logged delivery rather than email attachments.",
+      "BLEX Investments invests across private credit, private equity, and real assets. The platform presents each strategy clearly to prospective partners while handling sensitive documents through secure, access-logged delivery rather than email attachments.",
     image: kycImage,
-    imageAlt: "KYC Investments platform interface showing investment strategy pages and portfolio data",
+    imageAlt: "BLEX Investments platform interface showing investment strategy pages and portfolio data",
     technologies: ["React", "TypeScript", "Tailwind CSS", "PostgreSQL", "Secure file storage"],
     features: [
       "Strategy pages for private credit, equity, and real assets",
