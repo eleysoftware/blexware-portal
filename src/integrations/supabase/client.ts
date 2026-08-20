@@ -27,11 +27,21 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
+// Public project identifiers (safe to ship to the browser). Used when the
+// build-time env injection is unavailable, e.g. in published bundles.
+const FALLBACK_SUPABASE_URL = 'https://ptvwcblnkumrhiohavvv.supabase.co';
+const FALLBACK_SUPABASE_PUBLISHABLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0dndjYmxua3Vtcmhpb2hhdnZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjAzNjIsImV4cCI6MjEwMTAzNjM2Mn0.fMK3O07EJ-XKknnuVH_Guam2EUx23SU_VKuLqcxviNg';
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL'];
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY'];
+  const SUPABASE_URL =
+    import.meta.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL'] || FALLBACK_SUPABASE_URL;
+  const SUPABASE_PUBLISHABLE_KEY =
+    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
+    process.env['SUPABASE_PUBLISHABLE_KEY'] ||
+    FALLBACK_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
