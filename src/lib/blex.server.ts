@@ -4,8 +4,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { quoteBucket } from "@/config/storage";
 
-export const QUOTE_BUCKET = "quote-uploads";
+export const QUOTE_BUCKET = quoteBucket();
 
 export function adminDb(): SupabaseClient {
   return supabaseAdmin as unknown as SupabaseClient;

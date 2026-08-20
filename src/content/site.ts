@@ -1,4 +1,6 @@
-export const SITE_URL = "https://blexware.com";
+import { readEnv } from "@/config/env";
+
+export const SITE_URL = readEnv("VITE_APP_URL", "APP_URL")?.replace(/\/$/, "") ?? "https://blexware.com";
 export const SITE_NAME = "BLEXware";
 export const CONTACT_EMAIL = "hello@blexware.com";
 

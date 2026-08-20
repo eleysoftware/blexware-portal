@@ -8,7 +8,8 @@ export const Route = createFileRoute("/api/public/cron/engagement")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["CRON_SECRET"];
+        const { cronSecret } = await import("@/config/environment");
+        const secret = cronSecret();
         if (!secret) return new Response("Not configured", { status: 500 });
 
         const provided = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");

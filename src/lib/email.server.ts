@@ -1,12 +1,20 @@
 // Server-only email delivery via the Zoho ZeptoMail HTTPS API.
 // SMTP is unavailable in the Worker runtime, so all mail goes over HTTPS.
 
-const DEFAULT_ZEPTOMAIL_ENDPOINT = "https://api.zeptomail.com/v1.1/email";
+import {
+  emailApiKey,
+  emailApiUrl,
+  emailBounceAddress,
+  emailFrom,
+  emailFromName,
+  emailReplyTo,
+} from "@/config/email";
+
 const TEST_RECIPIENT_SUFFIX = "@blexware.test";
 
-export const FROM_ADDRESS = "quote@blexware.com";
-export const FROM_NAME = "BLEXware";
-export const REPLY_TO_ADDRESS = "hello@blexware.com";
+export const FROM_ADDRESS = emailFrom();
+export const FROM_NAME = emailFromName();
+export const REPLY_TO_ADDRESS = emailReplyTo();
 
 export type SendEmailInput = {
   to: string;
@@ -118,14 +126,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return { sent: true };
   }
 
-  const token = process.env["ZEPTOMAIL_TOKEN"];
+  const token = emailApiKey();
   if (!token) {
-    console.error("[email] ZEPTOMAIL_TOKEN is not configured");
+    console.error("[email] EMAIL_API_KEY is not configured");
     return { sent: false, reason: "not_configured" };
   }
 
-  const endpoint = process.env["ZEPTOMAIL_ENDPOINT"]?.trim() || DEFAULT_ZEPTOMAIL_ENDPOINT;
-  const bounceAddress = process.env["ZEPTOMAIL_BOUNCE_ADDRESS"]?.trim();
+  const endpoint = emailApiUrl();
+  const bounceAddress = emailBounceAddress();
 
   try {
     const payload: Record<string, unknown> = {

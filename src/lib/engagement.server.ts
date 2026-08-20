@@ -1,12 +1,13 @@
 // Server-only helpers for the proposal → estimate → SOW → invoice pipeline.
 import { SITE_URL } from "@/content/site";
+import { documentsBucket } from "@/config/storage";
 import { adminDb } from "@/lib/blex.server";
 import { renderDocx, renderPdf } from "@/lib/documents/render.server";
 import type { ProjectDocument } from "@/lib/documents/types";
 import { formatMoney } from "@/lib/documents/types";
 import { renderEmail, sendEmail } from "@/lib/email.server";
 
-export const DOCUMENT_BUCKET = "documents";
+export const DOCUMENT_BUCKET = documentsBucket();
 export const PROPOSAL_REVIEW_DAYS = 5;
 export const PROPOSAL_REMINDER_DAYS = 3;
 

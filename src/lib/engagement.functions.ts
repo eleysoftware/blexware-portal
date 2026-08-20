@@ -97,14 +97,14 @@ export const regenerateProposal = createServerFn({ method: "POST" })
       change_request: data.changeRequest,
     });
 
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) throw new Error("AI is not configured for this project yet.");
+    const { aiApiKey, aiApiUrl, aiModel } = await import("@/config/ai");
+    const apiKey = aiApiKey();
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(aiApiUrl(), {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: aiModel(),
         messages: [
           {
             role: "system",

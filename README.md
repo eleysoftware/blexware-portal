@@ -25,6 +25,28 @@ npm run dev
 
 A Hyperswitch API key was committed historically. Rotate that key in the Hyperswitch dashboard, then store the new value only in the gitignored `.env` file as `HYPERSWITCH_API_KEY`.
 
+## Environment configuration
+
+All configuration is read through the centralised modules in `src/config/`
+(`environment`, `database`, `payments`, `ai`, `email`, `storage`). Application
+code uses `config.payments.apiUrl`, `config.database.supabaseUrl`, and so on —
+never `process.env` directly (only `src/config/env.ts` touches the environment).
+
+| Environment | Source of values |
+| --- | --- |
+| Local | `.env.local` |
+| Test | `.env.test` |
+| Development | `.env.development` |
+| Staging | deployment environment secrets |
+| Production | hosting platform secret manager |
+
+`.env.example` documents every variable; real values never enter Git. Browser
+visible variables must be prefixed `VITE_` (this is Vite, not Next.js); secrets
+stay unprefixed and are only read inside server handlers.
+
+To add a variable: add it to `.env.example`, expose it from the matching module
+in `src/config/`, then consume it as `config.<area>.<value>`.
+
 ## Run Tests - Unit, Integraton, and E2E
 
 ```sh
