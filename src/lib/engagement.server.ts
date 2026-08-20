@@ -1,5 +1,6 @@
 // Server-only helpers for the proposal → estimate → SOW → invoice pipeline.
 import { SITE_URL } from "@/content/site";
+import { documentsBucket } from "@/config/storage";
 import { adminDb } from "@/lib/blex.server";
 import { renderDocx, renderPdf } from "@/lib/documents/render.server";
 import type { ProjectDocument } from "@/lib/documents/types";
