@@ -42,7 +42,8 @@ export const Route = createFileRoute("/api/public/auth-hooks/password-check")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = (process.env["AUTH_HOOK_SECRET"] ?? "").replace(/^v1,?whsec_/, "");
+        const { authHookSecret } = await import("@/config/environment");
+        const secret = (authHookSecret() ?? "").replace(/^v1,?whsec_/, "");
         if (!secret) return new Response("Hook not configured", { status: 503 });
 
         const body = await request.text();

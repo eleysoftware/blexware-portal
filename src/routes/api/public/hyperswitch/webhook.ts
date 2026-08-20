@@ -26,7 +26,8 @@ export const Route = createFileRoute("/api/public/hyperswitch/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["HYPERSWITCH_WEBHOOK_SECRET"];
+        const { hyperswitchWebhookSecret } = await import("@/config/payments");
+        const secret = hyperswitchWebhookSecret();
         if (!secret) return new Response("Not configured", { status: 500 });
 
         const body = await request.text();

@@ -61,3 +61,13 @@ export const environment = {
     return appUrl();
   },
 };
+
+/** SERVER ONLY. Shared secret for the scheduled-work endpoint. */
+export function cronSecret(): string | undefined {
+  return readEnv("CRON_SECRET");
+}
+
+/** SERVER ONLY. Shared secret for the Supabase auth HTTP hook. */
+export function authHookSecret(): string | undefined {
+  return readEnv("AUTH_HOOK_SECRET");
+}

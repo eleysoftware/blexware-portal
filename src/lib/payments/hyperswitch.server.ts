@@ -2,6 +2,16 @@
 // leaves this module. No processor (Helcim, Stripe, …) is referenced here —
 // connectors are configured inside the Hyperswitch dashboard.
 
+import {
+  hyperswitchApiKey,
+  hyperswitchApiUrl,
+  hyperswitchProfileId,
+  hyperswitchPublishableKey,
+  hyperswitchWebhookSecret,
+  isPaymentsConfigured as configuredInEnv,
+  paymentEnvironment,
+} from "@/config/payments";
+
 export type HyperswitchConfig = {
   apiKey: string;
   publishableKey: string;
@@ -21,36 +31,30 @@ export class PaymentsNotConfiguredError extends Error {
 }
 
 export function isPaymentsConfigured(): boolean {
-  return Boolean(
-    process.env["HYPERSWITCH_API_KEY"] &&
-      process.env["HYPERSWITCH_PUBLISHABLE_KEY"] &&
-      process.env["HYPERSWITCH_PROFILE_ID"],
-  );
+  return configuredInEnv();
 }
 
 export function hyperswitchConfig(): HyperswitchConfig {
-  const apiKey = process.env["HYPERSWITCH_API_KEY"];
-  const publishableKey = process.env["HYPERSWITCH_PUBLISHABLE_KEY"];
-  const profileId = process.env["HYPERSWITCH_PROFILE_ID"];
-  const environment = (process.env["HYPERSWITCH_ENVIRONMENT"] ?? "sandbox").toLowerCase();
+  if (!isPaymentsConfigured()) {
+    const missing = [
+      hyperswitchPublishableKey() ? null : "HYPERSWITCH_PUBLISHABLE_KEY",
+      hyperswitchProfileId() ? null : "HYPERSWITCH_PROFILE_ID",
+    ].filter(Boolean) as string[];
+    try {
+      hyperswitchApiKey();
+    } catch {
+      missing.unshift("HYPERSWITCH_API_KEY");
+    }
+    throw new PaymentsNotConfiguredError(missing);
+  }
 
-  const missing = [
-    apiKey ? null : "HYPERSWITCH_API_KEY",
-    publishableKey ? null : "HYPERSWITCH_PUBLISHABLE_KEY",
-    profileId ? null : "HYPERSWITCH_PROFILE_ID",
-  ].filter(Boolean) as string[];
-  if (missing.length) throw new PaymentsNotConfiguredError(missing);
-
-  const isProd = environment === "production" || environment === "live";
   return {
-    apiKey: apiKey!,
-    publishableKey: publishableKey!,
-    profileId: profileId!,
-    webhookSecret: process.env["HYPERSWITCH_WEBHOOK_SECRET"] ?? null,
-    environment: isProd ? "production" : "sandbox",
-    baseUrl:
-      process.env["HYPERSWITCH_BASE_URL"] ??
-      (isProd ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io"),
+    apiKey: hyperswitchApiKey(),
+    publishableKey: hyperswitchPublishableKey()!,
+    profileId: hyperswitchProfileId()!,
+    webhookSecret: hyperswitchWebhookSecret() ?? null,
+    environment: paymentEnvironment(),
+    baseUrl: hyperswitchApiUrl(),
   };
 }
 

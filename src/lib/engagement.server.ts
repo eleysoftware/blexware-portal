@@ -6,7 +6,7 @@ import type { ProjectDocument } from "@/lib/documents/types";
 import { formatMoney } from "@/lib/documents/types";
 import { renderEmail, sendEmail } from "@/lib/email.server";
 
-export const DOCUMENT_BUCKET = "documents";
+export const DOCUMENT_BUCKET = documentsBucket();
 export const PROPOSAL_REVIEW_DAYS = 5;
 export const PROPOSAL_REMINDER_DAYS = 3;
 
