@@ -119,7 +119,15 @@ export const regenerateProposal = createServerFn({ method: "POST" })
       }),
     });
     if (response.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-    if (!response.ok) throw new Error("The revised proposal could not be generated.");
+    if (response.status === 402) throw new Error("AI credits exhausted for this workspace.");
+    if (response.status === 401)
+      throw new Error("The AI key is invalid for this environment. Check AI_API_KEY.");
+    if (response.status === 403)
+      throw new Error("AI access is blocked for this workspace (policy or credit limit).");
+    if (!response.ok) {
+      console.error("[regenerateProposal]", response.status, await response.text());
+      throw new Error("The revised proposal could not be generated.");
+    }
 
     const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
     const content = payload.choices?.[0]?.message?.content?.trim();
