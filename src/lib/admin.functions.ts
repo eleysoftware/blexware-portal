@@ -309,6 +309,10 @@ export const generateProposal = createServerFn({ method: "POST" })
 
     if (response.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
     if (response.status === 402) throw new Error("AI credits exhausted for this workspace.");
+    if (response.status === 401)
+      throw new Error("The AI key is invalid for this environment. Check AI_API_KEY.");
+    if (response.status === 403)
+      throw new Error("AI access is blocked for this workspace (policy or credit limit).");
     if (!response.ok) {
       console.error("[generateProposal]", response.status, await response.text());
       throw new Error("The proposal draft could not be generated.");
