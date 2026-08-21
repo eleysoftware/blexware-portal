@@ -313,8 +313,9 @@ function QuoteDetailPage() {
 
             {!aiReady ? (
               <p className="mt-2 text-sm text-slate">
-                AI drafting is unavailable in this environment. Set AI_API_KEY in .env.local (see
-                README). Saving, sending, and document generation still work.
+                AI drafting is unavailable in this environment. Set GEMINI_API_KEY
+                (and optionally GROQ_API_KEY) in .env.local (see README). Saving,
+                sending, and document generation still work.
               </p>
             ) : null}
 

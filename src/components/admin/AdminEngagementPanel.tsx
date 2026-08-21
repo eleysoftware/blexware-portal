@@ -296,7 +296,7 @@ export function AdminEngagementPanel({
           </Button>
           {!aiReady ? (
             <p className="mt-2 text-xs text-slate">
-              AI drafting is unavailable in this environment. Set AI_API_KEY in .env.local (see README).
+              AI drafting is unavailable in this environment. Set GEMINI_API_KEY (and optionally GROQ_API_KEY) in .env.local (see README).
             </p>
           ) : null}
         </div>

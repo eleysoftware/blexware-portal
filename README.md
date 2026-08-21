@@ -49,21 +49,21 @@ in `src/config/`, then consume it as `config.<area>.<value>`.
 
 ### AI generation outside Lovable
 
-Inside Lovable, `LOVABLE_API_KEY` is injected automatically, so the AI actions
-("Generate draft", "Regenerate", "Regenerate proposal") just work. Locally
-nothing injects it — set your own key in `.env.local`:
+Inside Lovable, `LOVABLE_API_KEY` is injected automatically, so Generate/Regenerate
+work against Lovable's gateway. Locally the app uses **Gemini AI Studio** first and
+**Groq** if Gemini hits a rate limit, quota, or outage.
+
+Put both keys in `.env.local` (never commit them):
 
 ```
-AI_API_KEY=<your key>
-# optional: use any OpenAI-compatible provider instead of the Lovable gateway
-AI_API_URL=https://api.openai.com/v1/chat/completions
-AI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=<Gemini AI Studio key>
+GROQ_API_KEY=<Groq key>
 ```
 
-The Lovable-managed gateway key is never revealed for copying, so a local run
-needs a key you control (a Lovable AI Gateway key from your account, or any
-OpenAI-compatible provider key). Without it, the AI buttons are disabled with
-an inline note; every other admin action still works.
+Optional model overrides: `GEMINI_MODEL` (default `gemini-2.5-flash`) and
+`GROQ_MODEL` (default `llama-3.3-70b-versatile`). Restart `npm run dev` after
+changing env files. Without any of those keys, the AI buttons are disabled;
+every other admin action still works.
 
 ## Run Tests - Unit, Integraton, and E2E
 

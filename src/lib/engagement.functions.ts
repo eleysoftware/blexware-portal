@@ -97,41 +97,18 @@ export const regenerateProposal = createServerFn({ method: "POST" })
       change_request: data.changeRequest,
     });
 
-    const { aiApiKey, aiApiUrl, aiModel } = await import("@/config/ai");
-    const apiKey = aiApiKey();
-
-    const response = await fetch(aiApiUrl(), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: aiModel(),
-        messages: [
-          {
-            role: "system",
-            content:
-              "You revise software project proposals for BLEXware. Return the complete revised proposal in markdown using H2 sections. Apply the requested changes faithfully, keep everything else intact, never invent pricing or compliance claims.",
-          },
-          {
-            role: "user",
-            content: `Current proposal:\n\n${proposal.content}\n\nRequested changes:\n${data.changeRequest}`,
-          },
-        ],
-      }),
-    });
-    if (response.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-    if (response.status === 402) throw new Error("AI credits exhausted for this workspace.");
-    if (response.status === 401)
-      throw new Error("The AI key is invalid for this environment. Check AI_API_KEY.");
-    if (response.status === 403)
-      throw new Error("AI access is blocked for this workspace (policy or credit limit).");
-    if (!response.ok) {
-      console.error("[regenerateProposal]", response.status, await response.text());
-      throw new Error("The revised proposal could not be generated.");
-    }
-
-    const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-    const content = payload.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error("The AI returned an empty revision.");
+    const { completeChat } = await import("@/lib/ai.server");
+    const { content } = await completeChat([
+      {
+        role: "system",
+        content:
+          "You revise software project proposals for BLEXware. Return the complete revised proposal in markdown using H2 sections. Apply the requested changes faithfully, keep everything else intact, never invent pricing or compliance claims.",
+      },
+      {
+        role: "user",
+        content: `Current proposal:\n\n${proposal.content}\n\nRequested changes:\n${data.changeRequest}`,
+      },
+    ]);
 
     const { data: quote } = await db
       .from("quotes")

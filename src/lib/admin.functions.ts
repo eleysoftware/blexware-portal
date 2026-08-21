@@ -273,9 +273,6 @@ export const generateProposal = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!quote) throw new Error("Quote not found");
 
-    const { aiApiKey, aiApiUrl, aiModel } = await import("@/config/ai");
-    const apiKey = aiApiKey();
-
     const prompt = [
       `Prospect: ${quote.contact_name}${quote.company ? ` (${quote.company})` : ""}`,
       `Industry: ${quote.industry}`,
@@ -287,42 +284,15 @@ export const generateProposal = createServerFn({ method: "POST" })
       `Desired features: ${quote.features ?? "not specified"}`,
     ].join("\n");
 
-    const model = aiModel();
-    const response = await fetch(aiApiUrl(), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const { completeChat } = await import("@/lib/ai.server");
+    const { content, model } = await completeChat([
+      {
+        role: "system",
+        content:
+          "You write software project proposals for BLEXware, a Black-led AI and custom software studio. Write in markdown with these H2 sections in order: Executive Summary, Business Goals, Functional Requirements, Technical Requirements, Architecture, Recommended Technology, Timeline, Phases, Deliverables, Optional Features, Discovery Questions. Be concrete and grounded in the intake answers. Never invent pricing beyond the stated budget range, and never invent certifications or compliance claims.",
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You write software project proposals for BLEXware, a Black-led AI and custom software studio. Write in markdown with these H2 sections in order: Executive Summary, Business Goals, Functional Requirements, Technical Requirements, Architecture, Recommended Technology, Timeline, Phases, Deliverables, Optional Features, Discovery Questions. Be concrete and grounded in the intake answers. Never invent pricing beyond the stated budget range, and never invent certifications or compliance claims.",
-          },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (response.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
-    if (response.status === 402) throw new Error("AI credits exhausted for this workspace.");
-    if (response.status === 401)
-      throw new Error("The AI key is invalid for this environment. Check AI_API_KEY.");
-    if (response.status === 403)
-      throw new Error("AI access is blocked for this workspace (policy or credit limit).");
-    if (!response.ok) {
-      console.error("[generateProposal]", response.status, await response.text());
-      throw new Error("The proposal draft could not be generated.");
-    }
-
-    const payload = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = payload.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error("The AI returned an empty draft.");
+      { role: "user", content: prompt },
+    ]);
 
     const { composeProposalDocFromQuote } = await import("@/lib/documents/proposal");
     const doc = composeProposalDocFromQuote(
