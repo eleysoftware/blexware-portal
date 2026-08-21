@@ -47,11 +47,19 @@ function QuoteDetailPage() {
   const send = useServerFn(sendProposal);
   const refreshDocs = useServerFn(refreshProposalDocuments);
   const docUrl = useServerFn(getDocumentUrl);
+  const aiStatusFn = useServerFn(getAiStatus);
 
   const detail = useQuery({
     queryKey: ["quote", id],
     queryFn: () => fetchDetail({ data: { id } }),
   });
+
+  const aiStatus = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: () => aiStatusFn({ data: {} }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const aiReady = aiStatus.data?.configured !== false;
 
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
