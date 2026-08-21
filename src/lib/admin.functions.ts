@@ -500,6 +500,15 @@ export const getAdminStatus = createServerFn({ method: "POST" })
     return { isAdmin: data === true, email: String(context.claims['email'] ?? "") };
   });
 
+/** Whether an AI key is configured in this environment (used to disable AI actions in the UI). */
+export const getAiStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data)
+  .handler(async () => {
+    const { isAiConfigured } = await import("@/config/ai");
+    return { configured: isAiConfigured() };
+  });
+
 const UUID = /^[0-9a-f-]{36}$/i;
 
 async function loadQuoteParty(db: AdminDb, quoteId: string) {
