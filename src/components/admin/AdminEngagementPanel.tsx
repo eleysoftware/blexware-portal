@@ -21,6 +21,7 @@ import {
   sendEstimate,
   sendInvoiceNow,
 } from "@/lib/engagement.functions";
+import { getAiStatus } from "@/lib/admin.functions";
 
 type Draft = { label: string; amount: string; duration: string; note: string };
 
