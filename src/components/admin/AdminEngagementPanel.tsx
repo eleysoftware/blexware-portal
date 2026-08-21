@@ -289,11 +289,16 @@ export function AdminEngagementPanel({
           <Button
             className="mt-3"
             variant="outline"
-            disabled={regenerateMutation.isPending || !changeRequest.trim()}
+            disabled={regenerateMutation.isPending || !changeRequest.trim() || !aiReady}
             onClick={() => regenerateMutation.mutate()}
           >
             {regenerateMutation.isPending ? "Regenerating…" : "Regenerate proposal"}
           </Button>
+          {!aiReady ? (
+            <p className="mt-2 text-xs text-slate">
+              AI drafting is unavailable in this environment. Set AI_API_KEY in .env.local (see README).
+            </p>
+          ) : null}
         </div>
       ) : null}
 
