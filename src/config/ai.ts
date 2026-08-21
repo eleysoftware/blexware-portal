@@ -18,7 +18,10 @@ export function aiModel(): string {
 
 /** SERVER ONLY. */
 export function aiApiKey(): string {
-  return requireEnv(["AI_API_KEY", "LOVABLE_API_KEY"], "AI is not configured for this project yet.");
+  return requireEnv(
+    ["AI_API_KEY", "LOVABLE_API_KEY"],
+    "Set AI_API_KEY in .env.local (see .env.example and the README) or in your host's secret manager.",
+  );
 }
 
 export function isAiConfigured(): boolean {
