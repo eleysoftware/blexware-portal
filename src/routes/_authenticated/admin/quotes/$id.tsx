@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   generateProposal,
+  getAiStatus,
   getQuoteDetail,
   getQuoteFileUrl,
   refreshProposalDocuments,
@@ -46,11 +47,19 @@ function QuoteDetailPage() {
   const send = useServerFn(sendProposal);
   const refreshDocs = useServerFn(refreshProposalDocuments);
   const docUrl = useServerFn(getDocumentUrl);
+  const aiStatusFn = useServerFn(getAiStatus);
 
   const detail = useQuery({
     queryKey: ["quote", id],
     queryFn: () => fetchDetail({ data: { id } }),
   });
+
+  const aiStatus = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: () => aiStatusFn({ data: {} }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const aiReady = aiStatus.data?.configured !== false;
 
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
@@ -250,7 +259,7 @@ function QuoteDetailPage() {
                 <Button
                   size="sm"
                   onClick={() => draftMutation.mutate()}
-                  disabled={draftMutation.isPending}
+                  disabled={draftMutation.isPending || !aiReady}
                 >
                   {draftMutation.isPending ? "Generating…" : proposal ? "Regenerate" : "Generate draft"}
                 </Button>
@@ -301,6 +310,13 @@ function QuoteDetailPage() {
               emails the review link from quote@blexware.com and copies it for you; "Copy review link"
               shares it manually without sending mail.
             </p>
+
+            {!aiReady ? (
+              <p className="mt-2 text-sm text-slate">
+                AI drafting is unavailable in this environment. Set AI_API_KEY in .env.local (see
+                README). Saving, sending, and document generation still work.
+              </p>
+            ) : null}
 
             {proposal ? (
               <>

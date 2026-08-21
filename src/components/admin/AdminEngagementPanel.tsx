@@ -21,6 +21,7 @@ import {
   sendEstimate,
   sendInvoiceNow,
 } from "@/lib/engagement.functions";
+import { getAiStatus } from "@/lib/admin.functions";
 
 type Draft = { label: string; amount: string; duration: string; note: string };
 
@@ -44,11 +45,19 @@ export function AdminEngagementPanel({
   const issueRefund = useServerFn(refundPayment);
   const recordOffline = useServerFn(recordOfflinePaymentFn);
   const reconcile = useServerFn(reconcilePayment);
+  const aiStatusFn = useServerFn(getAiStatus);
 
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
     queryFn: () => fetchEngagement({ data: { quoteId } }),
   });
+
+  const aiStatus = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: () => aiStatusFn({ data: {} }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const aiReady = aiStatus.data?.configured !== false;
 
   const [rows, setRows] = useState<Draft[]>([emptyRow]);
   const [discount, setDiscount] = useState("0");
@@ -280,11 +289,16 @@ export function AdminEngagementPanel({
           <Button
             className="mt-3"
             variant="outline"
-            disabled={regenerateMutation.isPending || !changeRequest.trim()}
+            disabled={regenerateMutation.isPending || !changeRequest.trim() || !aiReady}
             onClick={() => regenerateMutation.mutate()}
           >
             {regenerateMutation.isPending ? "Regenerating…" : "Regenerate proposal"}
           </Button>
+          {!aiReady ? (
+            <p className="mt-2 text-xs text-slate">
+              AI drafting is unavailable in this environment. Set AI_API_KEY in .env.local (see README).
+            </p>
+          ) : null}
         </div>
       ) : null}
 

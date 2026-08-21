@@ -309,6 +309,10 @@ export const generateProposal = createServerFn({ method: "POST" })
 
     if (response.status === 429) throw new Error("AI rate limit reached. Try again shortly.");
     if (response.status === 402) throw new Error("AI credits exhausted for this workspace.");
+    if (response.status === 401)
+      throw new Error("The AI key is invalid for this environment. Check AI_API_KEY.");
+    if (response.status === 403)
+      throw new Error("AI access is blocked for this workspace (policy or credit limit).");
     if (!response.ok) {
       console.error("[generateProposal]", response.status, await response.text());
       throw new Error("The proposal draft could not be generated.");
@@ -498,6 +502,15 @@ export const getAdminStatus = createServerFn({ method: "POST" })
       _role: "admin",
     });
     return { isAdmin: data === true, email: String(context.claims['email'] ?? "") };
+  });
+
+/** Whether an AI key is configured in this environment (used to disable AI actions in the UI). */
+export const getAiStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data)
+  .handler(async () => {
+    const { isAiConfigured } = await import("@/config/ai");
+    return { configured: isAiConfigured() };
   });
 
 const UUID = /^[0-9a-f-]{36}$/i;
