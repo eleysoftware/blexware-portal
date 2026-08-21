@@ -311,6 +311,13 @@ function QuoteDetailPage() {
               shares it manually without sending mail.
             </p>
 
+            {!aiReady ? (
+              <p className="mt-2 text-sm text-slate">
+                AI drafting is unavailable in this environment. Set AI_API_KEY in .env.local (see
+                README). Saving, sending, and document generation still work.
+              </p>
+            ) : null}
+
             {proposal ? (
               <>
                 <label className="mt-4 block text-sm font-medium">
