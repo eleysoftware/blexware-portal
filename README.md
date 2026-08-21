@@ -47,6 +47,24 @@ stay unprefixed and are only read inside server handlers.
 To add a variable: add it to `.env.example`, expose it from the matching module
 in `src/config/`, then consume it as `config.<area>.<value>`.
 
+### AI generation outside Lovable
+
+Inside Lovable, `LOVABLE_API_KEY` is injected automatically, so the AI actions
+("Generate draft", "Regenerate", "Regenerate proposal") just work. Locally
+nothing injects it — set your own key in `.env.local`:
+
+```
+AI_API_KEY=<your key>
+# optional: use any OpenAI-compatible provider instead of the Lovable gateway
+AI_API_URL=https://api.openai.com/v1/chat/completions
+AI_MODEL=gpt-4o-mini
+```
+
+The Lovable-managed gateway key is never revealed for copying, so a local run
+needs a key you control (a Lovable AI Gateway key from your account, or any
+OpenAI-compatible provider key). Without it, the AI buttons are disabled with
+an inline note; every other admin action still works.
+
 ## Run Tests - Unit, Integraton, and E2E
 
 ```sh
