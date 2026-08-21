@@ -44,11 +44,19 @@ export function AdminEngagementPanel({
   const issueRefund = useServerFn(refundPayment);
   const recordOffline = useServerFn(recordOfflinePaymentFn);
   const reconcile = useServerFn(reconcilePayment);
+  const aiStatusFn = useServerFn(getAiStatus);
 
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
     queryFn: () => fetchEngagement({ data: { quoteId } }),
   });
+
+  const aiStatus = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: () => aiStatusFn({ data: {} }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const aiReady = aiStatus.data?.configured !== false;
 
   const [rows, setRows] = useState<Draft[]>([emptyRow]);
   const [discount, setDiscount] = useState("0");
