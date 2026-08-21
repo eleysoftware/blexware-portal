@@ -259,7 +259,7 @@ function QuoteDetailPage() {
                 <Button
                   size="sm"
                   onClick={() => draftMutation.mutate()}
-                  disabled={draftMutation.isPending}
+                  disabled={draftMutation.isPending || !aiReady}
                 >
                   {draftMutation.isPending ? "Generating…" : proposal ? "Regenerate" : "Generate draft"}
                 </Button>
