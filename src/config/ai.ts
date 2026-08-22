@@ -44,7 +44,7 @@ export function isAiConfigured(): boolean {
 }
 
 /** Gemini first, Groq as backup; Lovable/legacy only when those keys are absent. */
-export function aiTargets(): AiTarget[] {
+export function aiTargets(preference?: AiModelPreference): AiTarget[] {
   const targets: AiTarget[] = [];
   const geminiKey = readEnv("GEMINI_API_KEY");
   const groqKey = readEnv("GROQ_API_KEY");
@@ -67,7 +67,7 @@ export function aiTargets(): AiTarget[] {
       model: readEnv("GROQ_MODEL") ?? DEFAULT_GROQ_MODEL,
     });
   }
-  if (targets.length) return targets;
+  if (targets.length) return preferTargets(targets, preference);
 
   const legacyKey = readEnv("AI_API_KEY", "LOVABLE_API_KEY");
   if (legacyKey) {
@@ -79,7 +79,7 @@ export function aiTargets(): AiTarget[] {
       model: aiModel(),
     });
   }
-  return targets;
+  return preferTargets(targets, preference);
 }
 
 export const ai = {
@@ -96,3 +96,111 @@ export const ai = {
     return isAiConfigured();
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Model catalogs                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Curated fallback versions per platform, newest first. */
+export const AI_MODEL_CATALOG: Record<AiProviderId, string[]> = {
+  gemini: [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-pro",
+    DEFAULT_GEMINI_MODEL,
+    "gemini-2.5-flash-lite",
+  ],
+  groq: [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    DEFAULT_GROQ_MODEL,
+    "llama-3.1-8b-instant",
+    "deepseek-r1-distill-llama-70b",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+  ],
+  legacy: [
+    "google/gemini-3.7-flash",
+    "google/gemini-3.1-pro-preview",
+    "google/gemini-3.1-flash-lite",
+    DEFAULT_LOVABLE_MODEL,
+    "openai/gpt-5.4",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5.4-nano",
+  ],
+};
+
+const EXCLUDE_MODEL = /embedding|embed|aqa|imagen|veo|whisper|tts|guard|prompt-guard|distil-whisper|vision-preview|image/i;
+
+function modelsEndpoint(target: AiTarget): string | null {
+  if (target.id === "gemini") {
+    // OpenAI-compat base for Gemini: .../v1beta/openai/chat/completions -> .../models
+    return target.url.replace(/\/chat\/completions$/, "/models");
+  }
+  if (target.id === "groq") return target.url.replace(/\/chat\/completions$/, "/models");
+  return null;
+}
+
+const listCache = new Map<string, { at: number; models: string[] }>();
+const LIST_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * SERVER ONLY. Live model versions for a configured platform, falling back to
+ * the curated catalog when the provider has no listing endpoint or the call fails.
+ */
+export async function listAiModels(target: AiTarget): Promise<string[]> {
+  const fallback = AI_MODEL_CATALOG[target.id] ?? [];
+  const endpoint = modelsEndpoint(target);
+  if (!endpoint) return dedupe([target.model, ...fallback]);
+
+  const cached = listCache.get(target.id);
+  if (cached && Date.now() - cached.at < LIST_TTL_MS) return cached.models;
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: { Authorization: `Bearer ${target.key}` },
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    const payload = (await response.json()) as {
+      data?: { id?: string }[];
+      models?: { name?: string; supportedGenerationMethods?: string[] }[];
+    };
+
+    const ids = (payload.data ?? [])
+      .map((entry) => entry.id)
+      .concat(
+        (payload.models ?? [])
+          .filter((entry) => !entry.supportedGenerationMethods || entry.supportedGenerationMethods.includes("generateContent"))
+          .map((entry) => entry.name?.replace(/^models\//, "")),
+      )
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => !EXCLUDE_MODEL.test(id))
+      .filter((id) => (target.id === "gemini" ? id.startsWith("gemini-") : true))
+      .sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+
+    if (!ids.length) throw new Error("empty listing");
+    const models = dedupe([target.model, ...ids]);
+    listCache.set(target.id, { at: Date.now(), models });
+    return models;
+  } catch (error) {
+    console.warn(`[listAiModels:${target.id}] falling back to catalog`, (error as Error).message);
+    return dedupe([target.model, ...fallback]);
+  }
+}
+
+function dedupe(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+export type AiModelPreference = { provider?: string | null; model?: string | null };
+
+/** Reorders configured targets so the admin's chosen platform/version runs first. */
+export function preferTargets(targets: AiTarget[], preference?: AiModelPreference): AiTarget[] {
+  if (!preference?.provider && !preference?.model) return targets;
+  const chosen = targets.find((target) => target.id === preference.provider);
+  if (!chosen) return targets;
+  const rest = targets.filter((target) => target !== chosen);
+  const model = preference.model?.trim();
+  return [model ? { ...chosen, model } : chosen, ...rest];
+}

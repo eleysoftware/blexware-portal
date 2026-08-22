@@ -16,12 +16,14 @@ import {
   reconcilePayment,
   recordOfflinePaymentFn,
   refundPayment,
+  draftEstimateWithAi,
   regenerateProposal,
   saveEstimate,
   sendEstimate,
   sendInvoiceNow,
 } from "@/lib/engagement.functions";
 import { getAiStatus } from "@/lib/admin.functions";
+import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 
 type Draft = { label: string; amount: string; duration: string; note: string };
 
@@ -42,6 +44,7 @@ export function AdminEngagementPanel({
   const docUrl = useServerFn(getDocumentUrl);
   const sendInvoice = useServerFn(sendInvoiceNow);
   const regenerate = useServerFn(regenerateProposal);
+  const draftEstimate = useServerFn(draftEstimateWithAi);
   const issueRefund = useServerFn(refundPayment);
   const recordOffline = useServerFn(recordOfflinePaymentFn);
   const reconcile = useServerFn(reconcilePayment);
@@ -58,6 +61,7 @@ export function AdminEngagementPanel({
     staleTime: 5 * 60 * 1000,
   });
   const aiReady = aiStatus.data?.configured !== false;
+  const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
   const [rows, setRows] = useState<Draft[]>([emptyRow]);
   const [discount, setDiscount] = useState("0");
@@ -69,6 +73,7 @@ export function AdminEngagementPanel({
     { label: "Invoice 2", amount: "" },
   ]);
   const [changeRequest, setChangeRequest] = useState("");
+  const [estimateNote, setEstimateNote] = useState("");
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
 
@@ -170,12 +175,42 @@ export function AdminEngagementPanel({
   });
 
   const regenerateMutation = useMutation({
-    mutationFn: () => regenerate({ data: { proposalId: proposalId!, changeRequest } }),
+    mutationFn: () =>
+      regenerate({
+        data: { proposalId: proposalId!, changeRequest, provider: aiChoice.provider, model: aiChoice.model },
+      }),
     onSuccess: () => {
       toast.success("Proposal regenerated — review the new draft before sending");
       setChangeRequest("");
       invalidate();
       void queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const estimateAiMutation = useMutation({
+    mutationFn: () =>
+      draftEstimate({ data: { quoteId, provider: aiChoice.provider, model: aiChoice.model } }),
+    onSuccess: (result) => {
+      setRows(
+        result.lineItems.map((item) => ({
+          label: item.label,
+          amount: (item.amountCents / 100).toString(),
+          duration: item.durationLabel ?? "",
+          note: item.note ?? "",
+        })),
+      );
+      if (result.durationNote) setDurationNote(result.durationNote);
+      setEstimateNote(
+        [
+          `Drafted with ${result.provider} (${result.model}).`,
+          result.adjusted ? "Amounts were scaled to fit the client's selected budget range." : "",
+          result.rationale,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      toast.success("AI estimate drafted — review and edit before saving");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -286,14 +321,21 @@ export function AdminEngagementPanel({
             onChange={(event) => setChangeRequest(event.target.value)}
             placeholder="e.g. Remove the lead-capture feature and add a Savings Reset Kit download."
           />
-          <Button
-            className="mt-3"
-            variant="outline"
-            disabled={regenerateMutation.isPending || !changeRequest.trim() || !aiReady}
-            onClick={() => regenerateMutation.mutate()}
-          >
-            {regenerateMutation.isPending ? "Regenerating…" : "Regenerate proposal"}
-          </Button>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              disabled={regenerateMutation.isPending || !changeRequest.trim() || !aiReady}
+              onClick={() => regenerateMutation.mutate()}
+            >
+              {regenerateMutation.isPending ? "Regenerating…" : "Regenerate proposal"}
+            </Button>
+            <AiModelPicker
+              providers={aiStatus.data?.providers}
+              choice={aiChoice}
+              onChange={setAiChoice}
+              disabled={regenerateMutation.isPending}
+            />
+          </div>
           {!aiReady ? (
             <p className="mt-2 text-xs text-slate">
               AI drafting is unavailable in this environment. Set GEMINI_API_KEY (and optionally GROQ_API_KEY) in .env.local (see README).
@@ -305,8 +347,31 @@ export function AdminEngagementPanel({
       <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl">Cost & schedule estimate</h2>
-          {estimate ? <Badge variant="outline">{estimate.status}</Badge> : null}
+          <div className="flex flex-wrap items-center gap-3">
+            {estimate ? <Badge variant="outline">{estimate.status}</Badge> : null}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={estimateAiMutation.isPending || !aiReady}
+              onClick={() => estimateAiMutation.mutate()}
+            >
+              {estimateAiMutation.isPending ? "Drafting…" : "Draft estimate with AI"}
+            </Button>
+            <AiModelPicker
+              providers={aiStatus.data?.providers}
+              choice={aiChoice}
+              onChange={setAiChoice}
+              disabled={estimateAiMutation.isPending}
+            />
+          </div>
         </div>
+        {estimateNote ? <p className="mt-2 text-xs text-slate">{estimateNote}</p> : null}
+        {!aiReady ? (
+          <p className="mt-2 text-xs text-slate">
+            AI estimating is unavailable in this environment. Set GEMINI_API_KEY (and optionally
+            GROQ_API_KEY) in .env.local (see README). Manual entry still works.
+          </p>
+        ) : null}
 
         <div className="mt-4 space-y-3">
           {rows.map((row, index) => (

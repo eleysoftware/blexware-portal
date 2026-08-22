@@ -73,7 +73,7 @@ export const getEngagement = createServerFn({ method: "POST" })
 /** Re-runs the AI draft with the client's requested changes, keeping history. */
 export const regenerateProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { proposalId: string; changeRequest: string }) => {
+  .validator((data: { proposalId: string; changeRequest: string; provider?: string; model?: string }) => {
     if (!data.changeRequest.trim()) throw new Error("Describe the changes to make");
     return { ...data, changeRequest: data.changeRequest.slice(0, 4000) };
   })
@@ -108,7 +108,7 @@ export const regenerateProposal = createServerFn({ method: "POST" })
         role: "user",
         content: `Current proposal:\n\n${proposal.content}\n\nRequested changes:\n${data.changeRequest}`,
       },
-    ]);
+    ], { provider: data.provider, model: data.model });
 
     const { data: quote } = await db
       .from("quotes")
@@ -154,6 +154,92 @@ export const regenerateProposal = createServerFn({ method: "POST" })
     });
 
     return { ok: true };
+  });
+
+/** AI-drafted cost + time estimate. Returns a draft only — never writes to the DB. */
+export const draftEstimateWithAi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; provider?: string; model?: string }) => data)
+  .handler(async ({ data, context }) => {
+    const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+    await requireAdmin(context.supabase, context.userId);
+    const db = adminDb();
+
+    const { data: quote } = await db
+      .from("quotes")
+      .select("project_type, industry, services, budget, timeline, goals, features")
+      .eq("id", data.quoteId)
+      .maybeSingle();
+    if (!quote) throw new Error("Quote not found");
+
+    const { data: proposal } = await db
+      .from("proposals")
+      .select("content")
+      .eq("quote_id", data.quoteId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { parseBudgetBand, describeBand, parseEstimateJson, reconcileToBudget } = await import(
+      "@/lib/documents/estimate-ai"
+    );
+    const band = parseBudgetBand(quote.budget as string | null);
+
+    const prompt = [
+      `Project type: ${quote.project_type}`,
+      `Industry: ${quote.industry}`,
+      `Services: ${(quote.services as string[] | null)?.join(", ") ?? "n/a"}`,
+      `Client budget range: ${quote.budget} (${describeBand(band)})`,
+      `Timeline preference: ${quote.timeline}`,
+      `Goals: ${quote.goals}`,
+      `Desired features: ${quote.features ?? "not specified"}`,
+      "",
+      proposal?.content
+        ? `Approved proposal:\n\n${String(proposal.content).slice(0, 12000)}`
+        : "No proposal content available; estimate from the intake answers.",
+    ].join("\n");
+
+    const budgetRule =
+      band?.max === null
+        ? "The client chose the open-ended top budget band, so size the work honestly from scope with no upper clamp."
+        : `The sum of all line item amounts MUST land inside the client's budget range, targeting the middle-to-upper part of the band.`;
+
+    const { completeChat } = await import("@/lib/ai.server");
+    const { content, model, provider } = await completeChat(
+      [
+        {
+          role: "system",
+          content:
+            "You are a senior delivery lead at BLEXware pricing a software engagement. Return ONLY JSON matching " +
+            '{"lineItems":[{"label":string,"amount":number,"durationLabel":string,"note":string}],"durationNote":string,"rationale":string}. ' +
+            "One line item per proposal phase or major workstream. `amount` is US dollars (a number, no symbols or commas). " +
+            "`durationLabel` is a short span like \"2 weeks\". " +
+            budgetRule +
+            " Never invent compliance claims or certifications.",
+        },
+        { role: "user", content: prompt },
+      ],
+      { provider: data.provider, model: data.model, json: true },
+    );
+
+    let parsed;
+    try {
+      parsed = parseEstimateJson(content);
+    } catch {
+      throw new Error("The AI returned an estimate that could not be read. Try again or pick another model.");
+    }
+
+    const reconciled = reconcileToBudget(parsed.lineItems, band);
+    return {
+      lineItems: reconciled.lineItems,
+      totalCents: reconciled.totalCents,
+      adjusted: reconciled.adjusted,
+      durationNote: parsed.durationNote,
+      rationale: parsed.rationale,
+      model,
+      provider,
+      budget: (quote.budget as string | null) ?? null,
+    };
   });
 
 /** Creates or replaces the draft cost + schedule estimate for an approved proposal. */

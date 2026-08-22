@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 import {
   generateProposal,
   getAiStatus,
@@ -60,6 +61,7 @@ function QuoteDetailPage() {
     staleTime: 5 * 60 * 1000,
   });
   const aiReady = aiStatus.data?.configured !== false;
+  const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
@@ -83,7 +85,7 @@ function QuoteDetailPage() {
   });
 
   const draftMutation = useMutation({
-    mutationFn: () => draft({ data: { quoteId: id } }),
+    mutationFn: () => draft({ data: { quoteId: id, provider: aiChoice.provider, model: aiChoice.model } }),
     onSuccess: () => {
       toast.success("Draft generated — review before sending");
       void invalidate();
@@ -255,7 +257,13 @@ function QuoteDetailPage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl">Proposal draft</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <AiModelPicker
+                  providers={aiStatus.data?.providers}
+                  choice={aiChoice}
+                  onChange={setAiChoice}
+                  disabled={draftMutation.isPending}
+                />
                 <Button
                   size="sm"
                   onClick={() => draftMutation.mutate()}
