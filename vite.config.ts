@@ -12,4 +12,15 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    resolve: {
+      alias: [
+        // pdf-lib ships a CommonJS entry that destructures tslib@1's default export.
+        // In the worker bundle that interop yields undefined ("Cannot destructure
+        // property '__extends'"). Pin both to their ESM builds everywhere so local
+        // dev and the deployed worker load identical, bundler-safe code.
+        { find: /^pdf-lib$/, replacement: "pdf-lib/es/index.js" },
+      ],
+    },
+  },
 });
