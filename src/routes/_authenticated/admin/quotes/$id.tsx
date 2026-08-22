@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 import {
   generateProposal,
   getAiStatus,
@@ -84,7 +85,7 @@ function QuoteDetailPage() {
   });
 
   const draftMutation = useMutation({
-    mutationFn: () => draft({ data: { quoteId: id } }),
+    mutationFn: () => draft({ data: { quoteId: id, provider: aiChoice.provider, model: aiChoice.model } }),
     onSuccess: () => {
       toast.success("Draft generated — review before sending");
       void invalidate();
