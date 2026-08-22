@@ -173,8 +173,12 @@ function SignUpForm() {
     setBusy(true);
     try {
       await createAccount({ data: { email: parsed.data.email, password: parsed.data.password } });
-      // Supabase sends the confirmation email for the pending account.
-      await supabase.auth.resend({ type: "signup", email: parsed.data.email });
+      // The admin-created account is unconfirmed; this is the confirmation email.
+      await supabase.auth.resend({
+        type: "signup",
+        email: parsed.data.email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
       setDone(true);
     } catch (error) {
       setErrors([(error as Error).message]);
@@ -183,14 +187,33 @@ function SignUpForm() {
     }
   };
 
+  const resend = async () => {
+    setBusy(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`A new confirmation link is on its way to ${email}.`);
+  };
+
   if (done) {
     return (
       <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-5">
         <h2 className="text-sm font-semibold text-foreground">Check your email</h2>
         <p className="text-sm text-slate">
           We sent a confirmation link to <span className="font-medium">{email}</span>. Confirm your
-          address, then come back and sign in.
+          address, then come back and sign in. The link can only be used once and expires, so
+          request a fresh one if it stops working.
         </p>
+        <Button variant="outline" size="sm" onClick={resend} disabled={busy}>
+          {busy ? "Sending…" : "Resend confirmation email"}
+        </Button>
       </div>
     );
   }
