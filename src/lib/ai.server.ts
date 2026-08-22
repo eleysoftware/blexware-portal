@@ -1,5 +1,7 @@
 import { aiTargets } from "@/config/ai";
-import type { AiProviderId, AiTarget } from "@/config/ai";
+import type { AiModelPreference, AiProviderId, AiTarget } from "@/config/ai";
+
+export type ChatOptions = AiModelPreference & { json?: boolean };
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -58,6 +60,7 @@ export function shouldFailover(status: number): boolean {
 async function completeAgainst(
   target: AiTarget,
   messages: ChatMessage[],
+  options?: ChatOptions,
 ): Promise<{ content: string } | { error: Error; failover: boolean }> {
   try {
     const response = await fetch(target.url, {
@@ -66,7 +69,11 @@ async function completeAgainst(
         Authorization: `Bearer ${target.key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model: target.model, messages }),
+      body: JSON.stringify({
+        model: target.model,
+        messages,
+        ...(options?.json ? { response_format: { type: "json_object" } } : {}),
+      }),
     });
     const raw = await response.text();
     if (!response.ok) {
@@ -95,8 +102,11 @@ async function completeAgainst(
 }
 
 /** Gemini first when configured; Groq if Gemini hits a limit or error. */
-export async function completeChat(messages: ChatMessage[]): Promise<ChatCompletion> {
-  const targets = aiTargets();
+export async function completeChat(
+  messages: ChatMessage[],
+  options?: ChatOptions,
+): Promise<ChatCompletion> {
+  const targets = aiTargets(options);
   if (!targets.length) {
     throw new Error(
       "AI is not configured. Set GEMINI_API_KEY (and optionally GROQ_API_KEY) in .env.local.",
@@ -106,7 +116,7 @@ export async function completeChat(messages: ChatMessage[]): Promise<ChatComplet
   let lastError: Error | undefined;
   for (let index = 0; index < targets.length; index += 1) {
     const target = targets[index]!;
-    const result = await completeAgainst(target, messages);
+    const result = await completeAgainst(target, messages, options);
     if ("content" in result) {
       if (index > 0) console.warn(`[completeChat] using backup provider ${target.id} (${target.model})`);
       return { content: result.content, model: target.model, provider: target.id };
