@@ -60,6 +60,7 @@ function QuoteDetailPage() {
     staleTime: 5 * 60 * 1000,
   });
   const aiReady = aiStatus.data?.configured !== false;
+  const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
@@ -255,7 +256,13 @@ function QuoteDetailPage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl">Proposal draft</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <AiModelPicker
+                  providers={aiStatus.data?.providers}
+                  choice={aiChoice}
+                  onChange={setAiChoice}
+                  disabled={draftMutation.isPending}
+                />
                 <Button
                   size="sm"
                   onClick={() => draftMutation.mutate()}
