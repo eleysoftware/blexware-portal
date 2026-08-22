@@ -27,9 +27,20 @@ What changes:
 - If the client chose the open-ended top band ("$25,000+"), the model is told to size honestly from scope with no upper clamp.
 - Discount, payment plan kind, and invoice scheduling stay manual and unchanged.
 
+## Model versions available on each platform
+
+Versions come from two places: a live lookup of each provider's own model list, plus a curated fallback so the picker still works offline or if a lookup fails.
+
+- **Gemini** (`/v1beta/models`, live listing filtered to chat-capable `gemini-*` models). Curated fallback, newest first: `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-2.5-pro`, `gemini-2.5-flash` (current default), `gemini-2.5-flash-lite`.
+- **Groq** (`/openai/v1/models`, live listing filtered to text chat models). Curated fallback: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `llama-3.3-70b-versatile` (current default), `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`, `meta-llama/llama-4-maverick-17b-128e-instruct`.
+- **Lovable gateway (legacy)** — no listing endpoint, so a fixed catalog: `google/gemini-3.7-flash`, `google/gemini-3.1-pro-preview`, `google/gemini-3.1-flash-lite`, `google/gemini-2.5-flash` (current default), `openai/gpt-5.4`, `openai/gpt-5.4-mini`, `openai/gpt-5.4-nano`.
+
+Defaults stay exactly what they are today, so nothing changes unless an admin picks a different version. Model lists are fetched server-side (keys never reach the browser) and cached for an hour. Any provider default can still be overridden with `GEMINI_MODEL` / `GROQ_MODEL` / `AI_MODEL`, and that override is shown as selected.
+
 ## Technical notes
 
-- `src/config/ai.ts`: add a catalog of selectable models per provider and let `aiTargets()` accept an optional preferred `{ provider, model }` that reorders/overrides the target list; keys and URLs stay in env config.
+- `src/config/ai.ts`: add the curated per-provider model catalog above plus a `listModels(provider)` helper that calls the provider's models endpoint with an in-memory hourly cache and falls back to the catalog; let `aiTargets()` accept an optional preferred `{ provider, model }` that reorders/overrides the target list. Keys and URLs stay in env config.
+
 - `src/lib/ai.server.ts`: `completeChat(messages, options?)` gains the preference plus an optional JSON-output mode used by the estimate generator.
 - `src/lib/admin.functions.ts`: `getAiStatus` returns `{ configured, providers: [{ id, label, models, defaultModel }] }`.
 - `src/lib/engagement.functions.ts`: `regenerateProposal` and the draft-generation function accept optional `provider`/`model`; new `draftEstimateWithAi` server fn (admin-only) returns line items + duration note + rationale without writing to the DB.
