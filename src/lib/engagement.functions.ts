@@ -73,7 +73,7 @@ export const getEngagement = createServerFn({ method: "POST" })
 /** Re-runs the AI draft with the client's requested changes, keeping history. */
 export const regenerateProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { proposalId: string; changeRequest: string }) => {
+  .validator((data: { proposalId: string; changeRequest: string; provider?: string; model?: string }) => {
     if (!data.changeRequest.trim()) throw new Error("Describe the changes to make");
     return { ...data, changeRequest: data.changeRequest.slice(0, 4000) };
   })
@@ -108,7 +108,7 @@ export const regenerateProposal = createServerFn({ method: "POST" })
         role: "user",
         content: `Current proposal:\n\n${proposal.content}\n\nRequested changes:\n${data.changeRequest}`,
       },
-    ]);
+    ], { provider: data.provider, model: data.model });
 
     const { data: quote } = await db
       .from("quotes")

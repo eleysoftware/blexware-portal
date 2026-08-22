@@ -260,7 +260,7 @@ export const getQuoteFileUrl = createServerFn({ method: "POST" })
 
 export const generateProposal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { quoteId: string }) => data)
+  .validator((data: { quoteId: string; provider?: string; model?: string }) => data)
   .handler(async ({ data, context }) => {
     const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
     await requireAdmin(context.supabase, context.userId);
@@ -292,7 +292,7 @@ export const generateProposal = createServerFn({ method: "POST" })
           "You write software project proposals for BLEXware, a Black-led AI and custom software studio. Write in markdown with these H2 sections in order: Executive Summary, Business Goals, Functional Requirements, Technical Requirements, Architecture, Recommended Technology, Timeline, Phases, Deliverables, Optional Features, Discovery Questions. Be concrete and grounded in the intake answers. Never invent pricing beyond the stated budget range, and never invent certifications or compliance claims.",
       },
       { role: "user", content: prompt },
-    ]);
+    ], { provider: data.provider, model: data.model });
 
     const { composeProposalDocFromQuote } = await import("@/lib/documents/proposal");
     const doc = composeProposalDocFromQuote(
@@ -479,8 +479,17 @@ export const getAiStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: Record<string, never>) => data)
   .handler(async () => {
-    const { isAiConfigured } = await import("@/config/ai");
-    return { configured: isAiConfigured() };
+    const { aiTargets, listAiModels } = await import("@/config/ai");
+    const targets = aiTargets();
+    const providers = await Promise.all(
+      targets.map(async (target) => ({
+        id: target.id,
+        label: target.label,
+        defaultModel: target.model,
+        models: await listAiModels(target),
+      })),
+    );
+    return { configured: providers.length > 0, providers };
   });
 
 const UUID = /^[0-9a-f-]{36}$/i;
