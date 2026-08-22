@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { guarded } from "@/lib/errors";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -17,18 +18,20 @@ function viewerDb(supabase: unknown): SupabaseClient {
 export const listMyQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: Record<string, never>) => data ?? {})
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("quotes")
-      .select(
-        "id, quote_number, status, project_type, industry, budget, timeline, created_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(100);
+  .handler(
+    guarded("listMyQuotes", "loading your requests", async ({ context }) => {
+      const { data, error } = await context.supabase
+        .from("quotes")
+        .select(
+          "id, quote_number, status, project_type, industry, budget, timeline, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(100);
 
-    if (error) throw new Error(error.message);
-    return { quotes: (data ?? []) as unknown as Partial<QuoteRecord>[] };
-  });
+      if (error) throw new Error(error.message);
+      return { quotes: (data ?? []) as unknown as Partial<QuoteRecord>[] };
+    }),
+  );
 
 export const getMyQuote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -36,65 +39,67 @@ export const getMyQuote = createServerFn({ method: "POST" })
     if (!/^[0-9a-f-]{36}$/i.test(data.id)) throw new Error("Unknown quote");
     return data;
   })
-  .handler(async ({ data, context }) => {
-    const { data: quote, error } = await context.supabase
-      .from("quotes")
-      .select(
-        "id, quote_number, status, project_type, industry, services, goals, features, budget, timeline, contact_name, contact_email, company, created_at",
-      )
-      .eq("id", data.id)
-      .maybeSingle();
+  .handler(
+    guarded("getMyQuote", "loading your request", async ({ data, context }) => {
+      const { data: quote, error } = await context.supabase
+        .from("quotes")
+        .select(
+          "id, quote_number, status, project_type, industry, services, goals, features, budget, timeline, contact_name, contact_email, company, created_at",
+        )
+        .eq("id", data.id)
+        .maybeSingle();
 
-    if (error) throw new Error(error.message);
-    if (!quote) return { quote: null, files: [], proposal: null, documents: [] };
+      if (error) throw new Error(error.message);
+      if (!quote) return { quote: null, files: [], proposal: null, documents: [] };
 
-    const { data: files } = await context.supabase
-      .from("quote_files")
-      .select("id, original_name, byte_size, mime_type, created_at")
-      .eq("quote_id", data.id);
+      const { data: files } = await context.supabase
+        .from("quote_files")
+        .select("id, original_name, byte_size, mime_type, created_at")
+        .eq("quote_id", data.id);
 
-    const { data: proposal } = await context.supabase
-      .from("proposals")
-      .select("id, status, content, sent_at, responded_at, client_response_note, review_token, doc")
-      .eq("quote_id", data.id)
-      .neq("status", "draft")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      const { data: proposal } = await context.supabase
+        .from("proposals")
+        .select("id, status, content, sent_at, responded_at, client_response_note, review_token, doc")
+        .eq("quote_id", data.id)
+        .neq("status", "draft")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const { data: documents } = proposal
-      ? await viewerDb(context.supabase)
-          .from("documents")
-          .select("id, entity, entity_id, kind, format")
-          .eq("quote_id", data.id)
-          .eq("entity", "proposal")
-          .eq("entity_id", (proposal as unknown as { id: string }).id)
-          .order("created_at", { ascending: false })
-      : { data: [] };
+      const { data: documents } = proposal
+        ? await viewerDb(context.supabase)
+            .from("documents")
+            .select("id, entity, entity_id, kind, format")
+            .eq("quote_id", data.id)
+            .eq("entity", "proposal")
+            .eq("entity_id", (proposal as unknown as { id: string }).id)
+            .order("created_at", { ascending: false })
+        : { data: [] };
 
-    return {
-      quote: quote as unknown as Partial<QuoteRecord>,
-      files: (files ?? []) as unknown as QuoteFileRecord[],
-      proposal: (proposal ?? null) as unknown as Pick<
-        ProposalRecord,
-        | "id"
-        | "status"
-        | "content"
-        | "sent_at"
-        | "responded_at"
-        | "client_response_note"
-        | "review_token"
-        | "doc"
-      > | null,
-      documents: (documents ?? []) as unknown as {
-        id: string;
-        entity: string;
-        entity_id: string;
-        kind: string;
-        format: string;
-      }[],
-    };
-  });
+      return {
+        quote: quote as unknown as Partial<QuoteRecord>,
+        files: (files ?? []) as unknown as QuoteFileRecord[],
+        proposal: (proposal ?? null) as unknown as Pick<
+          ProposalRecord,
+          | "id"
+          | "status"
+          | "content"
+          | "sent_at"
+          | "responded_at"
+          | "client_response_note"
+          | "review_token"
+          | "doc"
+        > | null,
+        documents: (documents ?? []) as unknown as {
+          id: string;
+          entity: string;
+          entity_id: string;
+          kind: string;
+          format: string;
+        }[],
+      };
+    }),
+  );
 
 export const getMyQuoteFileUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -102,21 +107,23 @@ export const getMyQuoteFileUrl = createServerFn({ method: "POST" })
     if (!/^[0-9a-f-]{36}$/i.test(data.fileId)) throw new Error("Unknown file");
     return data;
   })
-  .handler(async ({ data, context }) => {
-    // RLS decides visibility here; if the row comes back the caller owns it.
-    const { data: file } = await context.supabase
-      .from("quote_files")
-      .select("id, storage_path, original_name")
-      .eq("id", data.fileId)
-      .maybeSingle();
+  .handler(
+    guarded("getMyQuoteFileUrl", "preparing the download", async ({ data, context }) => {
+      // RLS decides visibility here; if the row comes back the caller owns it.
+      const { data: file } = await context.supabase
+        .from("quote_files")
+        .select("id, storage_path, original_name")
+        .eq("id", data.fileId)
+        .maybeSingle();
 
-    if (!file) throw new Error("File not found");
+      if (!file) throw new Error("File not found");
 
-    const { adminDb, QUOTE_BUCKET } = await import("@/lib/blex.server");
-    const { data: signed, error } = await adminDb()
-      .storage.from(QUOTE_BUCKET)
-      .createSignedUrl((file as { storage_path: string }).storage_path, 60);
+      const { adminDb, QUOTE_BUCKET } = await import("@/lib/blex.server");
+      const { data: signed, error } = await adminDb()
+        .storage.from(QUOTE_BUCKET)
+        .createSignedUrl((file as { storage_path: string }).storage_path, 60);
 
-    if (error || !signed) throw new Error("Could not prepare that download");
-    return { url: signed.signedUrl, name: (file as { original_name: string }).original_name };
-  });
+      if (error || !signed) throw new Error("Could not prepare that download");
+      return { url: signed.signedUrl, name: (file as { original_name: string }).original_name };
+    }),
+  );
