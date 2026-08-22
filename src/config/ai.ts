@@ -67,7 +67,7 @@ export function aiTargets(preference?: AiModelPreference): AiTarget[] {
       model: readEnv("GROQ_MODEL") ?? DEFAULT_GROQ_MODEL,
     });
   }
-  if (targets.length) return targets;
+  if (targets.length) return preferTargets(targets, preference);
 
   const legacyKey = readEnv("AI_API_KEY", "LOVABLE_API_KEY");
   if (legacyKey) {
@@ -79,7 +79,7 @@ export function aiTargets(preference?: AiModelPreference): AiTarget[] {
       model: aiModel(),
     });
   }
-  return targets;
+  return preferTargets(targets, preference);
 }
 
 export const ai = {
