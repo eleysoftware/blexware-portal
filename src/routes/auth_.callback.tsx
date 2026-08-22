@@ -13,7 +13,7 @@ import { getViewerRole } from "@/lib/auth.functions";
 const title = "Confirming your email — BLEXware";
 const description = "Finish confirming your BLEXware portal account.";
 
-export const Route = createFileRoute("/auth/callback")({
+export const Route = createFileRoute("/auth_/callback")({
   ssr: false,
   head: () => ({
     meta: [

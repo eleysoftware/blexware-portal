@@ -20,6 +20,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AuthCallbackRouteImport } from './routes/auth_.callback'
 import { Route as InvoiceTokenRouteImport } from './routes/invoice.$token'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio.index'
 import { Route as PortfolioSlugRouteImport } from './routes/portfolio.$slug'
@@ -86,6 +87,11 @@ const ServicesRoute = ServicesRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth_/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InvoiceTokenRoute = InvoiceTokenRouteImport.update({
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/invoice/$token': typeof InvoiceTokenRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/proposal/$token': typeof ProposalTokenRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByTo {
   '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/invoice/$token': typeof InvoiceTokenRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/proposal/$token': typeof ProposalTokenRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/security': typeof SecurityRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/auth_/callback': typeof AuthCallbackRoute
   '/invoice/$token': typeof InvoiceTokenRoute
   '/portfolio/$slug': typeof PortfolioSlugRoute
   '/proposal/$token': typeof ProposalTokenRoute
@@ -249,6 +258,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/services'
     | '/terms'
+    | '/auth/callback'
     | '/invoice/$token'
     | '/portfolio/$slug'
     | '/proposal/$token'
@@ -274,6 +284,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/services'
     | '/terms'
+    | '/auth/callback'
     | '/invoice/$token'
     | '/portfolio/$slug'
     | '/proposal/$token'
@@ -300,6 +311,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/services'
     | '/terms'
+    | '/auth_/callback'
     | '/invoice/$token'
     | '/portfolio/$slug'
     | '/proposal/$token'
@@ -327,6 +339,7 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   ServicesRoute: typeof ServicesRoute
   TermsRoute: typeof TermsRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   InvoiceTokenRoute: typeof InvoiceTokenRoute
   PortfolioSlugRoute: typeof PortfolioSlugRoute
   ProposalTokenRoute: typeof ProposalTokenRoute
@@ -415,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth_/callback': {
+      id: '/auth_/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/invoice/$token': {
@@ -540,6 +560,7 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   ServicesRoute: ServicesRoute,
   TermsRoute: TermsRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   InvoiceTokenRoute: InvoiceTokenRoute,
   PortfolioSlugRoute: PortfolioSlugRoute,
   ProposalTokenRoute: ProposalTokenRoute,
