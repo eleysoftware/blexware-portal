@@ -160,7 +160,7 @@ export function EngagementPanel({
         </div>
       ) : null}
 
-      {agreement ? (
+      {agreement && show("sow") ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
