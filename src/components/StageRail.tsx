@@ -85,7 +85,9 @@ export function StageRail({
             {quoteStatusLabels[focused]}
             {focused === status ? "" : " (preview)"}
           </span>
-          <span className="truncate text-xs text-slate/60">{next ? quoteStatusLabels[next] : ""}</span>
+          <span className="truncate text-xs text-slate/60">
+            {next ? quoteStatusLabels[next] : ""}
+          </span>
         </div>
 
         <Button

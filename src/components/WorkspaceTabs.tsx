@@ -15,7 +15,11 @@ export function WorkspaceTabs({
   onChange: (id: string) => void;
 }) {
   return (
-    <div role="tablist" aria-label="Project sections" className="flex flex-wrap gap-1 border-b border-border">
+    <div
+      role="tablist"
+      aria-label="Project sections"
+      className="flex flex-wrap gap-1 border-b border-border"
+    >
       {tabs.map((tab) => {
         const active = tab.id === value;
         return (

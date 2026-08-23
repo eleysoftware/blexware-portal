@@ -11,7 +11,6 @@ import { Section } from "@/components/Section";
 import { StageRail } from "@/components/StageRail";
 import { WorkspacePanel, WorkspaceTabs, type WorkspaceTab } from "@/components/WorkspaceTabs";
 
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +42,6 @@ function PortalQuoteDetail() {
     { id: "sow", label: "SOW" },
     { id: "invoices", label: "Invoices" },
   ];
-
 
   const detail = useQuery({
     queryKey: ["my-quote", id],
@@ -264,7 +262,6 @@ function PortalQuoteDetail() {
     </Section>
   );
 }
-
 
 function Field({ label, value, block }: { label: string; value?: string | null; block?: boolean }) {
   return (
