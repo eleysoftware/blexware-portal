@@ -8,6 +8,9 @@ import { EngagementPanel } from "@/components/EngagementPanel";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { Section } from "@/components/Section";
+import { StageRail } from "@/components/StageRail";
+import { WorkspacePanel, WorkspaceTabs, type WorkspaceTab } from "@/components/WorkspaceTabs";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
