@@ -19,7 +19,17 @@ import { formatMoney, type ProjectDocument } from "@/lib/documents/types";
 
 type DocRow = { id: string; entity: string; entity_id: string; kind: string; format: string };
 
-export function EngagementPanel({ quoteId }: { quoteId: string }) {
+export type ClientEngagementTab = "estimate" | "sow" | "invoices";
+
+export function EngagementPanel({
+  quoteId,
+  tab,
+}: {
+  quoteId: string;
+  tab?: ClientEngagementTab;
+}) {
+  const show = (section: ClientEngagementTab) => !tab || tab === section;
+
   const queryClient = useQueryClient();
   const fetchEngagement = useServerFn(getMyEngagement);
   const respondEstimate = useServerFn(respondToMyEstimate);
