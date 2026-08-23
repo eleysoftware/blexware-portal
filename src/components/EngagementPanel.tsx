@@ -19,7 +19,11 @@ import { formatMoney, type ProjectDocument } from "@/lib/documents/types";
 
 type DocRow = { id: string; entity: string; entity_id: string; kind: string; format: string };
 
-export function EngagementPanel({ quoteId }: { quoteId: string }) {
+export type ClientEngagementTab = "estimate" | "sow" | "invoices";
+
+export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: ClientEngagementTab }) {
+  const show = (section: ClientEngagementTab) => !tab || tab === section;
+
   const queryClient = useQueryClient();
   const fetchEngagement = useServerFn(getMyEngagement);
   const respondEstimate = useServerFn(respondToMyEstimate);
@@ -75,12 +79,21 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
 
   if (engagement.isLoading) return <p className="text-sm text-slate">Loading your documents…</p>;
 
-  const estimate = engagement.data?.estimate as
-    | { id: string; status: string; doc: ProjectDocument; total_cents: number; expires_at: string | null }
-    | null;
-  const agreement = engagement.data?.agreement as
-    | { id: string; agreement_number: string; status: string; doc: ProjectDocument; signed_at: string | null; signer_name: string | null }
-    | null;
+  const estimate = engagement.data?.estimate as {
+    id: string;
+    status: string;
+    doc: ProjectDocument;
+    total_cents: number;
+    expires_at: string | null;
+  } | null;
+  const agreement = engagement.data?.agreement as {
+    id: string;
+    agreement_number: string;
+    status: string;
+    doc: ProjectDocument;
+    signed_at: string | null;
+    signer_name: string | null;
+  } | null;
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
     invoice_number: string;
@@ -97,7 +110,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
 
   return (
     <div className="space-y-6">
-      {estimate ? (
+      {estimate && show("estimate") ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
@@ -110,7 +123,9 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
           <DownloadRow docs={docsFor("estimate", estimate.id)} onOpen={openDoc} />
 
           <details className="mt-4">
-            <summary className="cursor-pointer text-sm text-primary">Read the full estimate</summary>
+            <summary className="cursor-pointer text-sm text-primary">
+              Read the full estimate
+            </summary>
             <div className="mt-4 rounded-xl border border-border p-5">
               <DocumentPreview doc={estimate.doc} />
             </div>
@@ -150,7 +165,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
         </div>
       ) : null}
 
-      {agreement ? (
+      {agreement && show("sow") ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
@@ -196,8 +211,9 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
                   data-testid="sow-consent"
                 />
                 <span>
-                  I agree that typing my name constitutes a legally binding electronic signature on this
-                  Statement of Work. My name, the time of signing and my IP address will be recorded.
+                  I agree that typing my name constitutes a legally binding electronic signature on
+                  this Statement of Work. My name, the time of signing and my IP address will be
+                  recorded.
                 </span>
               </label>
               <Button
@@ -213,7 +229,7 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
         </div>
       ) : null}
 
-      {invoices.length ? (
+      {invoices.length && show("invoices") ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">Invoices</h2>
           <ul className="mt-4 space-y-3">
@@ -226,7 +242,9 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
                   <p className="font-medium">{invoice.invoice_number}</p>
                   <p className="text-xs text-slate">
                     Installment #{invoice.sequence}
-                    {invoice.due_date ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}` : ""}
+                    {invoice.due_date
+                      ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
+                      : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -247,7 +265,8 @@ export function EngagementPanel({ quoteId }: { quoteId: string }) {
             ))}
           </ul>
           <p className="mt-4 text-xs text-slate">
-            Work begins once the first invoice is paid; the remaining invoices are issued every two weeks.
+            Work begins once the first invoice is paid; the remaining invoices are issued every two
+            weeks.
           </p>
         </div>
       ) : null}

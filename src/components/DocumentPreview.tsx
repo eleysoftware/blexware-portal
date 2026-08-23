@@ -212,6 +212,29 @@ export function DocumentPreview({ doc }: { doc: ProjectDocument }) {
               binding.
             </p>
           ) : null}
+          {doc.acceptance.countersign ? (
+            <div className="pt-4">
+              <p className="text-[10pt] font-bold">Accepted for BLEXware:</p>
+              <p className="text-[10pt]">
+                Name: {doc.acceptance.countersign.name}
+                {doc.acceptance.countersign.title ? ` — ${doc.acceptance.countersign.title}` : ""}
+              </p>
+              <p className="text-[10pt]">Date: {doc.acceptance.countersign.signedAt}</p>
+              <p className="text-[10pt]">
+                Signature:{" "}
+                <span
+                  className="text-[16pt]"
+                  style={{ fontFamily: '"Segoe Script","Brush Script MT","Snell Roundhand",cursive' }}
+                >
+                  {doc.acceptance.countersign.signatureText}
+                </span>
+              </p>
+              {doc.acceptance.countersign.startDate ? (
+                <p className="text-[10pt]">Project start date: {doc.acceptance.countersign.startDate}</p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="pt-4 text-[10pt]">
             <p className="font-bold" style={{ color: navy }}>
               Prepared By

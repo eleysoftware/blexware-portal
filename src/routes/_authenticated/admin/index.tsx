@@ -15,9 +15,10 @@ import { getAdminStatus, listQuotes, refreshProposalDocuments } from "@/lib/admi
 import { seedWellnessProject } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
 
-
 export const Route = createFileRoute("/_authenticated/admin/")({
-  head: () => ({ meta: [{ title: "Quote queue — BLEXware team" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({
+    meta: [{ title: "Quote queue — BLEXware team" }, { name: "robots", content: "noindex" }],
+  }),
   component: AdminDashboard,
 });
 
@@ -133,7 +134,6 @@ function AdminDashboard() {
             {converting ? "Converting…" : "Convert existing proposals"}
           </Button>
         </div>
-
       </PageHero>
 
       <Section tone="surface">
@@ -149,9 +149,7 @@ function AdminDashboard() {
                   : "border-border bg-background text-slate hover:border-primary/50"
               }`}
             >
-              {value === "all"
-                ? "All"
-                : quoteStatusLabels[value as keyof typeof quoteStatusLabels]}
+              {value === "all" ? "All" : quoteStatusLabels[value as keyof typeof quoteStatusLabels]}
               {value !== "all" && counts[value] ? ` (${counts[value]})` : ""}
             </button>
           ))}
@@ -203,7 +201,9 @@ function AdminDashboard() {
                     </td>
                     <td className="px-5 py-4">
                       <span className="block">{quote.contact_name}</span>
-                      <span className="text-xs text-slate">{quote.company ?? quote.contact_email}</span>
+                      <span className="text-xs text-slate">
+                        {quote.company ?? quote.contact_email}
+                      </span>
                     </td>
                     <td className="px-5 py-4 text-slate">
                       {quote.project_type} · {quote.industry}

@@ -7,9 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatMoney, type EstimateLineItem, type PaymentPlanKind, type ProjectDocument } from "@/lib/documents/types";
+import {
+  formatMoney,
+  type EstimateLineItem,
+  type PaymentPlanKind,
+  type ProjectDocument,
+} from "@/lib/documents/types";
 import { buildPaymentPlan } from "@/lib/documents/compose";
 import {
+  approveProjectStart,
   createAgreement,
   getDocumentUrl,
   getEngagement,
@@ -29,12 +35,16 @@ type Draft = { label: string; amount: string; duration: string; note: string };
 
 const emptyRow: Draft = { label: "", amount: "", duration: "", note: "" };
 
+export type EngagementTab = "proposal" | "estimate" | "sow" | "invoices";
+
 export function AdminEngagementPanel({
   quoteId,
   proposalId,
+  tab = "estimate",
 }: {
   quoteId: string;
   proposalId?: string | null;
+  tab?: EngagementTab;
 }) {
   const queryClient = useQueryClient();
   const fetchEngagement = useServerFn(getEngagement);
@@ -48,6 +58,7 @@ export function AdminEngagementPanel({
   const issueRefund = useServerFn(refundPayment);
   const recordOffline = useServerFn(recordOfflinePaymentFn);
   const reconcile = useServerFn(reconcilePayment);
+  const approveStart = useServerFn(approveProjectStart);
   const aiStatusFn = useServerFn(getAiStatus);
 
   const engagement = useQuery({
@@ -76,6 +87,7 @@ export function AdminEngagementPanel({
   const [estimateNote, setEstimateNote] = useState("");
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
+  const [startDate, setStartDate] = useState("");
 
   const estimate = (engagement.data?.estimates ?? [])[0] as
     | {
@@ -140,7 +152,10 @@ export function AdminEngagementPanel({
       paymentKind === "custom"
         ? customPayments
             .filter((row) => row.label.trim() && row.amount.trim())
-            .map((row) => ({ label: row.label.trim(), amountCents: Math.round(Number(row.amount) * 100) }))
+            .map((row) => ({
+              label: row.label.trim(),
+              amountCents: Math.round(Number(row.amount) * 100),
+            }))
         : undefined,
   });
 
@@ -177,7 +192,12 @@ export function AdminEngagementPanel({
   const regenerateMutation = useMutation({
     mutationFn: () =>
       regenerate({
-        data: { proposalId: proposalId!, changeRequest, provider: aiChoice.provider, model: aiChoice.model },
+        data: {
+          proposalId: proposalId!,
+          changeRequest,
+          provider: aiChoice.provider,
+          model: aiChoice.model,
+        },
       }),
     onSuccess: () => {
       toast.success("Proposal regenerated — review the new draft before sending");
@@ -225,7 +245,8 @@ export function AdminEngagementPanel({
   });
 
   const refundMutation = useMutation({
-    mutationFn: (input: { invoicePaymentId: string; amountCents: number }) => issueRefund({ data: input }),
+    mutationFn: (input: { invoicePaymentId: string; amountCents: number }) =>
+      issueRefund({ data: input }),
     onSuccess: (result) => {
       toast.success(`Refund ${result.status} — it completes once the processor confirms it`);
       setRefundAmounts({});
@@ -235,7 +256,8 @@ export function AdminEngagementPanel({
   });
 
   const offlineMutation = useMutation({
-    mutationFn: (input: { invoiceId: string; amountCents: number }) => recordOffline({ data: input }),
+    mutationFn: (input: { invoiceId: string; amountCents: number }) =>
+      recordOffline({ data: input }),
     onSuccess: () => {
       toast.success("Offline payment recorded");
       setOfflineAmounts({});
@@ -248,6 +270,17 @@ export function AdminEngagementPanel({
     mutationFn: (providerPaymentId: string) => reconcile({ data: { providerPaymentId } }),
     onSuccess: () => {
       toast.success("Payment reconciled with the payment service");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const approveStartMutation = useMutation({
+    mutationFn: () => approveStart({ data: { agreementId: agreement!.id, startDate } }),
+    onSuccess: (result) => {
+      toast.success(
+        `Countersigned — invoice 1 is due ${new Date(`${result.firstInvoiceDue}T00:00:00`).toLocaleDateString()}`,
+      );
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -275,8 +308,17 @@ export function AdminEngagementPanel({
       : undefined,
   );
   const agreement = (engagement.data?.agreements ?? [])[0] as
-    | { id: string; agreement_number: string; status: string; signed_at: string | null; signer_name: string | null }
+    | {
+        id: string;
+        agreement_number: string;
+        status: string;
+        signed_at: string | null;
+        signer_name: string | null;
+        doc?: ProjectDocument | null;
+      }
     | undefined;
+  const countersigned = agreement?.doc?.acceptance?.countersign ?? null;
+
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
     invoice_number: string;
@@ -307,13 +349,24 @@ export function AdminEngagementPanel({
     created_at: string;
   }[];
 
+  const tabDocuments = documents.filter((doc) =>
+    tab === "proposal"
+      ? doc.entity === "proposal"
+      : tab === "estimate"
+        ? doc.entity === "estimate"
+        : tab === "sow"
+          ? doc.entity === "agreement"
+          : false,
+  );
+
   return (
     <div className="space-y-6">
-      {proposalId ? (
+      {proposalId && tab === "proposal" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-xl">Client change request</h2>
           <p className="mt-1 text-sm text-slate">
-            Paste what the client asked for and regenerate the proposal. The previous version is kept.
+            Paste what the client asked for and regenerate the proposal. The previous version is
+            kept.
           </p>
           <Textarea
             className="mt-3"
@@ -338,13 +391,17 @@ export function AdminEngagementPanel({
           </div>
           {!aiReady ? (
             <p className="mt-2 text-xs text-slate">
-              AI drafting is unavailable in this environment. Set GEMINI_API_KEY (and optionally GROQ_API_KEY) in .env.local (see README).
+              AI drafting is unavailable in this environment. Set GEMINI_API_KEY (and optionally
+              GROQ_API_KEY) in .env.local (see README).
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+      <div
+        hidden={tab !== "estimate"}
+        className="rounded-2xl border border-border bg-background p-6 shadow-card"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl">Cost & schedule estimate</h2>
           <div className="flex flex-wrap items-center gap-3">
@@ -382,7 +439,9 @@ export function AdminEngagementPanel({
                 value={row.label}
                 placeholder="Phase or deliverable"
                 onChange={(event) =>
-                  setRows(rows.map((r, i) => (i === index ? { ...r, label: event.target.value } : r)))
+                  setRows(
+                    rows.map((r, i) => (i === index ? { ...r, label: event.target.value } : r)),
+                  )
                 }
               />
               <Input
@@ -392,7 +451,9 @@ export function AdminEngagementPanel({
                 inputMode="decimal"
                 placeholder="Amount ($)"
                 onChange={(event) =>
-                  setRows(rows.map((r, i) => (i === index ? { ...r, amount: event.target.value } : r)))
+                  setRows(
+                    rows.map((r, i) => (i === index ? { ...r, amount: event.target.value } : r)),
+                  )
                 }
               />
               <Input
@@ -400,7 +461,9 @@ export function AdminEngagementPanel({
                 value={row.duration}
                 placeholder="Duration"
                 onChange={(event) =>
-                  setRows(rows.map((r, i) => (i === index ? { ...r, duration: event.target.value } : r)))
+                  setRows(
+                    rows.map((r, i) => (i === index ? { ...r, duration: event.target.value } : r)),
+                  )
                 }
               />
               <Button
@@ -552,7 +615,7 @@ export function AdminEngagementPanel({
         </div>
       </div>
 
-      {agreement ? (
+      {agreement && tab === "sow" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">{agreement.agreement_number}</h2>
@@ -565,10 +628,47 @@ export function AdminEngagementPanel({
           ) : (
             <p className="mt-2 text-sm text-slate">Awaiting the client's electronic signature.</p>
           )}
+
+          {agreement.status === "signed" ? (
+            countersigned ? (
+              <p className="mt-4 text-sm text-slate">
+                Countersigned by Kamal Eley
+                {countersigned.startDate ? ` · project starts ${countersigned.startDate}` : ""}. The
+                invoice schedule has been issued.
+              </p>
+            ) : (
+              <div className="mt-5 space-y-3 border-t border-border pt-5">
+                <p className="text-sm text-slate">
+                  Approve the project, set the start date, and countersign as BLEXware. This issues
+                  invoice 1 with a due date three days before work starts.
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-sm font-medium">
+                    Project start date
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      data-testid="project-start-date"
+                    />
+                  </label>
+                  <Button
+                    className="shadow-cta"
+                    data-testid="project-approve"
+                    disabled={!startDate || approveStartMutation.isPending}
+                    onClick={() => approveStartMutation.mutate()}
+                  >
+                    {approveStartMutation.isPending ? "Approving…" : "Approve & countersign"}
+                  </Button>
+                </div>
+              </div>
+            )
+          ) : null}
         </div>
       ) : null}
 
-      {invoices.length ? (
+      {invoices.length && tab === "invoices" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-xl">Invoices &amp; payments</h2>
           <ul className="mt-4 space-y-4 text-sm">
@@ -581,14 +681,20 @@ export function AdminEngagementPanel({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span>
                       {invoice.invoice_number} · #{invoice.sequence}
-                      {invoice.due_date ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}` : ""}
+                      {invoice.due_date
+                        ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
+                        : ""}
                     </span>
                     <span className="flex flex-wrap items-center gap-3">
-                      <span className="font-semibold">{formatMoney(Number(invoice.amount_cents))}</span>
+                      <span className="font-semibold">
+                        {formatMoney(Number(invoice.amount_cents))}
+                      </span>
                       <span className="text-slate">
                         paid {formatMoney(paid)} · balance {formatMoney(balance)}
                       </span>
-                      <Badge variant={invoice.status === "paid" ? "secondary" : "outline"}>{invoice.status}</Badge>
+                      <Badge variant={invoice.status === "paid" ? "secondary" : "outline"}>
+                        {invoice.status}
+                      </Badge>
                       {invoice.status === "scheduled" ? (
                         <Button
                           size="sm"
@@ -605,12 +711,20 @@ export function AdminEngagementPanel({
                   {attempts.length ? (
                     <ul className="mt-3 space-y-2 border-t border-border pt-3">
                       {attempts.map((payment) => (
-                        <li key={payment.id} className="flex flex-wrap items-center justify-between gap-3">
+                        <li
+                          key={payment.id}
+                          className="flex flex-wrap items-center justify-between gap-3"
+                        >
                           <span className="text-slate">
-                            {formatMoney(Number(payment.amount_cents))} · {payment.payment_method ?? "—"} ·{" "}
+                            {formatMoney(Number(payment.amount_cents))} ·{" "}
+                            {payment.payment_method ?? "—"} ·{" "}
                             {payment.hyperswitch_connector ?? "unassigned connector"}
-                            {payment.processor_transaction_id ? ` · ${payment.processor_transaction_id}` : ""}
-                            {payment.paid_at ? ` · ${new Date(payment.paid_at).toLocaleDateString()}` : ""}
+                            {payment.processor_transaction_id
+                              ? ` · ${payment.processor_transaction_id}`
+                              : ""}
+                            {payment.paid_at
+                              ? ` · ${new Date(payment.paid_at).toLocaleDateString()}`
+                              : ""}
                             {payment.failure_message ? ` · ${payment.failure_message}` : ""}
                           </span>
                           <span className="flex flex-wrap items-center gap-2">
@@ -647,7 +761,9 @@ export function AdminEngagementPanel({
                                   onClick={() =>
                                     refundMutation.mutate({
                                       invoicePaymentId: payment.id,
-                                      amountCents: Math.round(Number(refundAmounts[payment.id] ?? 0) * 100),
+                                      amountCents: Math.round(
+                                        Number(refundAmounts[payment.id] ?? 0) * 100,
+                                      ),
                                     })
                                   }
                                 >
@@ -670,7 +786,10 @@ export function AdminEngagementPanel({
                         placeholder="Offline $"
                         value={offlineAmounts[invoice.id] ?? ""}
                         onChange={(event) =>
-                          setOfflineAmounts((current) => ({ ...current, [invoice.id]: event.target.value }))
+                          setOfflineAmounts((current) => ({
+                            ...current,
+                            [invoice.id]: event.target.value,
+                          }))
                         }
                       />
                       <Button
@@ -694,12 +813,11 @@ export function AdminEngagementPanel({
         </div>
       ) : null}
 
-
-      {documents.length ? (
+      {tabDocuments.length ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-xl">Generated documents</h2>
           <ul className="mt-4 flex flex-wrap gap-2">
-            {documents.map((doc) => (
+            {tabDocuments.map((doc) => (
               <li key={doc.id}>
                 <Button size="sm" variant="outline" onClick={() => openDoc(doc.id)}>
                   {doc.kind} · {doc.format.toUpperCase()}

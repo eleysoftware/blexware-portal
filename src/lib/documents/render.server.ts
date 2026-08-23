@@ -61,6 +61,9 @@ export async function renderPdf(doc: ProjectDocument): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  // Closest standard-font approximation of a handwritten countersignature.
+  const script = await pdf.embedFont(StandardFonts.TimesRomanBoldItalic);
+
 
   const width = 612;
   const height = 792;
@@ -312,6 +315,18 @@ export async function renderPdf(doc: ProjectDocument): Promise<Uint8Array> {
         { size: 9, color: MUTED },
       );
     }
+    const countersign = doc.acceptance.countersign;
+    if (countersign) {
+      y -= 10;
+      drawText("Accepted for BLEXware:", { size: 10, font: bold });
+      drawText(`Name: ${countersign.name}${countersign.title ? ` — ${countersign.title}` : ""}`, { size: 10 });
+      drawText(`Date: ${countersign.signedAt}`, { size: 10 });
+      drawText(`Signature: ${countersign.signatureText}`, { size: 14, font: script });
+      if (countersign.startDate) {
+        drawText(`Project start date: ${countersign.startDate}`, { size: 10 });
+      }
+    }
+
     y -= 10;
     drawText("Prepared By", { size: 10, font: bold, color: NAVY });
     drawText(doc.preparedBy.name, { size: 10, font: bold });
@@ -589,6 +604,19 @@ export async function renderDocx(doc: ProjectDocument): Promise<Uint8Array> {
         bold: Boolean(doc.acceptance.signatureText),
       }),
     );
+    const countersign = doc.acceptance.countersign;
+    if (countersign) {
+      children.push(docxParagraph("Accepted for BLEXware:", { bold: true, before: 200 }));
+      children.push(
+        docxParagraph(`Name: ${countersign.name}${countersign.title ? ` — ${countersign.title}` : ""}`),
+      );
+      children.push(docxParagraph(`Date: ${countersign.signedAt}`));
+      children.push(docxParagraph(`Signature: ${countersign.signatureText}`, { bold: true }));
+      if (countersign.startDate) {
+        children.push(docxParagraph(`Project start date: ${countersign.startDate}`));
+      }
+    }
+
     children.push(docxParagraph("Prepared By", { bold: true, color: NAVY_HEX, before: 200 }));
     children.push(docxParagraph(doc.preparedBy.name, { bold: true, spacing: 40 }));
     for (const line of [doc.preparedBy.company, doc.preparedBy.phone, doc.preparedBy.email, doc.date].filter(Boolean)) {

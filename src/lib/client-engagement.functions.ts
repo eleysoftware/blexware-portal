@@ -255,8 +255,8 @@ export const signMyAgreement = createServerFn({ method: "POST" })
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
       const { storeDocument, notifyTeam } = await import("@/lib/engagement.server");
-      const { createInvoiceSchedule } = await import("@/lib/invoicing.server");
       const db = adminDb();
+
 
       const signedAt = new Date();
       const headers = getRequest().headers;
@@ -302,12 +302,12 @@ export const signMyAgreement = createServerFn({ method: "POST" })
         .eq("id", visible.id);
 
       await db.from("quotes").update({ status: "signed" }).eq("id", visible.quote_id);
-      await createInvoiceSchedule(visible.id as string);
 
       await notifyTeam(`SOW signed — ${visible.agreement_number as string}`, [
         `${data.fullName} signed ${visible.agreement_number as string} at ${signedAt.toLocaleString("en-US")}.`,
-        "The first invoice has been issued. Work begins once it is paid.",
+        "Next step: approve the project start date and countersign so the first invoice goes out.",
       ]);
+
 
       await writeAudit({
         actorId: context.userId,

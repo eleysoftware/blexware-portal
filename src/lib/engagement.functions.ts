@@ -530,7 +530,89 @@ export const createAgreement = createServerFn({ method: "POST" })
     }),
   );
 
+/**
+ * Admin approval of a signed SOW: countersigns for BLEXware, records the
+ * project start date and issues the first invoice ahead of that date.
+ */
+export const approveProjectStart = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { agreementId: string; startDate: string }) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.startDate)) throw new Error("Choose a project start date");
+    return data;
+  })
+  .handler(
+    guarded("approveProjectStart", "approving the project start", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { storeDocument } = await import("@/lib/engagement.server");
+      const { createInvoiceSchedule } = await import("@/lib/invoicing.server");
+      const db = adminDb();
+
+      const { data: agreement } = await db
+        .from("agreements")
+        .select("id, quote_id, agreement_number, status, doc")
+        .eq("id", data.agreementId)
+        .maybeSingle();
+      if (!agreement) throw new Error("Agreement not found");
+      if (agreement.status !== "signed") throw new Error("The client has not signed this agreement yet.");
+
+      const now = new Date();
+      const start = new Date(`${data.startDate}T00:00:00Z`);
+      // First invoice is due three days before work starts.
+      const dueDate = new Date(start.getTime() - 3 * 86_400_000).toISOString().slice(0, 10);
+      const startLabel = start.toLocaleDateString("en-US", {
+        timeZone: "UTC",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+
+      const existingDoc = (agreement.doc ?? {}) as Record<string, unknown>;
+      const acceptance = (existingDoc["acceptance"] ?? {}) as Record<string, unknown>;
+      const countersignedDoc = {
+        ...existingDoc,
+        acceptance: {
+          ...acceptance,
+          countersign: {
+            name: "Kamal Eley",
+            title: "Developer, BLEXware",
+            signatureText: "Kamal Eley",
+            signedAt: now.toLocaleString("en-US"),
+            startDate: startLabel,
+          },
+        },
+      };
+
+      await storeDocument({
+        quoteId: agreement.quote_id as string,
+        entity: "agreement",
+        entityId: agreement.id as string,
+        kind: "sow_countersigned",
+        doc: countersignedDoc as never,
+        slug: agreement.agreement_number as string,
+      });
+
+      await db
+        .from("agreements")
+        .update({ doc: countersignedDoc })
+        .eq("id", agreement.id);
+
+      const schedule = await createInvoiceSchedule(agreement.id as string, { firstDueDate: dueDate });
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "agreement.countersigned",
+        entity: "quote",
+        entityId: agreement.quote_id as string,
+        metadata: { agreement: agreement.agreement_number, startDate: data.startDate, dueDate },
+      });
+
+      return { startDate: data.startDate, firstInvoiceDue: dueDate, invoices: schedule.created };
+    }),
+  );
+
 export const getDocumentUrl = createServerFn({ method: "POST" })
+
   .middleware([requireSupabaseAuth])
   .validator((data: { documentId: string }) => data)
   .handler(
