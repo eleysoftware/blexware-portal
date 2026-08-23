@@ -75,7 +75,16 @@ export type ProjectDocument = {
     signerName?: string;
     signatureText?: string;
     signedAt?: string;
+    /** BLEXware countersignature applied when the project is approved to start. */
+    countersign?: {
+      name: string;
+      title?: string;
+      signatureText: string;
+      signedAt: string;
+      startDate?: string;
+    };
   };
+
   confidentialFooter?: boolean;
 };
 

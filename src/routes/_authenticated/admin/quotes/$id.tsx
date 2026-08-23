@@ -8,6 +8,9 @@ import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { Section } from "@/components/Section";
+import { StageRail } from "@/components/StageRail";
+import { WorkspacePanel, WorkspaceTabs, type WorkspaceTab } from "@/components/WorkspaceTabs";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +28,7 @@ import {
   updateQuoteStatus,
 } from "@/lib/admin.functions";
 import { getDocumentUrl } from "@/lib/engagement.functions";
-import { quoteStatusLabels, quoteStatuses, type QuoteStatus } from "@/lib/quote-schema";
+import { type QuoteStatus } from "@/lib/quote-schema";
 
 export const Route = createFileRoute("/_authenticated/admin/quotes/$id")({
   head: () => ({ meta: [{ title: "Quote detail — BLEXware team" }, { name: "robots", content: "noindex" }] }),
@@ -63,8 +66,19 @@ function QuoteDetailPage() {
   const aiReady = aiStatus.data?.configured !== false;
   const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
+  const [tab, setTab] = useState("intake");
+  const tabs: WorkspaceTab[] = [
+    { id: "intake", label: "Intake" },
+    { id: "proposal", label: "Proposal" },
+    { id: "estimate", label: "Estimate" },
+    { id: "sow", label: "SOW" },
+    { id: "invoices", label: "Invoices" },
+    { id: "activity", label: "Activity" },
+  ];
+
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
+
   const proposal = detail.data?.proposals[0] ?? null;
 
   useEffect(() => {
@@ -196,23 +210,20 @@ function QuoteDetailPage() {
             </a>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {quoteStatuses.map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={quote.status === status ? "default" : "outline"}
-              onClick={() => statusMutation.mutate(status)}
-              disabled={statusMutation.isPending}
-            >
-              {quoteStatusLabels[status]}
-            </Button>
-          ))}
-        </div>
+        <StageRail
+          className="w-full max-w-md"
+          status={quote.status as QuoteStatus}
+          disabled={statusMutation.isPending}
+          onSelect={(status) => statusMutation.mutate(status)}
+        />
       </div>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="mt-8">
+        <WorkspaceTabs tabs={tabs} value={tab} onChange={setTab} />
+      </div>
+
+      <div className="mt-6">
+        <WorkspacePanel id="intake" active={tab === "intake"}>
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Intake answers</h2>
             <dl className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -255,8 +266,32 @@ function QuoteDetailPage() {
           </div>
 
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-lg">Attachments</h2>
+            {files.length === 0 ? (
+              <p className="mt-3 text-sm text-slate">No files were attached.</p>
+            ) : (
+              <ul className="mt-3 space-y-3 text-sm">
+                {files.map((file) => (
+                  <li key={file.id} className="flex items-center justify-between gap-3">
+                    <span className="truncate">{file.original_name}</span>
+                    <button
+                      type="button"
+                      onClick={() => openFile(file.id)}
+                      className="shrink-0 text-primary underline-offset-4 hover:underline"
+                    >
+                      Open ({formatBytes(file.byte_size)})
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </WorkspacePanel>
+
+        <WorkspacePanel id="proposal" active={tab === "proposal"}>
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl">Proposal draft</h2>
+              <h2 className="text-xl">Proposal</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <AiModelPicker
                   providers={aiStatus.data?.providers}
@@ -354,21 +389,24 @@ function QuoteDetailPage() {
                     This proposal is still markdown-only. Refresh formatted documents to generate the letter layout, PDF, and Word file.
                   </p>
                 )}
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm text-primary">Edit proposal text</summary>
+                  <Textarea
+                    className="mt-3 min-h-[24rem] font-mono text-xs"
+                    value={content}
+                    data-testid="proposal-content"
+                    onChange={(event) => setContent(event.target.value)}
+                    aria-label="Proposal markdown"
+                  />
+                </details>
+
                 <DocumentDownloads
                   docs={(detail.data?.documents ?? []).filter(
                     (doc) => doc.entity === "proposal" && doc.entity_id === proposal.id,
                   )}
                   onOpen={openDoc}
                 />
-                <Textarea
-                  value={content}
-                  onChange={(event) => setContent(event.target.value)}
-                  rows={24}
-                  className="mt-4 font-mono text-sm"
-                  aria-label="Proposal draft content"
-                  data-testid="proposal-content"
-                />
-                <p className="mt-2 text-xs text-slate">
+                <p className="mt-3 text-xs text-slate">
                   Status: {proposal.status.replace("_", " ")}
                   {proposal.client_response_note
                     ? ` · Client note: ${proposal.client_response_note}`
@@ -380,33 +418,22 @@ function QuoteDetailPage() {
             )}
           </div>
 
-          <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} />
-        </div>
+          <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} tab="proposal" />
+        </WorkspacePanel>
 
+        <WorkspacePanel id="estimate" active={tab === "estimate"}>
+          <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} tab="estimate" />
+        </WorkspacePanel>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
-            <h2 className="text-lg">Attachments</h2>
-            {files.length === 0 ? (
-              <p className="mt-3 text-sm text-slate">No files were attached.</p>
-            ) : (
-              <ul className="mt-3 space-y-3 text-sm">
-                {files.map((file) => (
-                  <li key={file.id} className="flex items-center justify-between gap-3">
-                    <span className="truncate">{file.original_name}</span>
-                    <button
-                      type="button"
-                      onClick={() => openFile(file.id)}
-                      className="shrink-0 text-primary underline-offset-4 hover:underline"
-                    >
-                      Open ({formatBytes(file.byte_size)})
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        <WorkspacePanel id="sow" active={tab === "sow"}>
+          <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} tab="sow" />
+        </WorkspacePanel>
 
+        <WorkspacePanel id="invoices" active={tab === "invoices"}>
+          <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} tab="invoices" />
+        </WorkspacePanel>
+
+        <WorkspacePanel id="activity" active={tab === "activity"}>
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-lg">Activity</h2>
             <ul className="mt-3 space-y-3 text-sm text-slate">
@@ -420,8 +447,9 @@ function QuoteDetailPage() {
               {audit.length === 0 ? <li>No activity recorded yet.</li> : null}
             </ul>
           </div>
-        </div>
+        </WorkspacePanel>
       </div>
     </Section>
   );
 }
+

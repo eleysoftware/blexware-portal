@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMoney, type EstimateLineItem, type PaymentPlanKind, type ProjectDocument } from "@/lib/documents/types";
 import { buildPaymentPlan } from "@/lib/documents/compose";
 import {
+  approveProjectStart,
   createAgreement,
   getDocumentUrl,
   getEngagement,
@@ -29,13 +30,18 @@ type Draft = { label: string; amount: string; duration: string; note: string };
 
 const emptyRow: Draft = { label: "", amount: "", duration: "", note: "" };
 
+export type EngagementTab = "proposal" | "estimate" | "sow" | "invoices";
+
 export function AdminEngagementPanel({
   quoteId,
   proposalId,
+  tab = "estimate",
 }: {
   quoteId: string;
   proposalId?: string | null;
+  tab?: EngagementTab;
 }) {
+
   const queryClient = useQueryClient();
   const fetchEngagement = useServerFn(getEngagement);
   const persistEstimate = useServerFn(saveEstimate);
@@ -48,7 +54,9 @@ export function AdminEngagementPanel({
   const issueRefund = useServerFn(refundPayment);
   const recordOffline = useServerFn(recordOfflinePaymentFn);
   const reconcile = useServerFn(reconcilePayment);
+  const approveStart = useServerFn(approveProjectStart);
   const aiStatusFn = useServerFn(getAiStatus);
+
 
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
@@ -76,6 +84,8 @@ export function AdminEngagementPanel({
   const [estimateNote, setEstimateNote] = useState("");
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
+  const [startDate, setStartDate] = useState("");
+
 
   const estimate = (engagement.data?.estimates ?? [])[0] as
     | {
@@ -253,6 +263,19 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const approveStartMutation = useMutation({
+    mutationFn: () => approveStart({ data: { agreementId: agreement!.id, startDate } }),
+    onSuccess: (result) => {
+      toast.success(
+        `Countersigned — invoice 1 is due ${new Date(`${result.firstInvoiceDue}T00:00:00`).toLocaleDateString()}`,
+      );
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+
+
   const openDoc = async (documentId: string) => {
     try {
       const { url } = await docUrl({ data: { documentId } });
@@ -275,8 +298,17 @@ export function AdminEngagementPanel({
       : undefined,
   );
   const agreement = (engagement.data?.agreements ?? [])[0] as
-    | { id: string; agreement_number: string; status: string; signed_at: string | null; signer_name: string | null }
+    | {
+        id: string;
+        agreement_number: string;
+        status: string;
+        signed_at: string | null;
+        signer_name: string | null;
+        doc?: ProjectDocument | null;
+      }
     | undefined;
+  const countersigned = agreement?.doc?.acceptance?.countersign ?? null;
+
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
     invoice_number: string;
@@ -307,10 +339,21 @@ export function AdminEngagementPanel({
     created_at: string;
   }[];
 
+  const tabDocuments = documents.filter((doc) =>
+    tab === "proposal"
+      ? doc.entity === "proposal"
+      : tab === "estimate"
+        ? doc.entity === "estimate"
+        : tab === "sow"
+          ? doc.entity === "agreement"
+          : false,
+  );
+
   return (
     <div className="space-y-6">
-      {proposalId ? (
+      {proposalId && tab === "proposal" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+
           <h2 className="text-xl">Client change request</h2>
           <p className="mt-1 text-sm text-slate">
             Paste what the client asked for and regenerate the proposal. The previous version is kept.
@@ -344,7 +387,8 @@ export function AdminEngagementPanel({
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+      <div hidden={tab !== "estimate"} className="rounded-2xl border border-border bg-background p-6 shadow-card">
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl">Cost & schedule estimate</h2>
           <div className="flex flex-wrap items-center gap-3">
@@ -552,7 +596,7 @@ export function AdminEngagementPanel({
         </div>
       </div>
 
-      {agreement ? (
+      {agreement && tab === "sow" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">{agreement.agreement_number}</h2>
@@ -565,10 +609,48 @@ export function AdminEngagementPanel({
           ) : (
             <p className="mt-2 text-sm text-slate">Awaiting the client's electronic signature.</p>
           )}
+
+          {agreement.status === "signed" ? (
+            countersigned ? (
+              <p className="mt-4 text-sm text-slate">
+                Countersigned by Kamal Eley
+                {countersigned.startDate ? ` · project starts ${countersigned.startDate}` : ""}. The
+                invoice schedule has been issued.
+              </p>
+            ) : (
+              <div className="mt-5 space-y-3 border-t border-border pt-5">
+                <p className="text-sm text-slate">
+                  Approve the project, set the start date, and countersign as BLEXware. This issues
+                  invoice 1 with a due date three days before work starts.
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-sm font-medium">
+                    Project start date
+                    <Input
+                      type="date"
+                      className="mt-1"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      data-testid="project-start-date"
+                    />
+                  </label>
+                  <Button
+                    className="shadow-cta"
+                    data-testid="project-approve"
+                    disabled={!startDate || approveStartMutation.isPending}
+                    onClick={() => approveStartMutation.mutate()}
+                  >
+                    {approveStartMutation.isPending ? "Approving…" : "Approve & countersign"}
+                  </Button>
+                </div>
+              </div>
+            )
+          ) : null}
         </div>
       ) : null}
 
-      {invoices.length ? (
+      {invoices.length && tab === "invoices" ? (
+
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-xl">Invoices &amp; payments</h2>
           <ul className="mt-4 space-y-4 text-sm">
@@ -695,11 +777,12 @@ export function AdminEngagementPanel({
       ) : null}
 
 
-      {documents.length ? (
+      {tabDocuments.length ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-xl">Generated documents</h2>
           <ul className="mt-4 flex flex-wrap gap-2">
-            {documents.map((doc) => (
+            {tabDocuments.map((doc) => (
+
               <li key={doc.id}>
                 <Button size="sm" variant="outline" onClick={() => openDoc(doc.id)}>
                   {doc.kind} · {doc.format.toUpperCase()}

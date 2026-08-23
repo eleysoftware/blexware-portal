@@ -6,7 +6,10 @@ import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
 import { emailInvoice, siteUrl } from "@/lib/engagement.server";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
-export async function createInvoiceSchedule(agreementId: string) {
+export async function createInvoiceSchedule(
+  agreementId: string,
+  options: { firstDueDate?: string | null } = {},
+) {
   const db = adminDb();
   const { data: agreement } = await db
     .from("agreements")
@@ -27,10 +30,11 @@ export async function createInvoiceSchedule(agreementId: string) {
     agreement_id: agreement.id,
     sequence: entry.sequence,
     amount_cents: entry.amountCents,
-    due_date: entry.dueDate,
+    due_date: entry.sequence === 1 && options.firstDueDate ? options.firstDueDate : entry.dueDate,
     scheduled_send_at: entry.scheduledSendAt,
     status: "scheduled",
   }));
+
   const { data: inserted, error } = await db.from("invoices").insert(rows).select("id, sequence");
   if (error) throw new Error(error.message);
 
