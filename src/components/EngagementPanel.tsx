@@ -223,7 +223,7 @@ export function EngagementPanel({
         </div>
       ) : null}
 
-      {invoices.length ? (
+      {invoices.length && show("invoices") ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">Invoices</h2>
           <ul className="mt-4 space-y-3">
