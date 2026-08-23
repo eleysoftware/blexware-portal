@@ -102,17 +102,24 @@ function PortalQuoteDetail() {
         ← Your projects
       </Link>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-foreground">
-          {quote.quote_number} — {quote.project_type}
-        </h1>
-        <Badge variant="secondary">
-          {quoteStatusLabels[quote.status as QuoteStatus] ?? quote.status}
-        </Badge>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-foreground">
+            {quote.quote_number} — {quote.project_type}
+          </h1>
+          <Badge variant="secondary">
+            {quoteStatusLabels[quote.status as QuoteStatus] ?? quote.status}
+          </Badge>
+        </div>
+        <StageRail className="w-full max-w-md" status={quote.status as QuoteStatus} />
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
+      <div className="mt-8">
+        <WorkspaceTabs tabs={tabs} value={tab} onChange={setTab} />
+      </div>
+
+      <div className="mt-6">
+        <WorkspacePanel id="overview" active={tab === "overview"}>
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
               What you told us
@@ -129,6 +136,34 @@ function PortalQuoteDetail() {
             </div>
           </div>
 
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
+              Your attachments
+            </h2>
+            {(detail.data?.files.length ?? 0) === 0 ? (
+              <p className="mt-3 text-sm text-slate">No files were attached.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {detail.data?.files.map((file) => (
+                  <li key={file.id}>
+                    <button
+                      type="button"
+                      onClick={() => download(file.id)}
+                      className="text-sm text-primary underline"
+                    >
+                      {file.original_name}
+                    </button>
+                    <span className="ml-2 text-xs text-slate">
+                      {(file.byte_size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </WorkspacePanel>
+
+        <WorkspacePanel id="proposal" active={tab === "proposal"}>
           {proposal ? (
             <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -137,7 +172,7 @@ function PortalQuoteDetail() {
                 </h2>
                 <Badge variant="outline">{proposal.status.replace("_", " ")}</Badge>
               </div>
-              <div className="mt-4 overflow-hidden rounded-xl border border-border">
+              <div className="mt-4 max-h-[36rem] overflow-y-auto rounded-xl border border-border">
                 {proposal.doc ? (
                   <DocumentPreview doc={proposal.doc} />
                 ) : (
@@ -200,42 +235,24 @@ function PortalQuoteDetail() {
               No proposal has been released for this project yet. We'll email you when it's ready.
             </div>
           )}
+        </WorkspacePanel>
 
-          <EngagementPanel quoteId={id} />
-        </div>
+        <WorkspacePanel id="estimate" active={tab === "estimate"}>
+          <EngagementPanel quoteId={id} tab="estimate" />
+        </WorkspacePanel>
 
+        <WorkspacePanel id="sow" active={tab === "sow"}>
+          <EngagementPanel quoteId={id} tab="sow" />
+        </WorkspacePanel>
 
-        <aside className="space-y-6">
-          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
-              Your attachments
-            </h2>
-            {(detail.data?.files.length ?? 0) === 0 ? (
-              <p className="mt-3 text-sm text-slate">No files were attached.</p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {detail.data?.files.map((file) => (
-                  <li key={file.id}>
-                    <button
-                      type="button"
-                      onClick={() => download(file.id)}
-                      className="text-sm text-primary underline"
-                    >
-                      {file.original_name}
-                    </button>
-                    <span className="ml-2 text-xs text-slate">
-                      {(file.byte_size / 1024 / 1024).toFixed(1)} MB
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </aside>
+        <WorkspacePanel id="invoices" active={tab === "invoices"}>
+          <EngagementPanel quoteId={id} tab="invoices" />
+        </WorkspacePanel>
       </div>
     </Section>
   );
 }
+
 
 function Field({ label, value, block }: { label: string; value?: string | null; block?: boolean }) {
   return (
