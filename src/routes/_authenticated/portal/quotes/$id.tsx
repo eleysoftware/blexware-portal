@@ -35,6 +35,15 @@ function PortalQuoteDetail() {
   const fetchDocUrl = useServerFn(getMyDocumentUrl);
   const respond = useServerFn(respondToProposal);
   const [note, setNote] = useState("");
+  const [tab, setTab] = useState("overview");
+  const tabs: WorkspaceTab[] = [
+    { id: "overview", label: "Overview" },
+    { id: "proposal", label: "Proposal" },
+    { id: "estimate", label: "Estimate" },
+    { id: "sow", label: "SOW" },
+    { id: "invoices", label: "Invoices" },
+  ];
+
 
   const detail = useQuery({
     queryKey: ["my-quote", id],
