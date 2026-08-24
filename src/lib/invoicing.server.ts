@@ -136,9 +136,13 @@ export async function markInvoiceViewed(invoiceId: string, status: string, viewe
 
 /**
  * Creates a Hyperswitch payment for an invoice. The amount is always computed
- * server-side from the stored invoice; the browser cannot influence it.
+ * server-side from the stored invoice; the browser cannot influence it. The
+ * client only chooses the method family (bank/ACH or card).
  */
-export async function startInvoicePayment(payToken: string) {
+export async function startInvoicePayment(
+  payToken: string,
+  method: "bank" | "card" = "bank",
+) {
   const { PaymentService } = await import("@/lib/payments/service.server");
   const db = adminDb();
   const loaded = await loadInvoiceByToken(payToken);
@@ -159,6 +163,7 @@ export async function startInvoicePayment(payToken: string) {
       amount_cents: amountCents,
       currency: String(invoice["currency"] ?? "usd"),
       status: "created",
+      metadata: { method_choice: method },
     })
     .select("id, payment_reference")
     .single();
@@ -172,6 +177,7 @@ export async function startInvoicePayment(payToken: string) {
     customerEmail: (quote?.["contact_email"] as string | undefined) ?? null,
     customerName: (quote?.["contact_name"] as string | undefined) ?? null,
     returnUrl: `${siteUrl()}/invoice/${payToken}?ref=${attempt.payment_reference as string}`,
+    methods: method,
     metadata: { invoice_payment_id: attempt.id as string, invoice_number: String(invoice["invoice_number"]) },
   });
 
@@ -189,7 +195,7 @@ export async function startInvoicePayment(payToken: string) {
     action: "payment.created",
     entity: "invoice",
     entityId: invoice["id"] as string,
-    metadata: { amount_cents: amountCents, reference: attempt.payment_reference },
+    metadata: { amount_cents: amountCents, reference: attempt.payment_reference, method },
   });
 
   const config = PaymentService.publicConfig();
@@ -199,9 +205,11 @@ export async function startInvoicePayment(payToken: string) {
     profileId: config.profileId,
     environment: config.environment,
     amountCents,
+    method,
     reference: attempt.payment_reference as string,
   };
 }
+
 
 /**
  * Applies an authoritative payment status to BLEXware records. Idempotent:

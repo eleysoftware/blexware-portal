@@ -706,6 +706,22 @@ export const reconcilePayment = createServerFn({ method: "POST" })
     }),
   );
 
+/**
+ * Read-only settlement/payout view for a settled payment, straight from the
+ * gateway. No payout credentials or bank details are returned.
+ */
+export const getPaymentSettlement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { providerPaymentId: string }) => data)
+  .handler(
+    guarded("getPaymentSettlement", "loading the payout status", async ({ data, context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { PaymentService } = await import("@/lib/payments/service.server");
+      if (!PaymentService.isConfigured()) return null;
+      return PaymentService.getSettlement(data.providerPaymentId);
+    }),
+  );
 
 
 /** Seeds the live Build Financial Wellness engagement at the estimate stage. */

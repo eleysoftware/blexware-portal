@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { TabEmptyState } from "@/components/TabIntro";
+import { SignatureBlock } from "@/components/SignatureBlock";
 import { getTabEmptyState } from "@/lib/workflow-guidance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   createAgreement,
   getDocumentUrl,
   getEngagement,
+  getPaymentSettlement,
   reconcilePayment,
   recordOfflinePaymentFn,
   refundPayment,
@@ -30,6 +32,7 @@ import {
   sendEstimate,
   sendInvoiceNow,
 } from "@/lib/engagement.functions";
+
 import { getAiStatus } from "@/lib/admin.functions";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 
@@ -60,8 +63,10 @@ export function AdminEngagementPanel({
   const issueRefund = useServerFn(refundPayment);
   const recordOffline = useServerFn(recordOfflinePaymentFn);
   const reconcile = useServerFn(reconcilePayment);
+  const fetchSettlement = useServerFn(getPaymentSettlement);
   const approveStart = useServerFn(approveProjectStart);
   const aiStatusFn = useServerFn(getAiStatus);
+
 
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
@@ -90,6 +95,21 @@ export function AdminEngagementPanel({
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
+  const [payouts, setPayouts] = useState<
+    Record<
+      string,
+      {
+        status: string;
+        amountCents: number;
+        netAmountCents: number | null;
+        feeCents: number | null;
+        connector: string | null;
+        paymentMethod: string | null;
+        settledAt: string | null;
+      } | null
+    >
+  >({});
+
 
   const estimate = (engagement.data?.estimates ?? [])[0] as
     | {
@@ -268,6 +288,19 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const payoutMutation = useMutation({
+    mutationFn: (providerPaymentId: string) => fetchSettlement({ data: { providerPaymentId } }),
+    onSuccess: (result, providerPaymentId) => {
+      if (!result) {
+        toast.error("The payment gateway isn't configured in this environment yet.");
+        return;
+      }
+      setPayouts((current) => ({ ...current, [providerPaymentId]: result }));
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+
   const reconcileMutation = useMutation({
     mutationFn: (providerPaymentId: string) => reconcile({ data: { providerPaymentId } }),
     onSuccess: () => {
@@ -329,6 +362,7 @@ export function AdminEngagementPanel({
     amount_paid_cents?: number;
     status: string;
     due_date: string | null;
+    pay_token?: string | null;
   }[];
   const payments = (engagement.data?.payments ?? []) as {
     id: string;
@@ -623,22 +657,23 @@ export function AdminEngagementPanel({
             <h2 className="text-xl">{agreement.agreement_number}</h2>
             <Badge variant="outline">{agreement.status}</Badge>
           </div>
-          {agreement.signed_at ? (
-            <p className="mt-2 text-sm text-slate">
-              Signed by {agreement.signer_name} on {new Date(agreement.signed_at).toLocaleString()}
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-slate">Awaiting the client's electronic signature.</p>
-          )}
+          <SignatureBlock
+            audience="admin"
+            agreement={{
+              agreement_number: agreement.agreement_number,
+              status: agreement.status,
+              signed_at: agreement.signed_at ?? null,
+              signer_name: agreement.signer_name ?? null,
+              document_hash: (agreement as { document_hash?: string | null }).document_hash ?? null,
+            }}
+            countersign={countersigned ?? null}
+          />
 
           {agreement.status === "signed" ? (
             countersigned ? (
-              <p className="mt-4 text-sm text-slate">
-                Countersigned by Kamal Eley
-                {countersigned.startDate ? ` · project starts ${countersigned.startDate}` : ""}. The
-                invoice schedule has been issued.
-              </p>
+              <p className="mt-4 text-sm text-slate">The invoice schedule has been issued.</p>
             ) : (
+
               <div className="mt-5 space-y-3 border-t border-border pt-5">
                 <p className="text-sm text-slate">
                   Approve the project, set the start date, and countersign as BLEXware. This issues
@@ -709,6 +744,22 @@ export function AdminEngagementPanel({
                           Send now
                         </Button>
                       ) : null}
+                      {invoice.pay_token ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            const link = `${window.location.origin}/invoice/${invoice.pay_token}`;
+                            void navigator.clipboard
+                              .writeText(link)
+                              .then(() => toast.success("Payment link copied"))
+                              .catch(() => toast.error("Could not copy the payment link"));
+                          }}
+                        >
+                          Copy pay link
+                        </Button>
+                      ) : null}
+
                     </span>
                   </div>
 
@@ -775,11 +826,42 @@ export function AdminEngagementPanel({
                                 </Button>
                               </>
                             ) : null}
+                            {payment.status === "succeeded" && payment.hyperswitch_payment_id ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  payoutMutation.mutate(payment.hyperswitch_payment_id as string)
+                                }
+                              >
+                                Payout status
+                              </Button>
+                            ) : null}
                           </span>
+                          {payment.hyperswitch_payment_id &&
+                          payouts[payment.hyperswitch_payment_id] ? (
+                            <p className="basis-full text-xs text-slate">
+                              Payout: {payouts[payment.hyperswitch_payment_id]!.status}
+                              {payouts[payment.hyperswitch_payment_id]!.netAmountCents !== null
+                                ? ` · net ${formatMoney(payouts[payment.hyperswitch_payment_id]!.netAmountCents!)}`
+                                : ""}
+                              {payouts[payment.hyperswitch_payment_id]!.feeCents !== null
+                                ? ` · fees ${formatMoney(payouts[payment.hyperswitch_payment_id]!.feeCents!)}`
+                                : ""}
+                              {payouts[payment.hyperswitch_payment_id]!.connector
+                                ? ` · ${payouts[payment.hyperswitch_payment_id]!.connector}`
+                                : ""}
+                              {payouts[payment.hyperswitch_payment_id]!.settledAt
+                                ? ` · ${new Date(payouts[payment.hyperswitch_payment_id]!.settledAt!).toLocaleString()}`
+                                : ""}
+                              . Bank account details stay in the payment gateway dashboard.
+                            </p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
                   ) : null}
+
 
                   {balance > 0 ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
