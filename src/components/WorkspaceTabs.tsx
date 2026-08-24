@@ -39,15 +39,30 @@ export function WorkspaceTabs({
             disabled={tab.disabled}
             onClick={() => onChange(tab.id)}
             className={cn(
-              "-mb-px rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              "-mb-px flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active
                 ? "border-primary text-foreground"
                 : "border-transparent text-slate hover:text-foreground",
+              !active && tab.state === "action" ? "text-primary" : "",
               tab.disabled ? "cursor-not-allowed opacity-40 hover:text-slate" : "",
             )}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            {tab.state ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    tab.state === "action" ? "bg-primary" : "bg-accent",
+                  )}
+                />
+                <span className="sr-only">
+                  {tab.state === "action" ? "— action needed" : "— next step, pending"}
+                </span>
+              </>
+            ) : null}
           </button>
         );
       })}
