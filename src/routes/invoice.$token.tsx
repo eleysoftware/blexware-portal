@@ -45,6 +45,7 @@ function InvoicePage() {
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [method, setMethod] = useState<"bank" | "card">("bank");
+  const [unavailable, setUnavailable] = useState<("bank" | "card")[]>([]);
   const [outcome, setOutcome] = useState<{
     status: "succeeded" | "processing";
     method: string | null;
@@ -61,7 +62,14 @@ function InvoicePage() {
   const start = useMutation({
     mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice } }),
     onSuccess: (result) => setSession(result as CheckoutSession),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error, choice) => {
+      toast.error(error.message);
+      // The gateway has no connector for this family — hide it and preselect the other.
+      if (/aren't available on this invoice/i.test(error.message)) {
+        setUnavailable((current) => [...current, choice]);
+        setMethod(choice === "bank" ? "card" : "bank");
+      }
+    },
   });
 
   const confirm = useMutation({
@@ -269,7 +277,9 @@ function InvoicePage() {
                     copy: string;
                     testId: string;
                   }[]
-                ).map((option) => (
+                )
+                  .filter((option) => !unavailable.includes(option.value))
+                  .map((option) => (
                   <label
                     key={option.value}
                     className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-ring ${
