@@ -2,7 +2,8 @@
 import { SITE_URL } from "@/content/site";
 import { documentsBucket } from "@/config/storage";
 import { adminDb } from "@/lib/blex.server";
-import { renderDocx, renderPdf } from "@/lib/documents/render.server";
+// render.server (and its PDF stack) is imported lazily inside storeDocument so
+// non-rendering paths — status updates, emails, downloads — never load it.
 import type { ProjectDocument } from "@/lib/documents/types";
 import { formatMoney } from "@/lib/documents/types";
 import { renderEmail, sendEmail } from "@/lib/email.server";
@@ -34,6 +35,7 @@ export async function storeDocument(input: {
   slug: string;
 }): Promise<StoredDocument[]> {
   const db = adminDb();
+  const { renderPdf, renderDocx } = await import("@/lib/documents/render.server");
   const [pdf, docx] = await Promise.all([renderPdf(input.doc), renderDocx(input.doc)]);
   const stamp = Date.now();
 
