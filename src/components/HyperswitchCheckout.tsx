@@ -46,24 +46,29 @@ export type CheckoutSession = {
   profileId: string;
   environment: "sandbox" | "production";
   amountCents: number;
+  method: "bank" | "card";
   reference: string;
 };
 
 /**
  * Hyperswitch Unified Checkout. All payment credentials (bank + card) are
- * collected by Hyperswitch — BLEXware never sees or stores them.
+ * collected by Hyperswitch — BLEXware never sees or stores them. The payment
+ * intent is created server-side restricted to the method the client chose.
  */
 export function HyperswitchCheckout({
   session,
   returnUrl,
   payLabel,
   onDone,
+  onChangeMethod,
 }: {
   session: CheckoutSession;
   returnUrl: string;
   payLabel: string;
   onDone: (status: "succeeded" | "processing" | "failed") => void;
+  onChangeMethod?: () => void;
 }) {
+
   const mountRef = useRef<HTMLDivElement | null>(null);
   const hyperRef = useRef<HyperInstance | null>(null);
   const widgetsRef = useRef<HyperWidgets | null>(null);
@@ -140,10 +145,16 @@ export function HyperswitchCheckout({
       <Button className="mt-6 w-full shadow-cta" disabled={!ready || busy} onClick={pay}>
         {busy ? "Processing…" : payLabel}
       </Button>
+      {onChangeMethod ? (
+        <Button variant="ghost" className="mt-2 w-full" disabled={busy} onClick={onChangeMethod}>
+          Choose a different payment method
+        </Button>
+      ) : null}
       <p className="mt-3 text-center text-xs text-slate">
         Secure payment powered by BLEXware. Your bank and card details are handled by our payment provider —
         BLEXware never stores them.
       </p>
+
     </div>
   );
 }

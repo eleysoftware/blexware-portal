@@ -44,7 +44,14 @@ function InvoicePage() {
   const confirmPayment = useServerFn(confirmInvoicePayment);
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
-  const [outcome, setOutcome] = useState<"succeeded" | "processing" | null>(null);
+  const [method, setMethod] = useState<"bank" | "card">("bank");
+  const [outcome, setOutcome] = useState<{
+    status: "succeeded" | "processing";
+    method: string | null;
+    reference: string;
+    amountCents: number;
+    at: string;
+  } | null>(null);
 
   const invoice = useQuery({
     queryKey: ["invoice", token],
@@ -52,19 +59,26 @@ function InvoicePage() {
   });
 
   const start = useMutation({
-    mutationFn: () => beginPayment({ data: { token } }),
+    mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice } }),
     onSuccess: (result) => setSession(result as CheckoutSession),
     onError: (error: Error) => toast.error(error.message),
   });
 
   const confirm = useMutation({
     mutationFn: (reference: string) => confirmPayment({ data: { token, reference } }),
-    onSuccess: (result) => {
-      setOutcome(result.status === "succeeded" ? "succeeded" : "processing");
+    onSuccess: (result, reference) => {
+      setOutcome({
+        status: result.status === "succeeded" ? "succeeded" : "processing",
+        method: ("paymentMethod" in result ? result.paymentMethod : null) ?? null,
+        reference,
+        amountCents: session?.amountCents ?? 0,
+        at: new Date().toLocaleString(),
+      });
       setSession(null);
       void queryClient.invalidateQueries({ queryKey: ["invoice", token] });
     },
   });
+
 
   if (invoice.isLoading) {
     return (
@@ -150,22 +164,50 @@ function InvoicePage() {
             ) : null}
           </dl>
 
-          {outcome === "succeeded" ? (
-            <div className="mt-8 rounded-xl border border-border bg-surface p-4 text-sm">
-              <p className="font-semibold">Payment successful</p>
-              <p className="mt-1 text-slate">
-                Thank you — a receipt has been emailed to you.
-                {balance > 0 ? ` Remaining balance: ${formatMoney(balance)}.` : " This invoice is paid in full."}
+          {outcome ? (
+            <div
+              className="mt-8 rounded-xl border border-border bg-surface p-4 text-sm"
+              role="status"
+              data-testid="invoice-outcome"
+            >
+              <p className="font-semibold">
+                <span aria-hidden className="mr-2">
+                  {outcome.status === "succeeded" ? "✓" : "⏳"}
+                </span>
+                {outcome.status === "succeeded"
+                  ? "Payment Successful"
+                  : "Payment Submitted — your bank payment is processing"}
               </p>
-            </div>
-          ) : null}
-
-          {outcome === "processing" ? (
-            <div className="mt-8 rounded-xl border border-border bg-surface p-4 text-sm">
-              <p className="font-semibold">Payment submitted</p>
-              <p className="mt-1 text-slate">
-                Your bank account has been securely connected. Your payment may take additional time to process —
-                we'll update this invoice and email you once it's confirmed.
+              <dl className="mt-3 space-y-1 text-slate">
+                <div className="flex justify-between">
+                  <dt>Invoice</dt>
+                  <dd>{data.number}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Amount</dt>
+                  <dd>{formatMoney(outcome.amountCents)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Method</dt>
+                  <dd>{outcome.method ?? (method === "bank" ? "Bank account (ACH)" : "Card")}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Date</dt>
+                  <dd>{outcome.at}</dd>
+                </div>
+                <div className="flex justify-between gap-6">
+                  <dt>Reference</dt>
+                  <dd className="break-all text-right">{outcome.reference}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Remaining balance</dt>
+                  <dd>{formatMoney(balance)}</dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-slate">
+                {outcome.status === "succeeded"
+                  ? "A receipt has been emailed to you."
+                  : "We'll update this invoice and email you once your bank confirms the payment."}
               </p>
             </div>
           ) : null}
@@ -180,16 +222,20 @@ function InvoicePage() {
           ) : session ? (
             <>
               <div className="mt-8 rounded-xl border border-border bg-surface p-4 text-sm">
-                <p className="font-semibold">Pay by Bank — Recommended</p>
+                <p className="font-semibold">
+                  {session.method === "bank" ? "Pay by Bank — Recommended" : "Credit or Debit Card"}
+                </p>
                 <p className="mt-1 text-slate">
-                  Securely connect your bank account to pay directly from your bank, or choose a credit or debit
-                  card below.
+                  {session.method === "bank"
+                    ? "Securely connect your bank account to pay directly from your bank."
+                    : "Enter your card details securely below."}
                 </p>
               </div>
               <HyperswitchCheckout
                 session={session}
                 returnUrl={`${window.location.origin}/invoice/${token}`}
                 payLabel={`Pay ${formatMoney(session.amountCents)}`}
+                onChangeMethod={() => setSession(null)}
                 onDone={(status) => {
                   if (status === "failed") {
                     toast.error("We were unable to process your payment. You can try again.");
@@ -200,20 +246,68 @@ function InvoicePage() {
               />
             </>
           ) : (
-            <>
+            <fieldset className="mt-8">
+              <legend className="text-sm font-semibold">How would you like to pay?</legend>
+              <div className="mt-3 space-y-3">
+                {(
+                  [
+                    {
+                      value: "bank" as const,
+                      title: "Pay by Bank (ACH) — Recommended",
+                      copy: "Securely connect your bank account to pay directly from your bank.",
+                      testId: "method-bank",
+                    },
+                    {
+                      value: "card" as const,
+                      title: "Credit or Debit Card",
+                      copy: "Pay with Visa, Mastercard, American Express or Discover.",
+                      testId: "method-card",
+                    },
+                  ] satisfies {
+                    value: "bank" | "card";
+                    title: string;
+                    copy: string;
+                    testId: string;
+                  }[]
+                ).map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-ring ${
+                      method === option.value ? "border-primary bg-surface" : "border-border"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      className="mt-1 accent-primary"
+                      value={option.value}
+                      checked={method === option.value}
+                      data-testid={option.testId}
+                      onChange={() => setMethod(option.value)}
+                    />
+                    <span>
+                      <span className="block font-semibold">{option.title}</span>
+                      <span className="mt-1 block text-slate">{option.copy}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
               <Button
-                className="mt-8 w-full shadow-cta"
+                className="mt-6 w-full shadow-cta"
                 data-testid="invoice-pay"
                 disabled={start.isPending}
-                onClick={() => start.mutate()}
+                onClick={() => start.mutate(method)}
               >
-                {start.isPending ? "Opening secure checkout…" : `Pay ${formatMoney(balance)}`}
+                {start.isPending
+                  ? "Opening secure checkout…"
+                  : `Continue to pay ${formatMoney(balance)}`}
               </Button>
               <p className="mt-3 text-center text-xs text-slate">
-                Pay by bank (recommended) or credit/debit card. Secure payment powered by BLEXware.
+                Secure payment powered by BLEXware. We never see or store your bank or card details.
               </p>
-            </>
+            </fieldset>
           )}
+
         </div>
       </Section>
     </>

@@ -37,6 +37,7 @@ type HyperswitchPayment = {
   status: string;
   amount: number;
   amount_received?: number | null;
+  net_amount?: number | null;
   currency: string;
   client_secret?: string | null;
   connector?: string | null;
@@ -45,7 +46,19 @@ type HyperswitchPayment = {
   connector_transaction_id?: string | null;
   error_code?: string | null;
   error_message?: string | null;
+  created?: string | null;
+  updated?: string | null;
 };
+
+/** The two payment families a client can choose from on an invoice. */
+export type PaymentMethodChoice = "bank" | "card";
+
+/** Hyperswitch payment method types per family. Connectors stay dashboard-configured. */
+export const METHOD_TYPES: Record<PaymentMethodChoice, string[]> = {
+  bank: ["ach"],
+  card: ["credit", "debit"],
+};
+
 
 /** Maps Hyperswitch payment statuses onto BLEXware payment states. */
 export function mapPaymentStatus(status: string): PaymentStatus {
@@ -98,7 +111,10 @@ export const PaymentService = {
     };
   },
 
-  /** Creates a payment for a server-calculated amount. */
+  /**
+   * Creates a payment for a server-calculated amount. When `methods` is given,
+   * only that family (bank/ACH or card) is offered in the hosted checkout.
+   */
   async createPayment(input: {
     amountCents: number;
     currency?: string;
@@ -107,6 +123,7 @@ export const PaymentService = {
     customerEmail?: string | null;
     customerName?: string | null;
     returnUrl: string;
+    methods?: PaymentMethodChoice;
     metadata?: Record<string, string>;
   }): Promise<PaymentSnapshot> {
     const config = hyperswitchConfig();
@@ -120,13 +137,59 @@ export const PaymentService = {
         capture_method: "automatic",
         description: input.description,
         return_url: input.returnUrl,
+        ...(input.methods
+          ? { allowed_payment_method_types: METHOD_TYPES[input.methods] }
+          : {}),
         ...(input.customerEmail ? { email: input.customerEmail } : {}),
         ...(input.customerName ? { name: input.customerName } : {}),
-        metadata: { reference: input.reference, ...(input.metadata ?? {}) },
+        metadata: {
+          reference: input.reference,
+          ...(input.methods ? { method_choice: input.methods } : {}),
+          ...(input.metadata ?? {}),
+        },
       },
     });
     return toSnapshot(payment);
   },
+
+  /**
+   * Read-only settlement view for admins: what the gateway reports as the net
+   * amount BLEXware receives. No payout credentials are ever exposed.
+   */
+  async getSettlement(providerPaymentId: string): Promise<{
+    providerPaymentId: string;
+    status: PaymentStatus;
+    amountCents: number;
+    netAmountCents: number | null;
+    feeCents: number | null;
+    connector: string | null;
+    paymentMethod: string | null;
+    settledAt: string | null;
+  }> {
+    const payment = await hyperswitchRequest<HyperswitchPayment>(
+      `/payments/${providerPaymentId}?force_sync=true`,
+      { method: "GET" },
+    );
+    const amountCents = Number(payment.amount_received ?? payment.amount ?? 0);
+    const netAmountCents =
+      payment.net_amount === null || payment.net_amount === undefined
+        ? null
+        : Number(payment.net_amount);
+    return {
+      providerPaymentId: payment.payment_id,
+      status: mapPaymentStatus(payment.status),
+      amountCents,
+      netAmountCents,
+      feeCents:
+        netAmountCents !== null && amountCents > 0 && netAmountCents <= amountCents
+          ? amountCents - netAmountCents
+          : null,
+      connector: payment.connector ?? null,
+      paymentMethod: payment.payment_method_type ?? payment.payment_method ?? null,
+      settledAt: payment.updated ?? null,
+    };
+  },
+
 
   async getPayment(providerPaymentId: string): Promise<PaymentSnapshot> {
     const payment = await hyperswitchRequest<HyperswitchPayment>(
