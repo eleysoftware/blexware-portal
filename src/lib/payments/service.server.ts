@@ -148,8 +148,16 @@ export const PaymentService = {
           ...(input.metadata ?? {}),
         },
       },
+    }).catch((error: unknown) => {
+      // The chosen family has no enabled connector on the gateway account yet.
+      // Tell the client which alternative works instead of a generic failure.
+      if (input.methods && isMethodUnavailable(error)) {
+        throw new UserFacingError(METHOD_UNAVAILABLE_MESSAGE[input.methods]);
+      }
+      throw error;
     });
     return toSnapshot(payment);
+
   },
 
   /**
