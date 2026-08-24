@@ -277,7 +277,9 @@ function InvoicePage() {
                     copy: string;
                     testId: string;
                   }[]
-                ).map((option) => (
+                )
+                  .filter((option) => !unavailable.includes(option.value))
+                  .map((option) => (
                   <label
                     key={option.value}
                     className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-ring ${
