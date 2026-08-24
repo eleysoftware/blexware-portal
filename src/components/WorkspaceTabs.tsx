@@ -2,7 +2,13 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export type WorkspaceTab = { id: string; label: string; disabled?: boolean };
+export type WorkspaceTab = {
+  id: string;
+  label: string;
+  disabled?: boolean;
+  /** "action" = the viewer owes the next step here, "pending" = the upcoming step lands here. */
+  state?: "action" | "pending";
+};
 
 /** Accessible tab strip. Panels stay mounted (hidden) so form state survives. */
 export function WorkspaceTabs({
