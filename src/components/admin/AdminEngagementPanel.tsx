@@ -815,6 +815,8 @@ export function AdminEngagementPanel({
             })}
           </ul>
         </div>
+      ) : tab === "invoices" ? (
+        <TabEmptyState message={getTabEmptyState("invoices", "admin")} />
       ) : null}
 
       {tabDocuments.length ? (
