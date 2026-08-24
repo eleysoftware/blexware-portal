@@ -20,6 +20,7 @@ export default defineConfig({
         // property '__extends'"). Pin both to their ESM builds everywhere so local
         // dev and the deployed worker load identical, bundler-safe code.
         { find: /^pdf-lib$/, replacement: "pdf-lib/es/index.js" },
+        { find: /^tslib$/, replacement: "tslib/tslib.es6.js" },
       ],
     },
   },
