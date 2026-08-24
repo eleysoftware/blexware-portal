@@ -3,10 +3,12 @@
 // Hyperswitch is the orchestration layer; the connector is chosen in the
 // Hyperswitch dashboard, not in this codebase.
 import {
+  HyperswitchApiError,
   hyperswitchConfig,
   hyperswitchRequest,
   isPaymentsConfigured,
 } from "@/lib/payments/hyperswitch.server";
+import { UserFacingError } from "@/lib/errors";
 
 export type PaymentStatus =
   | "created"
