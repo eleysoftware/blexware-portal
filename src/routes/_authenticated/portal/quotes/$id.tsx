@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EngagementPanel } from "@/components/EngagementPanel";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { Section } from "@/components/Section";
+import { NextStepBanner } from "@/components/NextStepBanner";
 import { StageRail } from "@/components/StageRail";
+import { TabIntro } from "@/components/TabIntro";
 import { WorkspacePanel, WorkspaceTabs, type WorkspaceTab } from "@/components/WorkspaceTabs";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +20,7 @@ import { getMyDocumentUrl } from "@/lib/client-engagement.functions";
 import { respondToProposal } from "@/lib/proposals.functions";
 import { getMyQuote, getMyQuoteFileUrl } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
+import { getNextStep, getTabPurpose } from "@/lib/workflow-guidance";
 
 export const Route = createFileRoute("/_authenticated/portal/quotes/$id")({
   head: () => ({
@@ -35,13 +38,6 @@ function PortalQuoteDetail() {
   const respond = useServerFn(respondToProposal);
   const [note, setNote] = useState("");
   const [tab, setTab] = useState("overview");
-  const tabs: WorkspaceTab[] = [
-    { id: "overview", label: "Overview" },
-    { id: "proposal", label: "Proposal" },
-    { id: "estimate", label: "Estimate" },
-    { id: "sow", label: "SOW" },
-    { id: "invoices", label: "Invoices" },
-  ];
 
   const detail = useQuery({
     queryKey: ["my-quote", id],
@@ -103,6 +99,19 @@ function PortalQuoteDetail() {
     );
   }
 
+  const nextStep = getNextStep(quote.status as QuoteStatus, "client");
+  const tabs: WorkspaceTab[] = [
+    { id: "overview", label: "Overview" },
+    { id: "proposal", label: "Proposal" },
+    { id: "estimate", label: "Estimate" },
+    { id: "sow", label: "SOW" },
+    { id: "invoices", label: "Invoices" },
+  ].map((item) =>
+    item.id === nextStep.tab
+      ? { ...item, state: nextStep.actionable ? ("action" as const) : ("pending" as const) }
+      : item,
+  );
+
   const proposal = detail.data?.proposal ?? null;
   const answered = proposal ? proposal.status !== "sent" : false;
 
@@ -124,12 +133,17 @@ function PortalQuoteDetail() {
         <StageRail className="w-full max-w-md" status={quote.status as QuoteStatus} />
       </div>
 
+      <div className="mt-6">
+        <NextStepBanner step={nextStep} onGoToTab={setTab} />
+      </div>
+
       <div className="mt-8">
         <WorkspaceTabs tabs={tabs} value={tab} onChange={setTab} />
       </div>
 
       <div className="mt-6">
         <WorkspacePanel id="overview" active={tab === "overview"}>
+          <TabIntro purpose={getTabPurpose("overview", "client")} />
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">
               What you told us
@@ -174,6 +188,7 @@ function PortalQuoteDetail() {
         </WorkspacePanel>
 
         <WorkspacePanel id="proposal" active={tab === "proposal"}>
+          <TabIntro purpose={getTabPurpose("proposal", "client")} />
           {proposal ? (
             <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -248,14 +263,17 @@ function PortalQuoteDetail() {
         </WorkspacePanel>
 
         <WorkspacePanel id="estimate" active={tab === "estimate"}>
+          <TabIntro purpose={getTabPurpose("estimate", "client")} />
           <EngagementPanel quoteId={id} tab="estimate" />
         </WorkspacePanel>
 
         <WorkspacePanel id="sow" active={tab === "sow"}>
+          <TabIntro purpose={getTabPurpose("sow", "client")} />
           <EngagementPanel quoteId={id} tab="sow" />
         </WorkspacePanel>
 
         <WorkspacePanel id="invoices" active={tab === "invoices"}>
+          <TabIntro purpose={getTabPurpose("invoices", "client")} />
           <EngagementPanel quoteId={id} tab="invoices" />
         </WorkspacePanel>
       </div>
