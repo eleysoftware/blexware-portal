@@ -3,6 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { TabEmptyState } from "@/components/TabIntro";
+import { getTabEmptyState } from "@/lib/workflow-guidance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -666,6 +668,8 @@ export function AdminEngagementPanel({
             )
           ) : null}
         </div>
+      ) : tab === "sow" ? (
+        <TabEmptyState message={getTabEmptyState("sow", "admin")} />
       ) : null}
 
       {invoices.length && tab === "invoices" ? (
@@ -811,6 +815,8 @@ export function AdminEngagementPanel({
             })}
           </ul>
         </div>
+      ) : tab === "invoices" ? (
+        <TabEmptyState message={getTabEmptyState("invoices", "admin")} />
       ) : null}
 
       {tabDocuments.length ? (
