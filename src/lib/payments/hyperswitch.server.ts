@@ -58,6 +58,23 @@ export function hyperswitchConfig(): HyperswitchConfig {
   };
 }
 
+/**
+ * A non-2xx response from Hyperswitch. `message` stays generic (it may reach a
+ * toast); callers inspect `code` to handle a specific gateway condition.
+ */
+export class HyperswitchApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly providerMessage: string | null;
+  constructor(status: number, code: string | null, providerMessage: string | null) {
+    super("The payment service could not complete this request. Please try again.");
+    this.name = "HyperswitchApiError";
+    this.status = status;
+    this.code = code;
+    this.providerMessage = providerMessage;
+  }
+}
+
 export async function hyperswitchRequest<T>(
   path: string,
   init: { method: "GET" | "POST"; body?: unknown } = { method: "GET" },
@@ -76,7 +93,20 @@ export async function hyperswitchRequest<T>(
   const text = await response.text();
   if (!response.ok) {
     console.error("[hyperswitch]", init.method, path, response.status, text);
-    throw new Error("The payment service could not complete this request. Please try again.");
+    let code: string | null = null;
+    let providerMessage: string | null = null;
+    try {
+      const parsed = JSON.parse(text) as {
+        error?: { code?: string; message?: string };
+        error_code?: string;
+        error_message?: string;
+      };
+      code = parsed.error?.code ?? parsed.error_code ?? null;
+      providerMessage = parsed.error?.message ?? parsed.error_message ?? null;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new HyperswitchApiError(response.status, code, providerMessage);
   }
   return (text ? JSON.parse(text) : {}) as T;
 }
