@@ -187,12 +187,20 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
             </div>
           </details>
 
-          {agreement.status === "signed" ? (
-            <p className="mt-4 text-sm text-slate">
-              Signed by {agreement.signer_name}
-              {agreement.signed_at ? ` on ${new Date(agreement.signed_at).toLocaleString()}` : ""}.
-            </p>
-          ) : (
+          <SignatureBlock
+            audience="client"
+            agreement={{
+              agreement_number: agreement.agreement_number,
+              status: agreement.status,
+              signed_at: agreement.signed_at ?? null,
+              signer_name: agreement.signer_name ?? null,
+              document_hash: (agreement as { document_hash?: string | null }).document_hash ?? null,
+            }}
+            countersign={agreement.doc?.acceptance?.countersign ?? null}
+          />
+
+          {agreement.status === "signed" ? null : (
+
             <div className="mt-6 space-y-4 border-t border-border pt-6">
               <div>
                 <label htmlFor="signature" className="text-sm font-medium">
