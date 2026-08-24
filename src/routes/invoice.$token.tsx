@@ -61,7 +61,14 @@ function InvoicePage() {
   const start = useMutation({
     mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice } }),
     onSuccess: (result) => setSession(result as CheckoutSession),
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error, choice) => {
+      toast.error(error.message);
+      // The gateway has no connector for this family — hide it and preselect the other.
+      if (/aren't available on this invoice/i.test(error.message)) {
+        setUnavailable((current) => [...current, choice]);
+        setMethod(choice === "bank" ? "card" : "bank");
+      }
+    },
   });
 
   const confirm = useMutation({
