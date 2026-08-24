@@ -44,6 +44,16 @@ function PortalQuoteDetail() {
     queryFn: () => fetchQuote({ data: { id } }),
   });
 
+  // Land on the tab that needs the client's attention, once, on first load.
+  const autoTabbed = useRef(false);
+  const loadedStatus = detail.data?.quote?.status as QuoteStatus | undefined;
+  useEffect(() => {
+    if (!loadedStatus || autoTabbed.current) return;
+    autoTabbed.current = true;
+    const step = getNextStep(loadedStatus, "client");
+    if (step.actionable) setTab(step.tab);
+  }, [loadedStatus]);
+
   const respondMutation = useMutation({
     mutationFn: (action: "approved" | "changes_requested" | "declined") => {
       const token = detail.data?.proposal?.review_token;
