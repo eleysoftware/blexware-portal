@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DocumentPreview } from "@/components/DocumentPreview";
+import { TabEmptyState } from "@/components/TabIntro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,6 +17,7 @@ import {
   signMyAgreement,
 } from "@/lib/client-engagement.functions";
 import { formatMoney, type ProjectDocument } from "@/lib/documents/types";
+import { getTabEmptyState } from "@/lib/workflow-guidance";
 
 type DocRow = { id: string; entity: string; entity_id: string; kind: string; format: string };
 
@@ -229,6 +231,8 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
             </div>
           )}
         </div>
+      ) : tab === "sow" ? (
+        <TabEmptyState message={getTabEmptyState("sow", "client")} />
       ) : null}
 
       {invoices.length && show("invoices") ? (
@@ -271,6 +275,8 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
             weeks.
           </p>
         </div>
+      ) : tab === "invoices" ? (
+        <TabEmptyState message={getTabEmptyState("invoices", "client")} />
       ) : null}
     </div>
   );
