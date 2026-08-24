@@ -35,6 +35,7 @@ export async function storeDocument(input: {
   slug: string;
 }): Promise<StoredDocument[]> {
   const db = adminDb();
+  const { renderPdf, renderDocx } = await import("@/lib/documents/render.server");
   const [pdf, docx] = await Promise.all([renderPdf(input.doc), renderDocx(input.doc)]);
   const stamp = Date.now();
 
