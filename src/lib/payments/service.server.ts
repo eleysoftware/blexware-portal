@@ -61,6 +61,19 @@ export const METHOD_TYPES: Record<PaymentMethodChoice, string[]> = {
   card: ["credit", "debit"],
 };
 
+/** Shown when the gateway account has no enabled connector for that family. */
+export const METHOD_UNAVAILABLE_MESSAGE: Record<PaymentMethodChoice, string> = {
+  bank: "Bank (ACH) payments aren't available on this invoice yet. Please pay by credit or debit card.",
+  card: "Card payments aren't available on this invoice yet. Please pay by bank (ACH).",
+};
+
+/** True when Hyperswitch reports no connector eligible for the requested method. */
+export function isMethodUnavailable(error: unknown): boolean {
+  if (!(error instanceof HyperswitchApiError)) return false;
+  if (error.code === "IR_39") return true;
+  return Boolean(error.providerMessage?.toLowerCase().includes("no eligible connector"));
+}
+
 
 /** Maps Hyperswitch payment statuses onto BLEXware payment states. */
 export function mapPaymentStatus(status: string): PaymentStatus {
