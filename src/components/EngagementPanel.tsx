@@ -163,6 +163,8 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
             </div>
           ) : null}
         </div>
+      ) : tab === "estimate" ? (
+        <TabEmptyState message={getTabEmptyState("estimate", "client")} />
       ) : null}
 
       {agreement && show("sow") ? (
