@@ -45,6 +45,7 @@ function InvoicePage() {
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [method, setMethod] = useState<"bank" | "card">("bank");
+  const [unavailable, setUnavailable] = useState<("bank" | "card")[]>([]);
   const [outcome, setOutcome] = useState<{
     status: "succeeded" | "processing";
     method: string | null;
