@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { TabEmptyState } from "@/components/TabIntro";
+import { SignatureBlock } from "@/components/SignatureBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
