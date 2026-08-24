@@ -3,7 +3,7 @@
 import { adminDb, writeAudit } from "@/lib/blex.server";
 import { paymentPlanToInvoiceEntries, buildPaymentPlan } from "@/lib/documents/compose";
 import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
-import { emailInvoice, siteUrl } from "@/lib/engagement.server";
+import { emailInvoice, siteUrl } from "@/lib/engagement-email.server";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
 export async function createInvoiceSchedule(
@@ -254,7 +254,7 @@ export async function applyPaymentStatus(input: {
     .eq("id", invoice.quote_id)
     .maybeSingle();
   const url = `${siteUrl()}/invoice/${invoice.pay_token as string}`;
-  const { emailPaymentUpdate, emailReceipt, notifyTeam } = await import("@/lib/engagement.server");
+   const { emailPaymentUpdate, emailReceipt, notifyTeam } = await import("@/lib/engagement-email.server");
 
   if (input.status === "succeeded" && !alreadySucceeded) {
     const credited = Number(input.amountCents ?? attempt.amount_cents);
@@ -469,7 +469,7 @@ export async function applyRefundStatus(input: {
     .eq("id", invoice.quote_id)
     .maybeSingle();
   if (quote) {
-    const { emailPaymentUpdate } = await import("@/lib/engagement.server");
+     const { emailPaymentUpdate } = await import("@/lib/engagement-email.server");
     await emailPaymentUpdate({
       to: quote.contact_email as string,
       name: quote.contact_name as string,
