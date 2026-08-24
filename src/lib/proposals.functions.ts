@@ -89,7 +89,7 @@ export const getProposalDocumentUrl = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!doc) throw new Error("Document not found");
 
-      const { signedDocumentUrl } = await import("@/lib/engagement.server");
+       const { signedDocumentUrl } = await import("@/lib/document-storage.server");
       return { url: await signedDocumentUrl(doc.storage_path as string) };
     }),
   );

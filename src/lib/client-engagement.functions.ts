@@ -74,7 +74,7 @@ export const getMyDocumentUrl = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!doc) throw new Error("Document not found");
 
-      const { signedDocumentUrl } = await import("@/lib/engagement.server");
+      const { signedDocumentUrl } = await import("@/lib/document-storage.server");
       return { url: await signedDocumentUrl(doc.storage_path as string) };
     }),
   );
@@ -105,21 +105,23 @@ export const respondToMyProposal = createServerFn({ method: "POST" })
       if (!visible) throw new Error("Proposal not found");
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
-      const { emailThankYouDeclined, notifyTeam } = await import("@/lib/engagement.server");
+       const { emailThankYouDeclined, notifyTeam } = await import("@/lib/engagement-email.server");
       const db = adminDb();
 
-      await db
+       const { error: proposalError } = await db
         .from("proposals")
         .update({
           status: data.action,
           client_response_note: data.note ?? null,
           responded_at: new Date().toISOString(),
         })
-        .eq("id", data.proposalId);
+         .eq("id", data.proposalId);
+       if (proposalError) throw new Error(proposalError.message);
 
       const quoteStatus =
         data.action === "approved" ? "approved" : data.action === "declined" ? "declined" : "reviewing";
-      await db.from("quotes").update({ status: quoteStatus }).eq("id", visible.quote_id);
+       const { error: quoteError } = await db.from("quotes").update({ status: quoteStatus }).eq("id", visible.quote_id);
+       if (quoteError) throw new Error(quoteError.message);
 
       const { data: quote } = await db
         .from("quotes")
@@ -179,22 +181,24 @@ export const respondToMyEstimate = createServerFn({ method: "POST" })
       if (visible.status !== "sent") throw new Error("This estimate is no longer open for response.");
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
-      const { emailThankYouDeclined, notifyTeam } = await import("@/lib/engagement.server");
+       const { emailThankYouDeclined, notifyTeam } = await import("@/lib/engagement-email.server");
       const db = adminDb();
 
-      await db
+       const { error: estimateError } = await db
         .from("estimates")
         .update({
           status: data.action,
           response_note: data.note ?? null,
           responded_at: new Date().toISOString(),
         })
-        .eq("id", data.estimateId);
+         .eq("id", data.estimateId);
+       if (estimateError) throw new Error(estimateError.message);
 
-      await db
+       const { error: quoteError } = await db
         .from("quotes")
         .update({ status: data.action === "approved" ? "estimate_approved" : "declined" })
-        .eq("id", visible.quote_id);
+         .eq("id", visible.quote_id);
+       if (quoteError) throw new Error(quoteError.message);
 
       const { data: quote } = await db
         .from("quotes")
@@ -254,7 +258,8 @@ export const signMyAgreement = createServerFn({ method: "POST" })
       if (visible.status !== "sent") throw new Error("This agreement is not open for signature.");
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
-      const { storeDocument, notifyTeam } = await import("@/lib/engagement.server");
+       const { storeDocument } = await import("@/lib/document-storage.server");
+       const { notifyTeam } = await import("@/lib/engagement-email.server");
       const db = adminDb();
 
 

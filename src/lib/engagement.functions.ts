@@ -357,7 +357,8 @@ export const sendEstimate = createServerFn({ method: "POST" })
     guarded("sendEstimate", "sending the estimate", async ({ data, context }) => {
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
-      const { storeDocument, emailEstimateSent, siteUrl } = await import("@/lib/engagement.server");
+       const { storeDocument } = await import("@/lib/document-storage.server");
+       const { emailEstimateSent, siteUrl } = await import("@/lib/engagement-email.server");
       const db = adminDb();
 
       const { data: estimate } = await db
@@ -424,7 +425,8 @@ export const createAgreement = createServerFn({ method: "POST" })
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const { buildSowDoc } = await import("@/lib/documents/compose");
-      const { storeDocument, emailAgreementSent, siteUrl } = await import("@/lib/engagement.server");
+       const { storeDocument } = await import("@/lib/document-storage.server");
+       const { emailAgreementSent, siteUrl } = await import("@/lib/engagement-email.server");
       const db = adminDb();
 
       const { data: estimate } = await db
@@ -544,7 +546,7 @@ export const approveProjectStart = createServerFn({ method: "POST" })
     guarded("approveProjectStart", "approving the project start", async ({ data, context }) => {
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
-      const { storeDocument } = await import("@/lib/engagement.server");
+       const { storeDocument } = await import("@/lib/document-storage.server");
       const { createInvoiceSchedule } = await import("@/lib/invoicing.server");
       const db = adminDb();
 
@@ -619,7 +621,7 @@ export const getDocumentUrl = createServerFn({ method: "POST" })
     guarded("getDocumentUrl", "preparing the download", async ({ data, context }) => {
       const { requireAdmin, adminDb } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
-      const { signedDocumentUrl } = await import("@/lib/engagement.server");
+       const { signedDocumentUrl } = await import("@/lib/document-storage.server");
 
       const { data: doc } = await adminDb()
         .from("documents")

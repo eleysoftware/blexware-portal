@@ -12,7 +12,7 @@ import {
   buildBfwProposalDoc,
 } from "@/content/build-financial-wellness";
 import { sectionsToMarkdown } from "@/lib/documents/compose";
-import { storeDocument } from "@/lib/engagement.server";
+import { storeDocument } from "@/lib/document-storage.server";
 
 export async function seedBuildFinancialWellness() {
   const db = adminDb();
