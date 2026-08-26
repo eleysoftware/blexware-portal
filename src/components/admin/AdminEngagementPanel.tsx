@@ -16,13 +16,15 @@ import {
   type PaymentPlanKind,
   type ProjectDocument,
 } from "@/lib/documents/types";
-import { buildPaymentPlan } from "@/lib/documents/compose";
+import { buildPaymentPlan, evenSplitRows, SPLIT_COUNTS } from "@/lib/documents/compose";
 import {
   approveProjectStart,
   createAgreement,
+  draftSowScopeWithAi,
   getDocumentUrl,
   getEngagement,
   getPaymentSettlement,
+  markEstimateApproved,
   reconcilePayment,
   recordOfflinePaymentFn,
   refundPayment,
@@ -31,7 +33,9 @@ import {
   saveEstimate,
   sendEstimate,
   sendInvoiceNow,
+  suggestInvoiceSchedule,
 } from "@/lib/engagement.functions";
+
 
 import { getAiStatus } from "@/lib/admin.functions";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";

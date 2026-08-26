@@ -35,6 +35,27 @@ export function splitFiftyFifty(totalCents: number): [number, number] {
   return [first, Math.max(0, Math.round(totalCents)) - first];
 }
 
+/** Supported invoice counts for the schedule builder. */
+export const SPLIT_COUNTS = [1, 2, 3, 4, 5, 6, 9, 12] as const;
+
+/**
+ * Splits a total into `count` even invoices. Rounding drift lands on the first
+ * invoice so the amounts always add back up to the total exactly.
+ */
+export function evenSplitRows(
+  totalCents: number,
+  count: number,
+): { label: string; amountCents: number }[] {
+  const total = Math.max(0, Math.round(totalCents));
+  const parts = Math.max(1, Math.floor(count));
+  const base = Math.floor(total / parts);
+  const remainder = total - base * parts;
+  return Array.from({ length: parts }, (_, index) => ({
+    label: parts === 1 ? "Due upon signature" : `Invoice ${index + 1} of ${parts}`,
+    amountCents: index === 0 ? base + remainder : base,
+  }));
+}
+
 export function buildPaymentPlan(
   kind: PaymentPlanKind,
   totalCents: number,

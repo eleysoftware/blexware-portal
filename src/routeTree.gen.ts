@@ -28,6 +28,7 @@ import { Route as ProposalTokenRouteImport } from './routes/proposal.$token'
 import { Route as ResourcesIndexRouteImport } from './routes/resources.index'
 import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
+import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin/import'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal/index'
 import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
 import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authenticated/portal/quotes/$id'
@@ -129,6 +130,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminImportRoute =
+  AuthenticatedAdminImportRouteImport.update({
+    id: '/admin/import',
+    path: '/admin/import',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPortalIndexRoute =
   AuthenticatedPortalIndexRouteImport.update({
     id: '/portal/',
@@ -183,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
@@ -209,6 +217,7 @@ export interface FileRoutesByTo {
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/resources': typeof ResourcesIndexRoute
+  '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
@@ -237,6 +246,7 @@ export interface FileRoutesById {
   '/resources/$slug': typeof ResourcesSlugRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
+  '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
   '/_authenticated/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/resources/$slug'
     | '/portfolio/'
     | '/resources/'
+    | '/admin/import'
     | '/admin/'
     | '/portal/'
     | '/admin/quotes/$id'
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
     | '/resources/$slug'
     | '/portfolio'
     | '/resources'
+    | '/admin/import'
     | '/admin'
     | '/portal'
     | '/admin/quotes/$id'
@@ -318,6 +330,7 @@ export interface FileRouteTypes {
     | '/resources/$slug'
     | '/portfolio/'
     | '/resources/'
+    | '/_authenticated/admin/import'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
     | '/_authenticated/admin/quotes/$id'
@@ -486,6 +499,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/import': {
+      id: '/_authenticated/admin/import'
+      path: '/admin/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/portal/': {
       id: '/_authenticated/portal/'
       path: '/portal'
@@ -532,6 +552,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
   AuthenticatedAdminQuotesIdRoute: typeof AuthenticatedAdminQuotesIdRoute
@@ -539,6 +560,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
   AuthenticatedAdminQuotesIdRoute: AuthenticatedAdminQuotesIdRoute,

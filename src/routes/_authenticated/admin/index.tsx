@@ -91,6 +91,9 @@ function AdminDashboard() {
           <Button variant="outline" size="sm" onClick={signOut}>
             Sign out
           </Button>
+          <Button variant="secondary" size="sm" asChild>
+            <Link to="/admin/import">Import existing project</Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
