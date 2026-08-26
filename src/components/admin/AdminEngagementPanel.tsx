@@ -413,17 +413,26 @@ export function AdminEngagementPanel({
         }))
       : undefined,
   );
-  const agreement = (engagement.data?.agreements ?? [])[0] as
-    | {
-        id: string;
-        agreement_number: string;
-        status: string;
-        signed_at: string | null;
-        signer_name: string | null;
-        doc?: ProjectDocument | null;
-      }
-    | undefined;
+  type AgreementRow = {
+    id: string;
+    agreement_number: string;
+    status: string;
+    signed_at: string | null;
+    signer_name: string | null;
+    total_cents?: number;
+    created_at?: string;
+    doc?: ProjectDocument | null;
+  };
+  const agreements = (engagement.data?.agreements ?? []) as AgreementRow[];
+  const agreement = agreements.find((row) => row.status !== "void") ?? agreements[0];
   const countersigned = agreement?.doc?.acceptance?.countersign ?? null;
+  const sowStatusLabel = !agreement
+    ? "Not created"
+    : agreement.status === "sent"
+      ? "Sent for signature"
+      : agreement.status.charAt(0).toUpperCase() + agreement.status.slice(1);
+  /** A sent or signed SOW is read-only until the team opts into a revision. */
+  const sowLocked = Boolean(agreement && agreement.status !== "draft") && !sowReviseMode;
 
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
