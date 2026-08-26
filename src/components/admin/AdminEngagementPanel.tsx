@@ -525,7 +525,7 @@ export function AdminEngagementPanel({
             <Button
               size="sm"
               variant="outline"
-              disabled={estimateAiMutation.isPending || !aiReady}
+              disabled={estimateAiMutation.isPending || !aiReady || estimateLocked}
               onClick={() => estimateAiMutation.mutate()}
             >
               {estimateAiMutation.isPending ? "Drafting…" : "Draft estimate with AI"}
