@@ -104,6 +104,7 @@ export function AdminEngagementPanel({
   const [startDate, setStartDate] = useState("");
   const [reviseMode, setReviseMode] = useState(false);
   const [sowAddendum, setSowAddendum] = useState("");
+  const [sowReviseMode, setSowReviseMode] = useState(false);
   const [scheduleNote, setScheduleNote] = useState("");
   const [payouts, setPayouts] = useState<
     Record<
@@ -129,6 +130,7 @@ export function AdminEngagementPanel({
     total_cents: number;
     duration_note: string | null;
     created_at?: string;
+    responded_at?: string | null;
     doc?: ProjectDocument | null;
   };
   const estimateVersions = (engagement.data?.estimates ?? []) as EstimateRow[];
@@ -136,6 +138,8 @@ export function AdminEngagementPanel({
   const approvedEstimate = estimateVersions.find((item) => item.status === "approved");
   /** The estimate the SOW is generated from — always the client-approved one. */
   const sowEstimate = approvedEstimate ?? estimate;
+  /** Approved estimates are read-only until the team explicitly opts into a revision. */
+  const estimateLocked = Boolean(approvedEstimate) && !reviseMode;
 
   useEffect(() => {
     if (!estimate?.line_items?.length) return;
@@ -266,10 +270,12 @@ export function AdminEngagementPanel({
         data: {
           estimateId: sowEstimate!.id,
           ...(sowAddendum.trim() ? { addendum: sowAddendum.trim() } : {}),
+          ...(sowReviseMode ? { revise: true } : {}),
         },
       }),
     onSuccess: () => {
       toast.success("SOW sent for signature");
+      setSowReviseMode(false);
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -407,17 +413,26 @@ export function AdminEngagementPanel({
         }))
       : undefined,
   );
-  const agreement = (engagement.data?.agreements ?? [])[0] as
-    | {
-        id: string;
-        agreement_number: string;
-        status: string;
-        signed_at: string | null;
-        signer_name: string | null;
-        doc?: ProjectDocument | null;
-      }
-    | undefined;
+  type AgreementRow = {
+    id: string;
+    agreement_number: string;
+    status: string;
+    signed_at: string | null;
+    signer_name: string | null;
+    total_cents?: number;
+    created_at?: string;
+    doc?: ProjectDocument | null;
+  };
+  const agreements = (engagement.data?.agreements ?? []) as AgreementRow[];
+  const agreement = agreements.find((row) => row.status !== "void") ?? agreements[0];
   const countersigned = agreement?.doc?.acceptance?.countersign ?? null;
+  const sowStatusLabel = !agreement
+    ? "Not created"
+    : agreement.status === "sent"
+      ? "Sent for signature"
+      : agreement.status.charAt(0).toUpperCase() + agreement.status.slice(1);
+  /** A sent or signed SOW is read-only until the team opts into a revision. */
+  const sowLocked = Boolean(agreement && agreement.status !== "draft") && !sowReviseMode;
 
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
@@ -510,7 +525,7 @@ export function AdminEngagementPanel({
             <Button
               size="sm"
               variant="outline"
-              disabled={estimateAiMutation.isPending || !aiReady}
+              disabled={estimateAiMutation.isPending || !aiReady || estimateLocked}
               onClick={() => estimateAiMutation.mutate()}
             >
               {estimateAiMutation.isPending ? "Drafting…" : "Draft estimate with AI"}
@@ -531,6 +546,20 @@ export function AdminEngagementPanel({
           </p>
         ) : null}
 
+        {estimateLocked && approvedEstimate ? (
+          <p
+            className="mt-4 rounded-xl border border-border bg-muted/40 p-3 text-sm"
+            data-testid="estimate-locked-banner"
+          >
+            The client approved {formatMoney(Number(approvedEstimate.total_cents))}
+            {approvedEstimate.responded_at
+              ? ` on ${new Date(approvedEstimate.responded_at).toLocaleDateString()}`
+              : ""}
+            . This estimate is read-only — tick “Revise the approved estimate” below to make changes.
+          </p>
+        ) : null}
+
+        <fieldset disabled={estimateLocked} className="contents">
         <div className="mt-4 space-y-3">
           {rows.map((row, index) => (
             <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
@@ -718,6 +747,7 @@ export function AdminEngagementPanel({
             ))}
           </ul>
         </div>
+        </fieldset>
 
         {approvedEstimate ? (
           <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
@@ -731,8 +761,8 @@ export function AdminEngagementPanel({
             <span>
               <span className="font-medium">Revise the approved estimate</span>
               <span className="block text-slate">
-                The client approved {formatMoney(Number(approvedEstimate.total_cents))}. Saving without
-                this checked is blocked so the approved version stays intact.
+                Saving a revision creates a new version that must be sent and approved again. The
+                approved version stays intact.
               </span>
             </span>
           </label>
@@ -742,7 +772,7 @@ export function AdminEngagementPanel({
           <Button
             variant="outline"
             data-testid="estimate-save"
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || estimateLocked}
             onClick={() => saveMutation.mutate()}
           >
             Save draft
@@ -750,7 +780,7 @@ export function AdminEngagementPanel({
           <Button
             className="shadow-cta"
             data-testid="estimate-send"
-            disabled={sendMutation.isPending}
+            disabled={sendMutation.isPending || estimateLocked}
             onClick={() => sendMutation.mutate()}
           >
             Send estimate to client
@@ -794,16 +824,23 @@ export function AdminEngagementPanel({
         ) : null}
       </div>
 
-      {tab === "sow" && !agreement && sowEstimate ? (
+      {tab === "sow" && sowEstimate && (!agreement || agreement.status === "draft" || sowReviseMode) ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">Statement of work</h2>
-            <Badge variant="outline">{sowEstimate.status}</Badge>
+            <Badge variant="outline" data-testid="sow-status">
+              {sowStatusLabel}
+            </Badge>
           </div>
           <p className="mt-1 text-sm text-slate">
-            The SOW is built from the approved estimate — scope, schedule, pricing and payment terms
-            carry over. Add an optional scope addendum below, or draft one with AI, then send it for
-            signature.
+            Based on the{" "}
+            {sowEstimate.status === "approved" ? "client-approved" : `${sowEstimate.status}`}{" "}
+            estimate of {formatMoney(Number(sowEstimate.total_cents))}
+            {sowEstimate.responded_at
+              ? ` — approved ${new Date(sowEstimate.responded_at).toLocaleDateString()}`
+              : ""}
+            . Scope, schedule, pricing and payment terms carry over. Add an optional scope addendum
+            below, or draft one with AI, then send it for signature.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -845,9 +882,31 @@ export function AdminEngagementPanel({
               disabled={agreementMutation.isPending || sowEstimate.status !== "approved"}
               onClick={() => agreementMutation.mutate()}
             >
-              {agreementMutation.isPending ? "Sending…" : "Generate & send SOW"}
+              {agreementMutation.isPending
+                ? "Sending…"
+                : sowReviseMode
+                  ? "Void & send revised SOW"
+                  : "Generate & send SOW"}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {tab === "sow" && agreements.length ? (
+        <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+          <h3 className="text-sm font-medium">SOW versions</h3>
+          <ul className="mt-2 space-y-1 text-sm text-slate">
+            {agreements.map((row, index) => (
+              <li key={row.id} className="flex flex-wrap items-center gap-2">
+                <span>
+                  v{agreements.length - index} · {row.agreement_number}
+                  {row.total_cents != null ? ` · ${formatMoney(Number(row.total_cents))}` : ""}
+                  {row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}
+                </span>
+                <Badge variant="outline">{row.status}</Badge>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
@@ -855,7 +914,7 @@ export function AdminEngagementPanel({
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">{agreement.agreement_number}</h2>
-            <Badge variant="outline">{agreement.status}</Badge>
+            <Badge variant="outline">{sowStatusLabel}</Badge>
           </div>
           <SignatureBlock
             audience="admin"
@@ -868,6 +927,26 @@ export function AdminEngagementPanel({
             }}
             countersign={countersigned ?? null}
           />
+
+          {agreement.status !== "draft" && agreement.status !== "void" ? (
+            <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={sowReviseMode}
+                data-testid="sow-revise"
+                onChange={(event) => setSowReviseMode(event.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Revise the statement of work</span>
+                <span className="block text-slate">
+                  {sowLocked
+                    ? "This SOW is locked. Tick this to draft a new version — the current SOW is voided and the client must sign the new one."
+                    : "The current SOW will be voided and the client must sign the new version. Issued invoices must be voided first."}
+                </span>
+              </span>
+            </label>
+          ) : null}
 
           {agreement.status === "signed" ? (
             countersigned ? (
