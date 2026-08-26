@@ -642,8 +642,34 @@ export const createAgreement = createServerFn({ method: "POST" })
         .limit(1)
         .maybeSingle();
 
-      if (existing && existing.status !== "draft") {
-        throw new Error("A statement of work already exists for this estimate.");
+      if (existing && existing.status !== "draft" && !data.revise) {
+        throw new Error(
+          "A statement of work already exists for this estimate. Choose “Revise the statement of work” to issue a new version.",
+        );
+      }
+
+      if (existing && existing.status !== "draft" && data.revise) {
+        // Billing must not be re-based underneath live invoices.
+        const { data: liveInvoices } = await db
+          .from("invoices")
+          .select("id, status")
+          .eq("agreement_id", existing.id);
+        const blocking = (liveInvoices ?? []).filter(
+          (invoice) => !["draft", "void", "cancelled"].includes(String(invoice.status)),
+        );
+        if (blocking.length) {
+          throw new Error(
+            "Invoices have already been issued against this SOW. Void or cancel them before revising it.",
+          );
+        }
+        await db.from("agreements").update({ status: "void" }).eq("id", existing.id);
+        await writeAudit({
+          actorId: context.userId,
+          action: "agreement.revised",
+          entity: "quote",
+          entityId: estimate.quote_id as string,
+          metadata: { voidedAgreementId: existing.id },
+        });
       }
 
       let agreement: { id: string; agreement_number: string };
