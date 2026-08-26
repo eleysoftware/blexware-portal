@@ -747,6 +747,7 @@ export function AdminEngagementPanel({
             ))}
           </ul>
         </div>
+        </fieldset>
 
         {approvedEstimate ? (
           <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
@@ -760,8 +761,8 @@ export function AdminEngagementPanel({
             <span>
               <span className="font-medium">Revise the approved estimate</span>
               <span className="block text-slate">
-                The client approved {formatMoney(Number(approvedEstimate.total_cents))}. Saving without
-                this checked is blocked so the approved version stays intact.
+                Saving a revision creates a new version that must be sent and approved again. The
+                approved version stays intact.
               </span>
             </span>
           </label>
@@ -771,7 +772,7 @@ export function AdminEngagementPanel({
           <Button
             variant="outline"
             data-testid="estimate-save"
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || estimateLocked}
             onClick={() => saveMutation.mutate()}
           >
             Save draft
@@ -779,7 +780,7 @@ export function AdminEngagementPanel({
           <Button
             className="shadow-cta"
             data-testid="estimate-send"
-            disabled={sendMutation.isPending}
+            disabled={sendMutation.isPending || estimateLocked}
             onClick={() => sendMutation.mutate()}
           >
             Send estimate to client
