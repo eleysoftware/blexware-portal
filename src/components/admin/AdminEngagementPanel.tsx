@@ -70,6 +70,9 @@ export function AdminEngagementPanel({
   const fetchSettlement = useServerFn(getPaymentSettlement);
   const approveStart = useServerFn(approveProjectStart);
   const aiStatusFn = useServerFn(getAiStatus);
+  const approveEstimateFn = useServerFn(markEstimateApproved);
+  const suggestSchedule = useServerFn(suggestInvoiceSchedule);
+  const draftSowScope = useServerFn(draftSowScopeWithAi);
 
 
   const engagement = useQuery({
