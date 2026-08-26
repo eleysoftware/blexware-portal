@@ -104,6 +104,7 @@ export function AdminEngagementPanel({
   const [startDate, setStartDate] = useState("");
   const [reviseMode, setReviseMode] = useState(false);
   const [sowAddendum, setSowAddendum] = useState("");
+  const [sowReviseMode, setSowReviseMode] = useState(false);
   const [scheduleNote, setScheduleNote] = useState("");
   const [payouts, setPayouts] = useState<
     Record<
