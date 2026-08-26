@@ -674,9 +674,42 @@ export function AdminEngagementPanel({
               </Button>
             </div>
           ) : null}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-slate">Split the balance into</span>
+            {SPLIT_COUNTS.map((count) => (
+              <Button
+                key={count}
+                size="sm"
+                variant="outline"
+                data-testid={`split-${count}`}
+                onClick={() => {
+                  setPaymentKind("custom");
+                  setCustomPayments(
+                    evenSplitRows(total, count).map((row) => ({
+                      label: row.label,
+                      amount: (row.amountCents / 100).toString(),
+                    })),
+                  );
+                  setScheduleNote("");
+                }}
+              >
+                {count}
+              </Button>
+            ))}
+            <span className="text-slate">invoices</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={scheduleMutation.isPending || !aiReady || total <= 0}
+              onClick={() => scheduleMutation.mutate()}
+            >
+              {scheduleMutation.isPending ? "Suggesting…" : "Suggest with AI"}
+            </Button>
+          </div>
+          {scheduleNote ? <p className="text-xs text-slate">{scheduleNote}</p> : null}
           <ul className="text-sm text-slate">
-            {previewPlan.rows.map((row) => (
-              <li key={row.label}>
+            {previewPlan.rows.map((row, index) => (
+              <li key={`${row.label}-${index}`}>
                 {row.label}: {formatMoney(row.amountCents)}
                 {row.send === "manual" ? " — send when you mark complete" : ""}
                 {row.send === "interval" ? " — every 14 days" : ""}
@@ -685,6 +718,25 @@ export function AdminEngagementPanel({
             ))}
           </ul>
         </div>
+
+        {approvedEstimate ? (
+          <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={reviseMode}
+              data-testid="estimate-revise"
+              onChange={(event) => setReviseMode(event.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Revise the approved estimate</span>
+              <span className="block text-slate">
+                The client approved {formatMoney(Number(approvedEstimate.total_cents))}. Saving without
+                this checked is blocked so the approved version stays intact.
+              </span>
+            </span>
+          </label>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -703,18 +755,45 @@ export function AdminEngagementPanel({
           >
             Send estimate to client
           </Button>
-          {estimate?.status === "approved" ? (
+          {estimate && estimate.status !== "approved" && !approvedEstimate ? (
             <Button
               variant="secondary"
-              data-testid="sow-send"
-              disabled={agreementMutation.isPending}
-              onClick={() => agreementMutation.mutate()}
+              data-testid="estimate-mark-approved"
+              disabled={approveEstimateMutation.isPending}
+              onClick={() => approveEstimateMutation.mutate()}
             >
-              Generate & send SOW
+              Mark estimate approved
             </Button>
           ) : null}
         </div>
+
+        {estimateVersions.length > 1 ? (
+          <div className="mt-5 border-t border-border pt-4">
+            <h3 className="text-sm font-medium">Estimate versions</h3>
+            <ul className="mt-2 space-y-1 text-sm text-slate">
+              {estimateVersions.map((version, index) => (
+                <li key={version.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    v{estimateVersions.length - index} · {formatMoney(Number(version.total_cents))}
+                    {version.created_at
+                      ? ` · ${new Date(version.created_at).toLocaleDateString()}`
+                      : ""}
+                  </span>
+                  <Badge variant="outline">{version.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {approvedEstimate ? (
+          <p className="mt-4 text-sm text-slate">
+            The client approved this estimate. Generate the statement of work from the{" "}
+            <span className="font-medium text-foreground">SOW</span> tab.
+          </p>
+        ) : null}
       </div>
+
 
       {agreement && tab === "sow" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
