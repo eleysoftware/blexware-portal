@@ -102,6 +102,9 @@ export function AdminEngagementPanel({
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
+  const [reviseMode, setReviseMode] = useState(false);
+  const [sowAddendum, setSowAddendum] = useState("");
+  const [scheduleNote, setScheduleNote] = useState("");
   const [payouts, setPayouts] = useState<
     Record<
       string,
