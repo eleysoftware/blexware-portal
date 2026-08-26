@@ -824,16 +824,23 @@ export function AdminEngagementPanel({
         ) : null}
       </div>
 
-      {tab === "sow" && !agreement && sowEstimate ? (
+      {tab === "sow" && sowEstimate && (!agreement || agreement.status === "draft" || sowReviseMode) ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">Statement of work</h2>
-            <Badge variant="outline">{sowEstimate.status}</Badge>
+            <Badge variant="outline" data-testid="sow-status">
+              {sowStatusLabel}
+            </Badge>
           </div>
           <p className="mt-1 text-sm text-slate">
-            The SOW is built from the approved estimate — scope, schedule, pricing and payment terms
-            carry over. Add an optional scope addendum below, or draft one with AI, then send it for
-            signature.
+            Based on the{" "}
+            {sowEstimate.status === "approved" ? "client-approved" : `${sowEstimate.status}`}{" "}
+            estimate of {formatMoney(Number(sowEstimate.total_cents))}
+            {sowEstimate.responded_at
+              ? ` — approved ${new Date(sowEstimate.responded_at).toLocaleDateString()}`
+              : ""}
+            . Scope, schedule, pricing and payment terms carry over. Add an optional scope addendum
+            below, or draft one with AI, then send it for signature.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -875,9 +882,31 @@ export function AdminEngagementPanel({
               disabled={agreementMutation.isPending || sowEstimate.status !== "approved"}
               onClick={() => agreementMutation.mutate()}
             >
-              {agreementMutation.isPending ? "Sending…" : "Generate & send SOW"}
+              {agreementMutation.isPending
+                ? "Sending…"
+                : sowReviseMode
+                  ? "Void & send revised SOW"
+                  : "Generate & send SOW"}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {tab === "sow" && agreements.length ? (
+        <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+          <h3 className="text-sm font-medium">SOW versions</h3>
+          <ul className="mt-2 space-y-1 text-sm text-slate">
+            {agreements.map((row, index) => (
+              <li key={row.id} className="flex flex-wrap items-center gap-2">
+                <span>
+                  v{agreements.length - index} · {row.agreement_number}
+                  {row.total_cents != null ? ` · ${formatMoney(Number(row.total_cents))}` : ""}
+                  {row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}
+                </span>
+                <Badge variant="outline">{row.status}</Badge>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
