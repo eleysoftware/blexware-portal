@@ -266,10 +266,12 @@ export function AdminEngagementPanel({
         data: {
           estimateId: sowEstimate!.id,
           ...(sowAddendum.trim() ? { addendum: sowAddendum.trim() } : {}),
+          ...(sowReviseMode ? { revise: true } : {}),
         },
       }),
     onSuccess: () => {
       toast.success("SOW sent for signature");
+      setSowReviseMode(false);
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
