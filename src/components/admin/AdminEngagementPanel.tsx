@@ -16,13 +16,15 @@ import {
   type PaymentPlanKind,
   type ProjectDocument,
 } from "@/lib/documents/types";
-import { buildPaymentPlan } from "@/lib/documents/compose";
+import { buildPaymentPlan, evenSplitRows, SPLIT_COUNTS } from "@/lib/documents/compose";
 import {
   approveProjectStart,
   createAgreement,
+  draftSowScopeWithAi,
   getDocumentUrl,
   getEngagement,
   getPaymentSettlement,
+  markEstimateApproved,
   reconcilePayment,
   recordOfflinePaymentFn,
   refundPayment,
@@ -31,7 +33,9 @@ import {
   saveEstimate,
   sendEstimate,
   sendInvoiceNow,
+  suggestInvoiceSchedule,
 } from "@/lib/engagement.functions";
+
 
 import { getAiStatus } from "@/lib/admin.functions";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
@@ -66,6 +70,9 @@ export function AdminEngagementPanel({
   const fetchSettlement = useServerFn(getPaymentSettlement);
   const approveStart = useServerFn(approveProjectStart);
   const aiStatusFn = useServerFn(getAiStatus);
+  const approveEstimateFn = useServerFn(markEstimateApproved);
+  const suggestSchedule = useServerFn(suggestInvoiceSchedule);
+  const draftSowScope = useServerFn(draftSowScopeWithAi);
 
 
   const engagement = useQuery({
@@ -95,6 +102,9 @@ export function AdminEngagementPanel({
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState("");
+  const [reviseMode, setReviseMode] = useState(false);
+  const [sowAddendum, setSowAddendum] = useState("");
+  const [scheduleNote, setScheduleNote] = useState("");
   const [payouts, setPayouts] = useState<
     Record<
       string,
@@ -111,17 +121,21 @@ export function AdminEngagementPanel({
   >({});
 
 
-  const estimate = (engagement.data?.estimates ?? [])[0] as
-    | {
-        id: string;
-        status: string;
-        line_items: EstimateLineItem[];
-        discount_cents: number;
-        total_cents: number;
-        duration_note: string | null;
-        doc?: ProjectDocument | null;
-      }
-    | undefined;
+  type EstimateRow = {
+    id: string;
+    status: string;
+    line_items: EstimateLineItem[];
+    discount_cents: number;
+    total_cents: number;
+    duration_note: string | null;
+    created_at?: string;
+    doc?: ProjectDocument | null;
+  };
+  const estimateVersions = (engagement.data?.estimates ?? []) as EstimateRow[];
+  const estimate = estimateVersions[0];
+  const approvedEstimate = estimateVersions.find((item) => item.status === "approved");
+  /** The estimate the SOW is generated from — always the client-approved one. */
+  const sowEstimate = approvedEstimate ?? estimate;
 
   useEffect(() => {
     if (!estimate?.line_items?.length) return;
@@ -170,6 +184,7 @@ export function AdminEngagementPanel({
     discountLabel,
     durationNote,
     paymentKind,
+    revise: reviseMode,
     customPayments:
       paymentKind === "custom"
         ? customPayments
@@ -202,14 +217,64 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const approveEstimateMutation = useMutation({
+    mutationFn: () => approveEstimateFn({ data: { estimateId: estimate!.id } }),
+    onSuccess: (result) => {
+      toast.success(
+        result.alreadyApproved
+          ? "This estimate was already approved"
+          : "Estimate marked approved — you can generate the SOW now",
+      );
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const scheduleMutation = useMutation({
+    mutationFn: () =>
+      suggestSchedule({
+        data: { quoteId, totalCents: total, provider: aiChoice.provider, model: aiChoice.model },
+      }),
+    onSuccess: (result) => {
+      setPaymentKind("custom");
+      setCustomPayments(
+        result.rows.map((row) => ({ label: row.label, amount: (row.amountCents / 100).toString() })),
+      );
+      setScheduleNote(
+        `Suggested ${result.count} invoice${result.count === 1 ? "" : "s"}. ${result.rationale}`.trim(),
+      );
+      toast.success("Invoice schedule suggested — review before saving");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const sowScopeMutation = useMutation({
+    mutationFn: () =>
+      draftSowScope({
+        data: { estimateId: sowEstimate!.id, provider: aiChoice.provider, model: aiChoice.model },
+      }),
+    onSuccess: (result) => {
+      setSowAddendum(result.markdown);
+      toast.success(`Scope drafted with ${result.provider} (${result.model}) — review before sending`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const agreementMutation = useMutation({
-    mutationFn: () => makeAgreement({ data: { estimateId: estimate!.id } }),
+    mutationFn: () =>
+      makeAgreement({
+        data: {
+          estimateId: sowEstimate!.id,
+          ...(sowAddendum.trim() ? { addendum: sowAddendum.trim() } : {}),
+        },
+      }),
     onSuccess: () => {
       toast.success("SOW sent for signature");
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
 
   const regenerateMutation = useMutation({
     mutationFn: () =>
@@ -609,9 +674,42 @@ export function AdminEngagementPanel({
               </Button>
             </div>
           ) : null}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-slate">Split the balance into</span>
+            {SPLIT_COUNTS.map((count) => (
+              <Button
+                key={count}
+                size="sm"
+                variant="outline"
+                data-testid={`split-${count}`}
+                onClick={() => {
+                  setPaymentKind("custom");
+                  setCustomPayments(
+                    evenSplitRows(total, count).map((row) => ({
+                      label: row.label,
+                      amount: (row.amountCents / 100).toString(),
+                    })),
+                  );
+                  setScheduleNote("");
+                }}
+              >
+                {count}
+              </Button>
+            ))}
+            <span className="text-slate">invoices</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={scheduleMutation.isPending || !aiReady || total <= 0}
+              onClick={() => scheduleMutation.mutate()}
+            >
+              {scheduleMutation.isPending ? "Suggesting…" : "Suggest with AI"}
+            </Button>
+          </div>
+          {scheduleNote ? <p className="text-xs text-slate">{scheduleNote}</p> : null}
           <ul className="text-sm text-slate">
-            {previewPlan.rows.map((row) => (
-              <li key={row.label}>
+            {previewPlan.rows.map((row, index) => (
+              <li key={`${row.label}-${index}`}>
                 {row.label}: {formatMoney(row.amountCents)}
                 {row.send === "manual" ? " — send when you mark complete" : ""}
                 {row.send === "interval" ? " — every 14 days" : ""}
@@ -620,6 +718,25 @@ export function AdminEngagementPanel({
             ))}
           </ul>
         </div>
+
+        {approvedEstimate ? (
+          <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={reviseMode}
+              data-testid="estimate-revise"
+              onChange={(event) => setReviseMode(event.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Revise the approved estimate</span>
+              <span className="block text-slate">
+                The client approved {formatMoney(Number(approvedEstimate.total_cents))}. Saving without
+                this checked is blocked so the approved version stays intact.
+              </span>
+            </span>
+          </label>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -638,18 +755,101 @@ export function AdminEngagementPanel({
           >
             Send estimate to client
           </Button>
-          {estimate?.status === "approved" ? (
+          {estimate && estimate.status !== "approved" && !approvedEstimate ? (
             <Button
               variant="secondary"
-              data-testid="sow-send"
-              disabled={agreementMutation.isPending}
-              onClick={() => agreementMutation.mutate()}
+              data-testid="estimate-mark-approved"
+              disabled={approveEstimateMutation.isPending}
+              onClick={() => approveEstimateMutation.mutate()}
             >
-              Generate & send SOW
+              Mark estimate approved
             </Button>
           ) : null}
         </div>
+
+        {estimateVersions.length > 1 ? (
+          <div className="mt-5 border-t border-border pt-4">
+            <h3 className="text-sm font-medium">Estimate versions</h3>
+            <ul className="mt-2 space-y-1 text-sm text-slate">
+              {estimateVersions.map((version, index) => (
+                <li key={version.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    v{estimateVersions.length - index} · {formatMoney(Number(version.total_cents))}
+                    {version.created_at
+                      ? ` · ${new Date(version.created_at).toLocaleDateString()}`
+                      : ""}
+                  </span>
+                  <Badge variant="outline">{version.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {approvedEstimate ? (
+          <p className="mt-4 text-sm text-slate">
+            The client approved this estimate. Generate the statement of work from the{" "}
+            <span className="font-medium text-foreground">SOW</span> tab.
+          </p>
+        ) : null}
       </div>
+
+      {tab === "sow" && !agreement && sowEstimate ? (
+        <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl">Statement of work</h2>
+            <Badge variant="outline">{sowEstimate.status}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-slate">
+            The SOW is built from the approved estimate — scope, schedule, pricing and payment terms
+            carry over. Add an optional scope addendum below, or draft one with AI, then send it for
+            signature.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={sowScopeMutation.isPending || !aiReady}
+              onClick={() => sowScopeMutation.mutate()}
+            >
+              {sowScopeMutation.isPending ? "Drafting…" : "Draft scope with AI"}
+            </Button>
+            <AiModelPicker
+              providers={aiStatus.data?.providers}
+              choice={aiChoice}
+              onChange={setAiChoice}
+              disabled={sowScopeMutation.isPending}
+            />
+          </div>
+          <Textarea
+            className="mt-3 font-mono text-sm"
+            rows={10}
+            value={sowAddendum}
+            placeholder={"## Scope of Work\n\n…"}
+            onChange={(event) => setSowAddendum(event.target.value)}
+            aria-label="Scope addendum"
+          />
+
+          {sowEstimate.status !== "approved" ? (
+            <p className="mt-3 text-sm text-slate">
+              The client hasn't approved the estimate yet. Approve it from the Estimate tab (or use
+              “Mark estimate approved” if they approved offline) before sending the SOW.
+            </p>
+          ) : null}
+
+          <div className="mt-4">
+            <Button
+              className="shadow-cta"
+              data-testid="sow-send"
+              disabled={agreementMutation.isPending || sowEstimate.status !== "approved"}
+              onClick={() => agreementMutation.mutate()}
+            >
+              {agreementMutation.isPending ? "Sending…" : "Generate & send SOW"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {agreement && tab === "sow" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
@@ -703,7 +903,7 @@ export function AdminEngagementPanel({
             )
           ) : null}
         </div>
-      ) : tab === "sow" ? (
+      ) : tab === "sow" && !sowEstimate ? (
         <TabEmptyState message={getTabEmptyState("sow", "admin")} />
       ) : null}
 

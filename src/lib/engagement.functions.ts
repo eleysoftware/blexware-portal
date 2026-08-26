@@ -13,6 +13,8 @@ export type EstimateInput = {
   paymentKind?: import("@/lib/documents/types").PaymentPlanKind;
   customPayments?: { label: string; amountCents: number }[];
   documentTitle?: string;
+  /** Explicit opt-in to supersede a client-approved estimate with a new draft. */
+  revise?: boolean;
 };
 
 /** Everything downstream of the quote: proposal, estimate, SOW, invoices. */
@@ -307,13 +309,22 @@ export const saveEstimate = createServerFn({ method: "POST" })
         ...(data.durationNote ? { durationNote: data.durationNote } : {}),
       });
 
-      const { data: existing } = await db
+      const { data: history } = await db
         .from("estimates")
         .select("id, status")
         .eq("quote_id", data.quoteId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
+
+      const existing = (history ?? [])[0];
+      const approved = (history ?? []).find((item) => item.status === "approved");
+
+      // Never silently fork a client-approved estimate: the admin has to opt in
+      // to a revision, and the approved row stays intact as the record of record.
+      if (approved && !data.revise) {
+        throw new Error(
+          "This estimate is already approved by the client. Choose “Revise estimate” to start a new version.",
+        );
+      }
 
       const row = {
         quote_id: data.quoteId,
@@ -337,18 +348,194 @@ export const saveEstimate = createServerFn({ method: "POST" })
         estimateId = inserted.id as string;
       }
 
-      await db.from("quotes").update({ status: "estimate_draft" }).eq("id", data.quoteId);
+      // Saving a draft must never walk the quote backwards past an approval.
+      if (!approved) {
+        await db.from("quotes").update({ status: "estimate_draft" }).eq("id", data.quoteId);
+      }
       await writeAudit({
         actorId: context.userId,
         action: "estimate.saved",
         entity: "quote",
         entityId: data.quoteId,
-        metadata: { total_cents: totals.totalCents },
+        metadata: { total_cents: totals.totalCents, revision: Boolean(approved) },
       });
 
-      return { estimateId, totals };
+      return { estimateId, totals, revision: Boolean(approved) };
     }),
   );
+
+/**
+ * Admin fallback when a client approves the estimate outside the portal
+ * (email, phone, in person). Mirrors the client-side approval exactly.
+ */
+export const markEstimateApproved = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { estimateId: string; note?: string }) => data)
+  .handler(
+    guarded("markEstimateApproved", "recording the approval", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: estimate } = await db
+        .from("estimates")
+        .select("id, quote_id, status")
+        .eq("id", data.estimateId)
+        .maybeSingle();
+      if (!estimate) throw new Error("Estimate not found");
+      if (estimate.status === "approved") return { alreadyApproved: true };
+
+      const { error } = await db
+        .from("estimates")
+        .update({
+          status: "approved",
+          responded_at: new Date().toISOString(),
+          response_note: data.note?.trim()
+            ? `Recorded by BLEXware: ${data.note.trim()}`
+            : "Approval recorded by BLEXware on the client's behalf.",
+        })
+        .eq("id", estimate.id);
+      if (error) throw new Error(error.message);
+
+      await db.from("quotes").update({ status: "estimate_approved" }).eq("id", estimate.quote_id);
+      await writeAudit({
+        actorId: context.userId,
+        action: "estimate.approved_by_admin",
+        entity: "quote",
+        entityId: estimate.quote_id as string,
+        metadata: { estimateId: estimate.id, note: data.note ?? null },
+      });
+
+      return { alreadyApproved: false };
+    }),
+  );
+
+/** AI suggestion for how to split the contract total into invoices. */
+export const suggestInvoiceSchedule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; totalCents: number; provider?: string; model?: string }) => data)
+  .handler(
+    guarded("suggestInvoiceSchedule", "suggesting an invoice schedule", async ({ data, context }) => {
+      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: quote } = await db
+        .from("quotes")
+        .select("budget, timeline, project_type")
+        .eq("id", data.quoteId)
+        .maybeSingle();
+      if (!quote) throw new Error("Quote not found");
+
+      const { data: estimate } = await db
+        .from("estimates")
+        .select("duration_note")
+        .eq("quote_id", data.quoteId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { completeChat } = await import("@/lib/ai.server");
+      const { content } = await completeChat(
+        [
+          {
+            role: "system",
+            content:
+              'Return ONLY JSON: {"count":number,"rationale":string}. `count` must be one of 1, 2, 3, 4, 5, 6, 9 or 12 — the number of even invoices for a software project. ' +
+              "Favour fewer invoices for small or short engagements and more for larger, longer ones. Keep each invoice comfortably above $300.",
+          },
+          {
+            role: "user",
+            content: [
+              `Contract total: $${(data.totalCents / 100).toFixed(2)}`,
+              `Client budget band: ${quote.budget ?? "unspecified"}`,
+              `Timeline preference: ${quote.timeline ?? "unspecified"}`,
+              `Estimated duration: ${estimate?.duration_note ?? "unspecified"}`,
+              `Project type: ${quote.project_type ?? "unspecified"}`,
+            ].join("\n"),
+          },
+        ],
+        { provider: data.provider, model: data.model, json: true },
+      );
+
+      const match = /\{[\s\S]*\}/.exec(content);
+      let count = 2;
+      let rationale = "";
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]) as { count?: number; rationale?: string };
+          if (typeof parsed.count === "number") count = parsed.count;
+          rationale = parsed.rationale ?? "";
+        } catch {
+          // fall through to the default split
+        }
+      }
+      const { SPLIT_COUNTS, evenSplitRows } = await import("@/lib/documents/compose");
+      const allowed = SPLIT_COUNTS as readonly number[];
+      if (!allowed.includes(count)) {
+        count = allowed.reduce((best, option) =>
+          Math.abs(option - count) < Math.abs(best - count) ? option : best,
+        );
+      }
+      return { count, rationale, rows: evenSplitRows(data.totalCents, count) };
+    }),
+  );
+
+/** AI draft of the scope/assumptions addendum that goes into the SOW. */
+export const draftSowScopeWithAi = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { estimateId: string; provider?: string; model?: string }) => data)
+  .handler(
+    guarded("draftSowScopeWithAi", "drafting the statement of work", async ({ data, context }) => {
+      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: estimate } = await db
+        .from("estimates")
+        .select("id, quote_id, doc, line_items, total_cents, duration_note")
+        .eq("id", data.estimateId)
+        .maybeSingle();
+      if (!estimate) throw new Error("Estimate not found");
+
+      const { data: proposal } = await db
+        .from("proposals")
+        .select("content")
+        .eq("quote_id", estimate.quote_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const items = (estimate.line_items as { label: string; durationLabel?: string }[] | null) ?? [];
+      const { completeChat } = await import("@/lib/ai.server");
+      const { content, model, provider } = await completeChat(
+        [
+          {
+            role: "system",
+            content:
+              "You draft the scope addendum for a BLEXware Statement of Work. Return markdown with exactly these H2 sections: " +
+              "## Scope of Work, ## Deliverables, ## Client Responsibilities, ## Assumptions & Exclusions. " +
+              "Be concrete and specific to the engagement. Never invent pricing, dates, certifications or compliance claims.",
+          },
+          {
+            role: "user",
+            content: [
+              `Approved line items: ${items.map((item) => `${item.label}${item.durationLabel ? ` (${item.durationLabel})` : ""}`).join("; ") || "n/a"}`,
+              `Estimated duration: ${estimate.duration_note ?? "not stated"}`,
+              "",
+              proposal?.content
+                ? `Approved proposal:\n\n${String(proposal.content).slice(0, 12000)}`
+                : "No proposal content available.",
+            ].join("\n"),
+          },
+        ],
+        { provider: data.provider, model: data.model },
+      );
+
+      return { markdown: content, model, provider };
+    }),
+  );
+
 
 export const sendEstimate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -419,12 +606,12 @@ export const sendEstimate = createServerFn({ method: "POST" })
 /** Turns an approved estimate into a SOW agreement and sends it for signature. */
 export const createAgreement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { estimateId: string }) => data)
+  .validator((data: { estimateId: string; addendum?: string }) => data)
   .handler(
     guarded("createAgreement", "creating the agreement", async ({ data, context }) => {
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
-      const { buildSowDoc } = await import("@/lib/documents/compose");
+      const { buildSowDoc, markdownToSections } = await import("@/lib/documents/compose");
        const { storeDocument } = await import("@/lib/document-storage.server");
        const { emailAgreementSent, siteUrl } = await import("@/lib/engagement-email.server");
       const db = adminDb();
@@ -484,10 +671,16 @@ export const createAgreement = createServerFn({ method: "POST" })
         };
       }
 
-      const doc = buildSowDoc(estimate.doc as never, {
+      const sourceDoc = estimate.doc as import("@/lib/documents/types").ProjectDocument;
+      const addendum = data.addendum?.trim();
+      const docInput = addendum
+        ? { ...sourceDoc, sections: [...(sourceDoc.sections ?? []), ...markdownToSections(addendum)] }
+        : sourceDoc;
+
+      const doc = buildSowDoc(docInput as never, {
         agreementNumber: agreement.agreement_number as string,
         totalCents: Number(estimate.total_cents),
-        paymentPlan: (estimate.doc as { paymentPlan?: import("@/lib/documents/types").PaymentPlan } | null)?.paymentPlan,
+        paymentPlan: sourceDoc?.paymentPlan,
       });
 
       await storeDocument({
