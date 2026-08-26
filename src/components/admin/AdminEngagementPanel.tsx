@@ -914,7 +914,7 @@ export function AdminEngagementPanel({
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">{agreement.agreement_number}</h2>
-            <Badge variant="outline">{agreement.status}</Badge>
+            <Badge variant="outline">{sowStatusLabel}</Badge>
           </div>
           <SignatureBlock
             audience="admin"
@@ -927,6 +927,26 @@ export function AdminEngagementPanel({
             }}
             countersign={countersigned ?? null}
           />
+
+          {agreement.status !== "draft" && agreement.status !== "void" ? (
+            <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={sowReviseMode}
+                data-testid="sow-revise"
+                onChange={(event) => setSowReviseMode(event.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Revise the statement of work</span>
+                <span className="block text-slate">
+                  {sowLocked
+                    ? "This SOW is locked. Tick this to draft a new version — the current SOW is voided and the client must sign the new one."
+                    : "The current SOW will be voided and the client must sign the new version. Issued invoices must be voided first."}
+                </span>
+              </span>
+            </label>
+          ) : null}
 
           {agreement.status === "signed" ? (
             countersigned ? (
