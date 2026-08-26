@@ -62,4 +62,5 @@ I can't run 1–3 myself: this project uses an external Supabase that Lovable ca
 - New `suggestInvoiceSchedule` server fn returning `{ firstPercent, installments, rationale }`, clamped server-side to the allowed installment values.
 - `buildPaymentPlan` in `src/lib/documents/compose.ts` gains a `percentage` kind taking `{ firstPercent, installments }`; existing kinds retained for older records.
 - `AdminEngagementPanel.tsx`: SOW block moves out of the `tab === "estimate"` container into its own SOW section; new schedule builder under `tab === "invoices"`; estimate version list in the estimate section.
-- Unit tests: percentage-plan math across every installment option, save-after-approval no longer forking, and schedule-suggestion clamping.
+- New `importProject` admin server fn + `/admin/import` route: Zod-validated fields, PDF/DOCX upload into the existing private `quote-uploads` bucket, server-side text extraction (PDF via the existing renderer stack, DOCX via a mammoth-style extractor), then quote/proposal/estimate rows written in states derived from the chosen stage. `seedBuildFinancialWellness` is refactored to call the same core so there is one code path.
+- Unit tests: percentage-plan math across every installment option, save-after-approval no longer forking, schedule-suggestion clamping, and stage → row-status mapping for the importer.
