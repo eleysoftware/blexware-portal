@@ -121,17 +121,21 @@ export function AdminEngagementPanel({
   >({});
 
 
-  const estimate = (engagement.data?.estimates ?? [])[0] as
-    | {
-        id: string;
-        status: string;
-        line_items: EstimateLineItem[];
-        discount_cents: number;
-        total_cents: number;
-        duration_note: string | null;
-        doc?: ProjectDocument | null;
-      }
-    | undefined;
+  type EstimateRow = {
+    id: string;
+    status: string;
+    line_items: EstimateLineItem[];
+    discount_cents: number;
+    total_cents: number;
+    duration_note: string | null;
+    created_at?: string;
+    doc?: ProjectDocument | null;
+  };
+  const estimateVersions = (engagement.data?.estimates ?? []) as EstimateRow[];
+  const estimate = estimateVersions[0];
+  const approvedEstimate = estimateVersions.find((item) => item.status === "approved");
+  /** The estimate the SOW is generated from — always the client-approved one. */
+  const sowEstimate = approvedEstimate ?? estimate;
 
   useEffect(() => {
     if (!estimate?.line_items?.length) return;
