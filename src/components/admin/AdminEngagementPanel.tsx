@@ -903,7 +903,7 @@ export function AdminEngagementPanel({
             )
           ) : null}
         </div>
-      ) : tab === "sow" ? (
+      ) : tab === "sow" && !sowEstimate ? (
         <TabEmptyState message={getTabEmptyState("sow", "admin")} />
       ) : null}
 
