@@ -606,7 +606,7 @@ export const sendEstimate = createServerFn({ method: "POST" })
 /** Turns an approved estimate into a SOW agreement and sends it for signature. */
 export const createAgreement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { estimateId: string; addendum?: string }) => data)
+  .validator((data: { estimateId: string; addendum?: string; revise?: boolean }) => data)
   .handler(
     guarded("createAgreement", "creating the agreement", async ({ data, context }) => {
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
