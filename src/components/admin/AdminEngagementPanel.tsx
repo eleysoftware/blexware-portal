@@ -546,6 +546,20 @@ export function AdminEngagementPanel({
           </p>
         ) : null}
 
+        {estimateLocked && approvedEstimate ? (
+          <p
+            className="mt-4 rounded-xl border border-border bg-muted/40 p-3 text-sm"
+            data-testid="estimate-locked-banner"
+          >
+            The client approved {formatMoney(Number(approvedEstimate.total_cents))}
+            {approvedEstimate.responded_at
+              ? ` on ${new Date(approvedEstimate.responded_at).toLocaleDateString()}`
+              : ""}
+            . This estimate is read-only — tick “Revise the approved estimate” below to make changes.
+          </p>
+        ) : null}
+
+        <fieldset disabled={estimateLocked} className="contents">
         <div className="mt-4 space-y-3">
           {rows.map((row, index) => (
             <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
