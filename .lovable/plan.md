@@ -32,9 +32,18 @@ A schedule builder in the Invoices tab, applied when the SOW is countersigned:
 - **Suggest schedule with AI** — proposes the first-invoice percentage and installment count from project size, duration, and the client's budget band, with a one-line rationale; you can override before saving.
 - This replaces the fixed $600-installment default.
 
-## 4. Tamara West's project
+## 4. "Create project from existing proposal" (import tool)
 
-There is no proposal on that quote right now. The importer that recreates the Build Financial Wellness proposal already exists (`seedBuildFinancialWellness`) but has not been run against this environment. I'll expose it as an admin-only "Recreate Build Financial Wellness project" action and run it, producing the quote, proposal, and priced estimate so steps 5–6 below have something to move through.
+Instead of a one-off Tamara West button, the admin queue gets a general **Create project from existing proposal** action for onboarding any engagement that started outside the portal:
+
+- **Project name** for the imported engagement, plus client name, email, company, and phone.
+- **Upload the existing proposal** — PDF or Word (.docx), up to 20 MB. The file is stored privately with the quote, its text is extracted, and it becomes the proposal content and the formatted proposal document. You can edit the parsed text before saving if the extraction is imperfect.
+- **Starting stage** — pick where the project already is: Proposal sent, Proposal approved, Estimate draft, Estimate sent, Estimate approved, SOW sent, SOW signed, or Invoicing. The quote, proposal, and (where the stage requires it) estimate rows are created in states consistent with that choice, so the workspace tabs and stage rail line up immediately.
+- Optional line items/total when the chosen stage is estimate-or-later; otherwise you price it in the Estimate tab afterwards.
+- Everything is audit-logged as an admin import, and the client's portal access works the same as a normal quote.
+
+Tamara West's Build Financial Wellness project is then created through this same tool (the existing hard-coded importer stays available as a preset), giving steps 5–6 below something to move through.
+
 
 ## 5. What's left for you (after the above ships)
 
@@ -53,4 +62,5 @@ I can't run 1–3 myself: this project uses an external Supabase that Lovable ca
 - New `suggestInvoiceSchedule` server fn returning `{ firstPercent, installments, rationale }`, clamped server-side to the allowed installment values.
 - `buildPaymentPlan` in `src/lib/documents/compose.ts` gains a `percentage` kind taking `{ firstPercent, installments }`; existing kinds retained for older records.
 - `AdminEngagementPanel.tsx`: SOW block moves out of the `tab === "estimate"` container into its own SOW section; new schedule builder under `tab === "invoices"`; estimate version list in the estimate section.
-- Unit tests: percentage-plan math across every installment option, save-after-approval no longer forking, and schedule-suggestion clamping.
+- New `importProject` admin server fn + `/admin/import` route: Zod-validated fields, PDF/DOCX upload into the existing private `quote-uploads` bucket, server-side text extraction (PDF via the existing renderer stack, DOCX via a mammoth-style extractor), then quote/proposal/estimate rows written in states derived from the chosen stage. `seedBuildFinancialWellness` is refactored to call the same core so there is one code path.
+- Unit tests: percentage-plan math across every installment option, save-after-approval no longer forking, schedule-suggestion clamping, and stage → row-status mapping for the importer.
