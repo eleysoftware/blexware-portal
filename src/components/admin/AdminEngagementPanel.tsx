@@ -130,6 +130,7 @@ export function AdminEngagementPanel({
     total_cents: number;
     duration_note: string | null;
     created_at?: string;
+    responded_at?: string | null;
     doc?: ProjectDocument | null;
   };
   const estimateVersions = (engagement.data?.estimates ?? []) as EstimateRow[];
@@ -137,6 +138,8 @@ export function AdminEngagementPanel({
   const approvedEstimate = estimateVersions.find((item) => item.status === "approved");
   /** The estimate the SOW is generated from — always the client-approved one. */
   const sowEstimate = approvedEstimate ?? estimate;
+  /** Approved estimates are read-only until the team explicitly opts into a revision. */
+  const estimateLocked = Boolean(approvedEstimate) && !reviseMode;
 
   useEffect(() => {
     if (!estimate?.line_items?.length) return;
