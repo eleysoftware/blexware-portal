@@ -794,6 +794,62 @@ export function AdminEngagementPanel({
         ) : null}
       </div>
 
+      {tab === "sow" && !agreement && sowEstimate ? (
+        <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl">Statement of work</h2>
+            <Badge variant="outline">{sowEstimate.status}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-slate">
+            The SOW is built from the approved estimate — scope, schedule, pricing and payment terms
+            carry over. Add an optional scope addendum below, or draft one with AI, then send it for
+            signature.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={sowScopeMutation.isPending || !aiReady}
+              onClick={() => sowScopeMutation.mutate()}
+            >
+              {sowScopeMutation.isPending ? "Drafting…" : "Draft scope with AI"}
+            </Button>
+            <AiModelPicker
+              providers={aiStatus.data?.providers}
+              choice={aiChoice}
+              onChange={setAiChoice}
+              disabled={sowScopeMutation.isPending}
+            />
+          </div>
+          <Textarea
+            className="mt-3 font-mono text-sm"
+            rows={10}
+            value={sowAddendum}
+            placeholder={"## Scope of Work\n\n…"}
+            onChange={(event) => setSowAddendum(event.target.value)}
+            aria-label="Scope addendum"
+          />
+
+          {sowEstimate.status !== "approved" ? (
+            <p className="mt-3 text-sm text-slate">
+              The client hasn't approved the estimate yet. Approve it from the Estimate tab (or use
+              “Mark estimate approved” if they approved offline) before sending the SOW.
+            </p>
+          ) : null}
+
+          <div className="mt-4">
+            <Button
+              className="shadow-cta"
+              data-testid="sow-send"
+              disabled={agreementMutation.isPending || sowEstimate.status !== "approved"}
+              onClick={() => agreementMutation.mutate()}
+            >
+              {agreementMutation.isPending ? "Sending…" : "Generate & send SOW"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {agreement && tab === "sow" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
