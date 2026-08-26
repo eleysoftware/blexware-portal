@@ -184,6 +184,7 @@ export function AdminEngagementPanel({
     discountLabel,
     durationNote,
     paymentKind,
+    revise: reviseMode,
     customPayments:
       paymentKind === "custom"
         ? customPayments
@@ -216,14 +217,64 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const approveEstimateMutation = useMutation({
+    mutationFn: () => approveEstimateFn({ data: { estimateId: estimate!.id } }),
+    onSuccess: (result) => {
+      toast.success(
+        result.alreadyApproved
+          ? "This estimate was already approved"
+          : "Estimate marked approved — you can generate the SOW now",
+      );
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const scheduleMutation = useMutation({
+    mutationFn: () =>
+      suggestSchedule({
+        data: { quoteId, totalCents: total, provider: aiChoice.provider, model: aiChoice.model },
+      }),
+    onSuccess: (result) => {
+      setPaymentKind("custom");
+      setCustomPayments(
+        result.rows.map((row) => ({ label: row.label, amount: (row.amountCents / 100).toString() })),
+      );
+      setScheduleNote(
+        `Suggested ${result.count} invoice${result.count === 1 ? "" : "s"}. ${result.rationale}`.trim(),
+      );
+      toast.success("Invoice schedule suggested — review before saving");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const sowScopeMutation = useMutation({
+    mutationFn: () =>
+      draftSowScope({
+        data: { estimateId: sowEstimate!.id, provider: aiChoice.provider, model: aiChoice.model },
+      }),
+    onSuccess: (result) => {
+      setSowAddendum(result.markdown);
+      toast.success(`Scope drafted with ${result.provider} (${result.model}) — review before sending`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const agreementMutation = useMutation({
-    mutationFn: () => makeAgreement({ data: { estimateId: estimate!.id } }),
+    mutationFn: () =>
+      makeAgreement({
+        data: {
+          estimateId: sowEstimate!.id,
+          ...(sowAddendum.trim() ? { addendum: sowAddendum.trim() } : {}),
+        },
+      }),
     onSuccess: () => {
       toast.success("SOW sent for signature");
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
 
   const regenerateMutation = useMutation({
     mutationFn: () =>
