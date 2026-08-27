@@ -19,8 +19,9 @@ import {
 import { buildPaymentPlan, evenSplitRows, SPLIT_COUNTS } from "@/lib/documents/compose";
 import {
   approveProjectStart,
-  createAgreement,
-  draftSowScopeWithAi,
+  generateAgreement,
+  sendAgreement,
+  draftSowWithAi,
   getDocumentUrl,
   getEngagement,
   getPaymentSettlement,
@@ -59,7 +60,8 @@ export function AdminEngagementPanel({
   const fetchEngagement = useServerFn(getEngagement);
   const persistEstimate = useServerFn(saveEstimate);
   const release = useServerFn(sendEstimate);
-  const makeAgreement = useServerFn(createAgreement);
+  const makeAgreement = useServerFn(generateAgreement);
+  const sendSow = useServerFn(sendAgreement);
   const docUrl = useServerFn(getDocumentUrl);
   const sendInvoice = useServerFn(sendInvoiceNow);
   const regenerate = useServerFn(regenerateProposal);
