@@ -98,6 +98,61 @@ export async function dispatchInvoice(invoiceId: string) {
   return { emailed: result.sent };
 }
 
+/**
+ * Renders the formatted invoice letter (PDF + Word) into the documents bucket.
+ * Called when an invoice is sent and again when a payment lands, so downloads
+ * always reflect the current paid/balance state.
+ */
+export async function renderInvoiceDocument(invoiceId: string) {
+  const db = adminDb();
+  const { data: invoice } = await db.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
+  if (!invoice) return;
+
+  const [{ data: quote }, agreementResult, { count }] = await Promise.all([
+    db
+      .from("quotes")
+      .select("contact_name, contact_email, company, quote_number")
+      .eq("id", invoice.quote_id as string)
+      .maybeSingle(),
+    invoice.agreement_id
+      ? db
+          .from("agreements")
+          .select("agreement_number, total_cents")
+          .eq("id", invoice.agreement_id as string)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    db
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_id", invoice.quote_id as string)
+      .not("status", "eq", "void"),
+  ]);
+  if (!quote) return;
+
+  const { buildInvoiceDoc } = await import("@/lib/documents/compose");
+  const { storeDocument } = await import("@/lib/document-storage.server");
+  const doc = buildInvoiceDoc({
+    invoice: invoice as never,
+    quote: quote as never,
+    agreement: (agreementResult.data ?? null) as never,
+    invoiceCount: count ?? 1,
+    payUrl: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
+  });
+
+  try {
+    await storeDocument({
+      quoteId: invoice.quote_id as string,
+      entity: "invoice",
+      entityId: invoice.id as string,
+      kind: "invoice",
+      doc,
+      slug: invoice.invoice_number as string,
+    });
+  } catch (error) {
+    console.error("[invoice:render]", (error as Error).message);
+  }
+}
+
 type InvoiceRow = Record<string, unknown>;
 
 const OPEN_STATUSES = ["draft", "scheduled", "sent", "viewed", "partially_paid", "overdue"];
