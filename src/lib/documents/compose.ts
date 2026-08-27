@@ -1,6 +1,7 @@
 import {
   BLEX_PREPARED_BY,
   formatMoney,
+  type DocFact,
   type DocSection,
   type EstimateLineItem,
   type PaymentPlan,
@@ -425,5 +426,112 @@ export function buildSowDoc(
       ],
       signerName: estimateDoc.preparedFor.name,
     },
+  };
+}
+
+export function buildInvoiceDoc(input: {
+  invoice: {
+    invoice_number: string;
+    sequence: number;
+    amount_cents: number;
+    amount_paid_cents?: number | null;
+    status: string;
+    due_date?: string | null;
+    issue_date?: string | null;
+    description?: string | null;
+  };
+  quote: {
+    contact_name: string;
+    contact_email: string;
+    company?: string | null;
+    quote_number?: string | null;
+  };
+  agreement?: { agreement_number: string; total_cents: number } | null;
+  invoiceCount?: number;
+  payUrl: string;
+}): ProjectDocument {
+  const { invoice, quote, agreement, invoiceCount, payUrl } = input;
+  const total = Number(invoice.amount_cents);
+  const paid = Math.max(0, Number(invoice.amount_paid_cents ?? 0));
+  const balance = Math.max(0, total - paid);
+  const paidInFull = invoice.status === "paid" || balance <= 0;
+  const clientName = quote.company?.trim() || quote.contact_name;
+
+  const facts: DocFact[] = [
+    { label: "Invoice number", value: invoice.invoice_number },
+    ...(agreement ? [{ label: "Agreement", value: agreement.agreement_number }] : []),
+    ...(quote.quote_number ? [{ label: "Quote", value: quote.quote_number }] : []),
+    { label: "Issue date", value: invoice.issue_date ?? "—" },
+    { label: "Due date", value: invoice.due_date ?? "Due on receipt" },
+    ...(invoiceCount && invoiceCount > 1
+      ? [{ label: "Installment", value: `${invoice.sequence} of ${invoiceCount}` }]
+      : []),
+  ];
+
+  const paymentLine = agreement
+    ? `${
+        invoiceCount && invoiceCount > 1
+          ? `Installment ${invoice.sequence} of ${invoiceCount} `
+          : ""
+      }toward agreement ${agreement.agreement_number} (${formatMoney(
+        Number(agreement.total_cents),
+      )} project total)`
+    : `Project services — installment ${invoice.sequence}`;
+
+  const sections: DocSection[] = [
+    {
+      heading: "Charges",
+      table: {
+        columns: ["Description", "Amount"],
+        numeric: true,
+        rows: [
+          [
+            invoice.description?.trim() || `Professional services — ${paymentLine}`,
+            formatMoney(total),
+          ],
+          ...(paid > 0
+            ? [
+                ["Payments received to date", `-${formatMoney(paid)}`],
+                [paidInFull ? "Balance" : "Balance due", formatMoney(balance)],
+              ]
+            : []),
+        ],
+      },
+    },
+    {
+      heading: paidInFull ? "Payment Status" : "How to Pay",
+      body: [
+        paidInFull
+          ? "This invoice has been paid in full. No further action is needed — thank you for your business."
+          : `${formatMoney(balance)} is due ${
+              invoice.due_date ? `by ${invoice.due_date}` : "on receipt"
+            }. Pay securely online by bank transfer (ACH) or card using the private link below.`,
+        ...(paidInFull ? [] : [payUrl]),
+      ],
+      ...(paidInFull
+        ? {}
+        : {
+            note: "The link is private to you. Questions about this invoice? Just reply to the email it arrived in.",
+          }),
+    },
+  ];
+
+  return {
+    kind: "invoice",
+    documentNumber: invoice.invoice_number,
+    title: clientName.toUpperCase(),
+    subtitle: "Invoice",
+    documentTitle: paidInFull ? "Invoice — Paid in Full" : "Invoice",
+    clientName,
+    date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    preparedFor: {
+      name: quote.contact_name,
+      company: quote.company ?? undefined,
+      email: quote.contact_email,
+    },
+    preparedBy: BLEX_PREPARED_BY,
+    facts,
+    sections,
+    confidentialFooter: true,
   };
 }

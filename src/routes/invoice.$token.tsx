@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { HyperswitchCheckout, type CheckoutSession } from "@/components/HyperswitchCheckout";
 import { Logo } from "@/components/Logo";
 import { PageHero } from "@/components/PageHero";
@@ -122,6 +123,11 @@ function InvoicePage() {
         description={`${client?.company ?? client?.name ?? ""} · project ${client?.quoteNumber ?? ""}`}
       />
       <Section tone="surface">
+        {invoice.data?.doc ? (
+          <div className="mx-auto mb-8 max-w-3xl">
+            <DocumentPreview doc={invoice.data.doc} />
+          </div>
+        ) : null}
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-background p-8 shadow-card">
           <div className="flex items-center justify-between gap-4">
             <Logo className="h-7 w-auto" />

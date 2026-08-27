@@ -16,9 +16,9 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
       const { isPaymentsConfigured } = await import("@/lib/payments/hyperswitch.server");
 
       const loaded = await loadInvoiceByToken(data.token);
-      if (!loaded) return { invoice: null, client: null, paymentsEnabled: false };
+      if (!loaded) return { invoice: null, client: null, paymentsEnabled: false, doc: null };
 
-      const { invoice, quote } = loaded;
+      const { invoice, quote, agreement } = loaded;
       const status = String(invoice["status"]);
       if (HIDDEN_STATUSES.includes(status)) {
         return { invoice: null, client: null, paymentsEnabled: false };
@@ -29,8 +29,20 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
       const amountCents = Number(invoice["amount_cents"]);
       const paidCents = Number(invoice["amount_paid_cents"] ?? 0);
 
+      const { buildInvoiceDoc } = await import("@/lib/documents/compose");
+      const { siteUrl } = await import("@/lib/engagement-email.server");
+      const doc = quote
+        ? buildInvoiceDoc({
+            invoice: invoice as never,
+            quote: quote as never,
+            agreement: agreement as never,
+            payUrl: `${siteUrl()}/invoice/${data.token}`,
+          })
+        : null;
+
       return {
         paymentsEnabled: isPaymentsConfigured(),
+        doc,
         invoice: {
           number: String(invoice["invoice_number"]),
           sequence: Number(invoice["sequence"]),

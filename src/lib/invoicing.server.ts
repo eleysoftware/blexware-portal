@@ -53,7 +53,7 @@ export async function dispatchInvoice(invoiceId: string) {
   const db = adminDb();
   const { data: invoice } = await db
     .from("invoices")
-    .select("id, quote_id, invoice_number, sequence, amount_cents, due_date, pay_token, status")
+    .select("id, quote_id, agreement_id, invoice_number, sequence, amount_cents, due_date, pay_token, status")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice) throw new Error("Invoice not found");
@@ -85,6 +85,8 @@ export async function dispatchInvoice(invoiceId: string) {
     first: Number(invoice.sequence) === 1,
   });
 
+  await renderInvoiceDocument(invoice.id as string);
+
   await writeAudit({
     actorLabel: "system",
     action: "invoice.sent",
@@ -94,6 +96,61 @@ export async function dispatchInvoice(invoiceId: string) {
   });
 
   return { emailed: result.sent };
+}
+
+/**
+ * Renders the formatted invoice letter (PDF + Word) into the documents bucket.
+ * Called when an invoice is sent and again when a payment lands, so downloads
+ * always reflect the current paid/balance state.
+ */
+export async function renderInvoiceDocument(invoiceId: string) {
+  const db = adminDb();
+  const { data: invoice } = await db.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
+  if (!invoice) return;
+
+  const [{ data: quote }, agreementResult, { count }] = await Promise.all([
+    db
+      .from("quotes")
+      .select("contact_name, contact_email, company, quote_number")
+      .eq("id", invoice.quote_id as string)
+      .maybeSingle(),
+    invoice.agreement_id
+      ? db
+          .from("agreements")
+          .select("agreement_number, total_cents")
+          .eq("id", invoice.agreement_id as string)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    db
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_id", invoice.quote_id as string)
+      .not("status", "eq", "void"),
+  ]);
+  if (!quote) return;
+
+  const { buildInvoiceDoc } = await import("@/lib/documents/compose");
+  const { storeDocument } = await import("@/lib/document-storage.server");
+  const doc = buildInvoiceDoc({
+    invoice: invoice as never,
+    quote: quote as never,
+    agreement: (agreementResult.data ?? null) as never,
+    invoiceCount: count ?? 1,
+    payUrl: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
+  });
+
+  try {
+    await storeDocument({
+      quoteId: invoice.quote_id as string,
+      entity: "invoice",
+      entityId: invoice.id as string,
+      kind: "invoice",
+      doc,
+      slug: invoice.invoice_number as string,
+    });
+  } catch (error) {
+    console.error("[invoice:render]", (error as Error).message);
+  }
 }
 
 type InvoiceRow = Record<string, unknown>;
@@ -122,7 +179,20 @@ export async function loadInvoiceByToken(payToken: string) {
     .eq("id", invoice.quote_id)
     .maybeSingle();
 
-  return { invoice: invoice as InvoiceRow, quote: (quote ?? null) as InvoiceRow | null };
+  const { data: agreement } = await db
+    .from("agreements")
+    .select("agreement_number, total_cents")
+    .eq("quote_id", invoice.quote_id)
+    .neq("status", "void")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    invoice: invoice as InvoiceRow,
+    quote: (quote ?? null) as InvoiceRow | null,
+    agreement: (agreement ?? null) as InvoiceRow | null,
+  };
 }
 
 /** Records the first view of an invoice (audit + status transition). */
@@ -278,6 +348,9 @@ export async function applyPaymentStatus(input: {
         ...(balance === 0 ? { paid_at: new Date().toISOString() } : {}),
       })
       .eq("id", invoice.id);
+
+    // Re-render the invoice document so downloads show the new paid/balance state.
+    await renderInvoiceDocument(invoice.id as string);
 
     if (quote) {
       await emailReceipt({

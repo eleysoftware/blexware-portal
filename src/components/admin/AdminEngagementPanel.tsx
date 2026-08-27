@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { TabEmptyState } from "@/components/TabIntro";
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { SignatureBlock } from "@/components/SignatureBlock";
 import { getTabEmptyState } from "@/lib/workflow-guidance";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +20,9 @@ import {
 import { buildPaymentPlan, evenSplitRows, SPLIT_COUNTS } from "@/lib/documents/compose";
 import {
   approveProjectStart,
-  createAgreement,
-  draftSowScopeWithAi,
+  generateAgreement,
+  sendAgreement,
+  draftSowWithAi,
   getDocumentUrl,
   getEngagement,
   getPaymentSettlement,
@@ -59,7 +61,8 @@ export function AdminEngagementPanel({
   const fetchEngagement = useServerFn(getEngagement);
   const persistEstimate = useServerFn(saveEstimate);
   const release = useServerFn(sendEstimate);
-  const makeAgreement = useServerFn(createAgreement);
+  const makeAgreement = useServerFn(generateAgreement);
+  const sendSow = useServerFn(sendAgreement);
   const docUrl = useServerFn(getDocumentUrl);
   const sendInvoice = useServerFn(sendInvoiceNow);
   const regenerate = useServerFn(regenerateProposal);
@@ -72,7 +75,7 @@ export function AdminEngagementPanel({
   const aiStatusFn = useServerFn(getAiStatus);
   const approveEstimateFn = useServerFn(markEstimateApproved);
   const suggestSchedule = useServerFn(suggestInvoiceSchedule);
-  const draftSowScope = useServerFn(draftSowScopeWithAi);
+  const draftSow = useServerFn(draftSowWithAi);
 
 
   const engagement = useQuery({
@@ -252,19 +255,21 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const sowScopeMutation = useMutation({
+  const sowDraftMutation = useMutation({
     mutationFn: () =>
-      draftSowScope({
+      draftSow({
         data: { estimateId: sowEstimate!.id, provider: aiChoice.provider, model: aiChoice.model },
       }),
-    onSuccess: (result) => {
+    onSuccess: (result: { markdown: string; provider: string; model: string }) => {
       setSowAddendum(result.markdown);
-      toast.success(`Scope drafted with ${result.provider} (${result.model}) — review before sending`);
+      toast.success(
+        `SOW drafted with ${result.provider} (${result.model}) — review, then press Generate SOW`,
+      );
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const agreementMutation = useMutation({
+  const generateMutation = useMutation({
     mutationFn: () =>
       makeAgreement({
         data: {
@@ -274,8 +279,21 @@ export function AdminEngagementPanel({
         },
       }),
     onSuccess: () => {
-      toast.success("SOW sent for signature");
+      toast.success(
+        sowReviseMode
+          ? "Revised SOW generated as a draft — review it, then send for signature"
+          : "SOW generated as a draft — review it, then send for signature",
+      );
       setSowReviseMode(false);
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const sendSowMutation = useMutation({
+    mutationFn: () => sendSow({ data: { agreementId: agreement!.id } }),
+    onSuccess: () => {
+      toast.success("SOW sent for signature");
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -460,6 +478,7 @@ export function AdminEngagementPanel({
   const documents = (engagement.data?.documents ?? []) as {
     id: string;
     entity: string;
+    entity_id: string;
     kind: string;
     format: string;
     created_at: string;
@@ -472,7 +491,9 @@ export function AdminEngagementPanel({
         ? doc.entity === "estimate"
         : tab === "sow"
           ? doc.entity === "agreement"
-          : false,
+          : tab === "invoices"
+            ? doc.entity === "invoice"
+            : false,
   );
 
   return (
@@ -847,47 +868,107 @@ export function AdminEngagementPanel({
             <Button
               size="sm"
               variant="outline"
-              disabled={sowScopeMutation.isPending || !aiReady}
-              onClick={() => sowScopeMutation.mutate()}
+              disabled={sowDraftMutation.isPending || !aiReady}
+              onClick={() => sowDraftMutation.mutate()}
             >
-              {sowScopeMutation.isPending ? "Drafting…" : "Draft scope with AI"}
+              {sowDraftMutation.isPending ? "Drafting…" : "Draft SOW with AI"}
             </Button>
             <AiModelPicker
               providers={aiStatus.data?.providers}
               choice={aiChoice}
               onChange={setAiChoice}
-              disabled={sowScopeMutation.isPending}
+              disabled={sowDraftMutation.isPending}
             />
           </div>
-          <Textarea
-            className="mt-3 font-mono text-sm"
-            rows={10}
-            value={sowAddendum}
-            placeholder={"## Scope of Work\n\n…"}
-            onChange={(event) => setSowAddendum(event.target.value)}
-            aria-label="Scope addendum"
-          />
+          {!aiReady ? (
+            <p className="mt-2 text-xs text-slate">
+              AI drafting isn't configured for this deployment — write the SOW below instead.
+            </p>
+          ) : null}
+
+          {agreement?.doc ? (
+            <div className="mt-4 space-y-3">
+              <DocumentPreview doc={agreement.doc} />
+              {documents.filter((doc) => doc.entity === "agreement").length ? (
+                <div className="flex flex-wrap gap-2">
+                  {documents
+                    .filter((doc) => doc.entity === "agreement")
+                    .map((doc) => (
+                      <Button
+                        key={doc.id}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openDoc(doc.id)}
+                      >
+                        {doc.format.toUpperCase()}
+                      </Button>
+                    ))}
+                </div>
+              ) : null}
+              <details className="rounded-xl border border-border p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Edit SOW content (markdown)
+                </summary>
+                <Textarea
+                  className="mt-3 font-mono text-sm"
+                  rows={10}
+                  value={sowAddendum}
+                  placeholder={"## Scope of Work\n\n…"}
+                  onChange={(event) => setSowAddendum(event.target.value)}
+                  aria-label="SOW content"
+                />
+                <p className="mt-2 text-xs text-slate">
+                  Applies to the next generated version — press Generate SOW afterwards.
+                </p>
+              </details>
+            </div>
+          ) : (
+            <Textarea
+              className="mt-3 font-mono text-sm"
+              rows={10}
+              value={sowAddendum}
+              placeholder={"## Scope of Work\n\n…"}
+              onChange={(event) => setSowAddendum(event.target.value)}
+              aria-label="SOW content"
+            />
+          )}
 
           {sowEstimate.status !== "approved" ? (
             <p className="mt-3 text-sm text-slate">
               The client hasn't approved the estimate yet. Approve it from the Estimate tab (or use
-              “Mark estimate approved” if they approved offline) before sending the SOW.
+              “Mark estimate approved” if they approved offline) before generating the SOW.
             </p>
           ) : null}
 
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button
               className="shadow-cta"
-              data-testid="sow-send"
-              disabled={agreementMutation.isPending || sowEstimate.status !== "approved"}
-              onClick={() => agreementMutation.mutate()}
+              data-testid="sow-generate"
+              disabled={
+                generateMutation.isPending ||
+                sowEstimate.status !== "approved" ||
+                (agreement != null && agreement.status !== "draft" && !sowReviseMode)
+              }
+              onClick={() => generateMutation.mutate()}
             >
-              {agreementMutation.isPending
-                ? "Sending…"
+              {generateMutation.isPending
+                ? "Generating…"
                 : sowReviseMode
-                  ? "Void & send revised SOW"
-                  : "Generate & send SOW"}
+                  ? "Void & generate revised SOW"
+                  : agreement
+                    ? "Regenerate SOW"
+                    : "Generate SOW"}
             </Button>
+            {agreement?.status === "draft" ? (
+              <Button
+                variant="outline"
+                data-testid="sow-send"
+                disabled={sendSowMutation.isPending}
+                onClick={() => sendSowMutation.mutate()}
+              >
+                {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1038,7 +1119,18 @@ export function AdminEngagementPanel({
                           Copy pay link
                         </Button>
                       ) : null}
-
+                      {documents
+                        .filter((doc) => doc.entity === "invoice" && doc.entity_id === invoice.id)
+                        .map((doc) => (
+                          <Button
+                            key={doc.id}
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openDoc(doc.id)}
+                          >
+                            {doc.format.toUpperCase()}
+                          </Button>
+                        ))}
                     </span>
                   </div>
 
