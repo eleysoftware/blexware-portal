@@ -450,8 +450,8 @@ export function AdminEngagementPanel({
       ? "Sent for signature"
       : agreement.status.charAt(0).toUpperCase() + agreement.status.slice(1);
   /** A sent or signed SOW is read-only until the team opts into a revision. */
-  const sowLocked = Boolean(agreement && agreement.status !== "draft") && !sowReviseMode;
   const sowEditable = !agreement || agreement.status === "draft" || sowReviseMode;
+
 
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
