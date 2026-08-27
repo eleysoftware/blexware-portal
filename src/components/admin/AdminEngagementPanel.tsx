@@ -478,6 +478,7 @@ export function AdminEngagementPanel({
   const documents = (engagement.data?.documents ?? []) as {
     id: string;
     entity: string;
+    entity_id: string;
     kind: string;
     format: string;
     created_at: string;
@@ -490,7 +491,9 @@ export function AdminEngagementPanel({
         ? doc.entity === "estimate"
         : tab === "sow"
           ? doc.entity === "agreement"
-          : false,
+          : tab === "invoices"
+            ? doc.entity === "invoice"
+            : false,
   );
 
   return (
@@ -1116,7 +1119,18 @@ export function AdminEngagementPanel({
                           Copy pay link
                         </Button>
                       ) : null}
-
+                      {documents
+                        .filter((doc) => doc.entity === "invoice" && doc.entity_id === invoice.id)
+                        .map((doc) => (
+                          <Button
+                            key={doc.id}
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openDoc(doc.id)}
+                          >
+                            {doc.format.toUpperCase()}
+                          </Button>
+                        ))}
                     </span>
                   </div>
 
