@@ -18,7 +18,7 @@ export type StoredDocument = { format: "pdf" | "docx"; path: string; sha256: str
 
 export async function storeDocument(input: {
   quoteId: string;
-  entity: "proposal" | "estimate" | "agreement";
+  entity: "proposal" | "estimate" | "agreement" | "invoice";
   entityId: string;
   kind: string;
   doc: ProjectDocument;

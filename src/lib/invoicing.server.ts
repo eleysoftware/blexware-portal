@@ -53,7 +53,7 @@ export async function dispatchInvoice(invoiceId: string) {
   const db = adminDb();
   const { data: invoice } = await db
     .from("invoices")
-    .select("id, quote_id, invoice_number, sequence, amount_cents, due_date, pay_token, status")
+    .select("id, quote_id, agreement_id, invoice_number, sequence, amount_cents, due_date, pay_token, status")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice) throw new Error("Invoice not found");
