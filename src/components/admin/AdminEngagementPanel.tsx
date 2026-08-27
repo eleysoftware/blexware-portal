@@ -861,8 +861,10 @@ export function AdminEngagementPanel({
             {sowEstimate.responded_at
               ? ` — approved ${new Date(sowEstimate.responded_at).toLocaleDateString()}`
               : ""}
-            . Scope, schedule, pricing and payment terms carry over. Add an optional scope addendum
-            below, or draft one with AI, then send it for signature.
+            . Scope, schedule, pricing and payment terms carry over.
+            {sowEditable
+              ? " Add an optional scope addendum below, or draft one with AI, then send it for signature."
+              : ""}
           </p>
 
           {sowEditable ? (
