@@ -1,6 +1,7 @@
 import {
   BLEX_PREPARED_BY,
   formatMoney,
+  type DocFact,
   type DocSection,
   type EstimateLineItem,
   type PaymentPlan,

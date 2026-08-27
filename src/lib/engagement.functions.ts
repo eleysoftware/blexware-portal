@@ -722,32 +722,76 @@ export const generateAgreement = createServerFn({ method: "POST" })
         slug: agreement.agreement_number as string,
       });
 
+      await db
+        .from("agreements")
+        .update({ doc, total_cents: estimate.total_cents })
+        .eq("id", agreement.id);
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "agreement.generated",
+        entity: "quote",
+        entityId: estimate.quote_id as string,
+        metadata: { agreement: agreement.agreement_number, revised: data.revise === true },
+      });
+
+      return { agreementId: agreement.id as string };
+    }),
+  );
+
+/**
+ * Step 2 of the SOW flow: emails the drafted agreement to the client for
+ * signature and moves the quote to `contract_sent`.
+ */
+export const sendAgreement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { agreementId: string }) => data)
+  .handler(
+    guarded("sendAgreement", "sending the statement of work", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: agreement } = await db
+        .from("agreements")
+        .select("id, quote_id, agreement_number, status, doc")
+        .eq("id", data.agreementId)
+        .maybeSingle();
+      if (!agreement) throw new Error("Agreement not found");
+      if (agreement.status !== "draft") {
+        throw new Error("Only a drafted SOW can be sent. Void and regenerate it to make changes.");
+      }
+      if (!agreement.doc) throw new Error("Generate the SOW document before sending it.");
+
+      const { data: quote } = await db
+        .from("quotes")
+        .select("contact_name, contact_email")
+        .eq("id", agreement.quote_id as string)
+        .maybeSingle();
+      if (!quote) throw new Error("Quote not found");
+
       const { requireEmailSent } = await import("@/lib/email.server");
+      const { emailAgreementSent, siteUrl } = await import("@/lib/engagement-email.server");
       requireEmailSent(
         await emailAgreementSent({
-          to: contactEmail,
+          to: quote.contact_email as string,
           name: quote.contact_name as string,
           agreementNumber: agreement.agreement_number as string,
-          url: `${siteUrl()}/portal/quotes/${estimate.quote_id as string}`,
+          url: `${siteUrl()}/portal/quotes/${agreement.quote_id as string}`,
         }),
       );
 
       await db
         .from("agreements")
-        .update({
-          doc,
-          total_cents: estimate.total_cents,
-          status: "sent",
-          sent_at: new Date().toISOString(),
-        })
+        .update({ status: "sent", sent_at: new Date().toISOString() })
         .eq("id", agreement.id);
-      await db.from("quotes").update({ status: "contract_sent" }).eq("id", estimate.quote_id);
+      await db.from("quotes").update({ status: "contract_sent" }).eq("id", agreement.quote_id);
 
       await writeAudit({
         actorId: context.userId,
         action: "agreement.sent",
         entity: "quote",
-        entityId: estimate.quote_id as string,
+        entityId: agreement.quote_id as string,
         metadata: { agreement: agreement.agreement_number, emailed: true },
       });
 
