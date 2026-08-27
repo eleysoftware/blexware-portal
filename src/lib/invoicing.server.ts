@@ -179,7 +179,20 @@ export async function loadInvoiceByToken(payToken: string) {
     .eq("id", invoice.quote_id)
     .maybeSingle();
 
-  return { invoice: invoice as InvoiceRow, quote: (quote ?? null) as InvoiceRow | null };
+  const { data: agreement } = await db
+    .from("agreements")
+    .select("agreement_number, total_cents")
+    .eq("quote_id", invoice.quote_id)
+    .neq("status", "void")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    invoice: invoice as InvoiceRow,
+    quote: (quote ?? null) as InvoiceRow | null,
+    agreement: (agreement ?? null) as InvoiceRow | null,
+  };
 }
 
 /** Records the first view of an invoice (audit + status transition). */

@@ -16,9 +16,9 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
       const { isPaymentsConfigured } = await import("@/lib/payments/hyperswitch.server");
 
       const loaded = await loadInvoiceByToken(data.token);
-      if (!loaded) return { invoice: null, client: null, paymentsEnabled: false };
+      if (!loaded) return { invoice: null, client: null, paymentsEnabled: false, doc: null };
 
-      const { invoice, quote } = loaded;
+      const { invoice, quote, agreement } = loaded;
       const status = String(invoice["status"]);
       if (HIDDEN_STATUSES.includes(status)) {
         return { invoice: null, client: null, paymentsEnabled: false };
