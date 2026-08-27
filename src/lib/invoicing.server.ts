@@ -336,6 +336,9 @@ export async function applyPaymentStatus(input: {
       })
       .eq("id", invoice.id);
 
+    // Re-render the invoice document so downloads show the new paid/balance state.
+    await renderInvoiceDocument(invoice.id as string);
+
     if (quote) {
       await emailReceipt({
         to: quote.contact_email as string,
