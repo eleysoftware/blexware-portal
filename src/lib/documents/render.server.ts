@@ -367,6 +367,7 @@ export async function renderPdf(doc: ProjectDocument): Promise<Uint8Array> {
 /* ----------------------------------------------------------------- DOCX */
 
 const FONT = "Arial";
+const SCRIPT_FONT = "Brush Script MT";
 
 function docxParagraph(
   text: string,
