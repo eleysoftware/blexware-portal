@@ -54,7 +54,7 @@ export type PaymentPlan = {
 };
 
 export type ProjectDocument = {
-  kind: "proposal" | "estimate" | "sow";
+  kind: "proposal" | "estimate" | "sow" | "invoice";
   documentNumber?: string;
   /** Cover title, typically the client company in all caps. */
   title: string;
