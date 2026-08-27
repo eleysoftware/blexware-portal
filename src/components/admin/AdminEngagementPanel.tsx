@@ -845,7 +845,7 @@ export function AdminEngagementPanel({
         ) : null}
       </div>
 
-      {tab === "sow" && sowEstimate && (!agreement || agreement.status === "draft" || sowReviseMode) ? (
+      {tab === "sow" && sowEstimate ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">Statement of work</h2>
@@ -864,27 +864,32 @@ export function AdminEngagementPanel({
             below, or draft one with AI, then send it for signature.
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={sowDraftMutation.isPending || !aiReady}
-              onClick={() => sowDraftMutation.mutate()}
-            >
-              {sowDraftMutation.isPending ? "Drafting…" : "Draft SOW with AI"}
-            </Button>
-            <AiModelPicker
-              providers={aiStatus.data?.providers}
-              choice={aiChoice}
-              onChange={setAiChoice}
-              disabled={sowDraftMutation.isPending}
-            />
-          </div>
-          {!aiReady ? (
-            <p className="mt-2 text-xs text-slate">
-              AI drafting isn't configured for this deployment — write the SOW below instead.
-            </p>
+          {sowEditable ? (
+            <>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={sowDraftMutation.isPending || !aiReady}
+                  onClick={() => sowDraftMutation.mutate()}
+                >
+                  {sowDraftMutation.isPending ? "Drafting…" : "Draft SOW with AI"}
+                </Button>
+                <AiModelPicker
+                  providers={aiStatus.data?.providers}
+                  choice={aiChoice}
+                  onChange={setAiChoice}
+                  disabled={sowDraftMutation.isPending}
+                />
+              </div>
+              {!aiReady ? (
+                <p className="mt-2 text-xs text-slate">
+                  AI drafting isn't configured for this deployment — write the SOW below instead.
+                </p>
+              ) : null}
+            </>
           ) : null}
+
 
           {agreement?.doc ? (
             <div className="mt-4 space-y-3">
