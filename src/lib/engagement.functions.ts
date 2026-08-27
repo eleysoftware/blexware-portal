@@ -518,8 +518,9 @@ export const draftSowWithAi = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You draft the scope addendum for a BLEXware Statement of Work. Return markdown with exactly these H2 sections: " +
-              "## Scope of Work, ## Deliverables, ## Client Responsibilities, ## Assumptions & Exclusions. " +
+              "You draft the full body of a BLEXware Statement of Work. Return markdown with exactly these H2 sections: " +
+              "## Scope of Work, ## Deliverables, ## Timeline, ## Client Responsibilities, ## Assumptions & Exclusions. " +
+              "The Timeline section derives milestones from the estimated duration and line-item durations. " +
               "Be concrete and specific to the engagement. Never invent pricing, dates, certifications or compliance claims.",
           },
           {
