@@ -450,7 +450,8 @@ export function AdminEngagementPanel({
       ? "Sent for signature"
       : agreement.status.charAt(0).toUpperCase() + agreement.status.slice(1);
   /** A sent or signed SOW is read-only until the team opts into a revision. */
-  const sowLocked = Boolean(agreement && agreement.status !== "draft") && !sowReviseMode;
+  const sowEditable = !agreement || agreement.status === "draft" || sowReviseMode;
+
 
   const invoices = (engagement.data?.invoices ?? []) as {
     id: string;
@@ -845,7 +846,7 @@ export function AdminEngagementPanel({
         ) : null}
       </div>
 
-      {tab === "sow" && sowEstimate && (!agreement || agreement.status === "draft" || sowReviseMode) ? (
+      {tab === "sow" && sowEstimate ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">Statement of work</h2>
@@ -860,31 +861,38 @@ export function AdminEngagementPanel({
             {sowEstimate.responded_at
               ? ` — approved ${new Date(sowEstimate.responded_at).toLocaleDateString()}`
               : ""}
-            . Scope, schedule, pricing and payment terms carry over. Add an optional scope addendum
-            below, or draft one with AI, then send it for signature.
+            . Scope, schedule, pricing and payment terms carry over.
+            {sowEditable
+              ? " Add an optional scope addendum below, or draft one with AI, then send it for signature."
+              : ""}
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={sowDraftMutation.isPending || !aiReady}
-              onClick={() => sowDraftMutation.mutate()}
-            >
-              {sowDraftMutation.isPending ? "Drafting…" : "Draft SOW with AI"}
-            </Button>
-            <AiModelPicker
-              providers={aiStatus.data?.providers}
-              choice={aiChoice}
-              onChange={setAiChoice}
-              disabled={sowDraftMutation.isPending}
-            />
-          </div>
-          {!aiReady ? (
-            <p className="mt-2 text-xs text-slate">
-              AI drafting isn't configured for this deployment — write the SOW below instead.
-            </p>
+          {sowEditable ? (
+            <>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={sowDraftMutation.isPending || !aiReady}
+                  onClick={() => sowDraftMutation.mutate()}
+                >
+                  {sowDraftMutation.isPending ? "Drafting…" : "Draft SOW with AI"}
+                </Button>
+                <AiModelPicker
+                  providers={aiStatus.data?.providers}
+                  choice={aiChoice}
+                  onChange={setAiChoice}
+                  disabled={sowDraftMutation.isPending}
+                />
+              </div>
+              {!aiReady ? (
+                <p className="mt-2 text-xs text-slate">
+                  AI drafting isn't configured for this deployment — write the SOW below instead.
+                </p>
+              ) : null}
+            </>
           ) : null}
+
 
           {agreement?.doc ? (
             <div className="mt-4 space-y-3">
@@ -905,24 +913,26 @@ export function AdminEngagementPanel({
                     ))}
                 </div>
               ) : null}
-              <details className="rounded-xl border border-border p-3">
-                <summary className="cursor-pointer text-sm font-medium">
-                  Edit SOW content (markdown)
-                </summary>
-                <Textarea
-                  className="mt-3 font-mono text-sm"
-                  rows={10}
-                  value={sowAddendum}
-                  placeholder={"## Scope of Work\n\n…"}
-                  onChange={(event) => setSowAddendum(event.target.value)}
-                  aria-label="SOW content"
-                />
-                <p className="mt-2 text-xs text-slate">
-                  Applies to the next generated version — press Generate SOW afterwards.
-                </p>
-              </details>
+              {sowEditable ? (
+                <details className="rounded-xl border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Edit SOW content (markdown)
+                  </summary>
+                  <Textarea
+                    className="mt-3 font-mono text-sm"
+                    rows={10}
+                    value={sowAddendum}
+                    placeholder={"## Scope of Work\n\n…"}
+                    onChange={(event) => setSowAddendum(event.target.value)}
+                    aria-label="SOW content"
+                  />
+                  <p className="mt-2 text-xs text-slate">
+                    Applies to the next generated version — press Generate SOW afterwards.
+                  </p>
+                </details>
+              ) : null}
             </div>
-          ) : (
+          ) : sowEditable ? (
             <Textarea
               className="mt-3 font-mono text-sm"
               rows={10}
@@ -931,45 +941,67 @@ export function AdminEngagementPanel({
               onChange={(event) => setSowAddendum(event.target.value)}
               aria-label="SOW content"
             />
-          )}
+          ) : null}
 
-          {sowEstimate.status !== "approved" ? (
+          {!sowEditable && agreement && agreement.status !== "void" ? (
+            <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={sowReviseMode}
+                data-testid="sow-revise"
+                onChange={(event) => setSowReviseMode(event.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Revise the statement of work</span>
+                <span className="block text-slate">
+                  This SOW is locked. Tick this to draft a new version — the current SOW is voided
+                  and the client must sign the new one.
+                </span>
+              </span>
+            </label>
+          ) : null}
+
+
+          {sowEditable && sowEstimate.status !== "approved" ? (
             <p className="mt-3 text-sm text-slate">
               The client hasn't approved the estimate yet. Approve it from the Estimate tab (or use
               “Mark estimate approved” if they approved offline) before generating the SOW.
             </p>
           ) : null}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button
-              className="shadow-cta"
-              data-testid="sow-generate"
-              disabled={
-                generateMutation.isPending ||
-                sowEstimate.status !== "approved" ||
-                (agreement != null && agreement.status !== "draft" && !sowReviseMode)
-              }
-              onClick={() => generateMutation.mutate()}
-            >
-              {generateMutation.isPending
-                ? "Generating…"
-                : sowReviseMode
-                  ? "Void & generate revised SOW"
-                  : agreement
-                    ? "Regenerate SOW"
-                    : "Generate SOW"}
-            </Button>
-            {agreement?.status === "draft" ? (
+          {sowEditable ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button
-                variant="outline"
-                data-testid="sow-send"
-                disabled={sendSowMutation.isPending}
-                onClick={() => sendSowMutation.mutate()}
+                className="shadow-cta"
+                data-testid="sow-generate"
+                disabled={
+                  generateMutation.isPending ||
+                  sowEstimate.status !== "approved" ||
+                  (agreement != null && agreement.status !== "draft" && !sowReviseMode)
+                }
+                onClick={() => generateMutation.mutate()}
               >
-                {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
+                {generateMutation.isPending
+                  ? "Generating…"
+                  : sowReviseMode
+                    ? "Void & generate revised SOW"
+                    : agreement
+                      ? "Regenerate SOW"
+                      : "Generate SOW"}
               </Button>
-            ) : null}
-          </div>
+              {agreement?.status === "draft" ? (
+                <Button
+                  variant="outline"
+                  data-testid="sow-send"
+                  disabled={sendSowMutation.isPending}
+                  onClick={() => sendSowMutation.mutate()}
+                >
+                  {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1008,26 +1040,6 @@ export function AdminEngagementPanel({
             }}
             countersign={countersigned ?? null}
           />
-
-          {agreement.status !== "draft" && agreement.status !== "void" ? (
-            <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={sowReviseMode}
-                data-testid="sow-revise"
-                onChange={(event) => setSowReviseMode(event.target.checked)}
-              />
-              <span>
-                <span className="font-medium">Revise the statement of work</span>
-                <span className="block text-slate">
-                  {sowLocked
-                    ? "This SOW is locked. Tick this to draft a new version — the current SOW is voided and the client must sign the new one."
-                    : "The current SOW will be voided and the client must sign the new version. Issued invoices must be voided first."}
-                </span>
-              </span>
-            </label>
-          ) : null}
 
           {agreement.status === "signed" ? (
             countersigned ? (
