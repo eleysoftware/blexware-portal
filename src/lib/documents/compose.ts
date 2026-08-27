@@ -491,7 +491,7 @@ export function buildInvoiceDoc(input: {
           ],
           ...(paid > 0
             ? [
-                ["Payments received to date", `\u2212${formatMoney(paid)}`],
+                ["Payments received to date", `-${formatMoney(paid)}`],
                 [paidInFull ? "Balance" : "Balance due", formatMoney(balance)],
               ]
             : []),
