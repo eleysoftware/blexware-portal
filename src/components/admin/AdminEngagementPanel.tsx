@@ -911,24 +911,26 @@ export function AdminEngagementPanel({
                     ))}
                 </div>
               ) : null}
-              <details className="rounded-xl border border-border p-3">
-                <summary className="cursor-pointer text-sm font-medium">
-                  Edit SOW content (markdown)
-                </summary>
-                <Textarea
-                  className="mt-3 font-mono text-sm"
-                  rows={10}
-                  value={sowAddendum}
-                  placeholder={"## Scope of Work\n\n…"}
-                  onChange={(event) => setSowAddendum(event.target.value)}
-                  aria-label="SOW content"
-                />
-                <p className="mt-2 text-xs text-slate">
-                  Applies to the next generated version — press Generate SOW afterwards.
-                </p>
-              </details>
+              {sowEditable ? (
+                <details className="rounded-xl border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Edit SOW content (markdown)
+                  </summary>
+                  <Textarea
+                    className="mt-3 font-mono text-sm"
+                    rows={10}
+                    value={sowAddendum}
+                    placeholder={"## Scope of Work\n\n…"}
+                    onChange={(event) => setSowAddendum(event.target.value)}
+                    aria-label="SOW content"
+                  />
+                  <p className="mt-2 text-xs text-slate">
+                    Applies to the next generated version — press Generate SOW afterwards.
+                  </p>
+                </details>
+              ) : null}
             </div>
-          ) : (
+          ) : sowEditable ? (
             <Textarea
               className="mt-3 font-mono text-sm"
               rows={10}
@@ -937,7 +939,27 @@ export function AdminEngagementPanel({
               onChange={(event) => setSowAddendum(event.target.value)}
               aria-label="SOW content"
             />
-          )}
+          ) : null}
+
+          {!sowEditable && agreement && agreement.status !== "void" ? (
+            <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={sowReviseMode}
+                data-testid="sow-revise"
+                onChange={(event) => setSowReviseMode(event.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Revise the statement of work</span>
+                <span className="block text-slate">
+                  This SOW is locked. Tick this to draft a new version — the current SOW is voided
+                  and the client must sign the new one.
+                </span>
+              </span>
+            </label>
+          ) : null}
+
 
           {sowEstimate.status !== "approved" ? (
             <p className="mt-3 text-sm text-slate">
