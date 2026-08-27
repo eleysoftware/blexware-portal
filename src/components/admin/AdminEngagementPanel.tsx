@@ -74,7 +74,7 @@ export function AdminEngagementPanel({
   const aiStatusFn = useServerFn(getAiStatus);
   const approveEstimateFn = useServerFn(markEstimateApproved);
   const suggestSchedule = useServerFn(suggestInvoiceSchedule);
-  const draftSowScope = useServerFn(draftSowScopeWithAi);
+  const draftSow = useServerFn(draftSowWithAi);
 
 
   const engagement = useQuery({
@@ -254,19 +254,21 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const sowScopeMutation = useMutation({
+  const sowDraftMutation = useMutation({
     mutationFn: () =>
-      draftSowScope({
+      draftSow({
         data: { estimateId: sowEstimate!.id, provider: aiChoice.provider, model: aiChoice.model },
       }),
-    onSuccess: (result) => {
+    onSuccess: (result: { markdown: string; provider: string; model: string }) => {
       setSowAddendum(result.markdown);
-      toast.success(`Scope drafted with ${result.provider} (${result.model}) — review before sending`);
+      toast.success(
+        `SOW drafted with ${result.provider} (${result.model}) — review, then press Generate SOW`,
+      );
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const agreementMutation = useMutation({
+  const generateMutation = useMutation({
     mutationFn: () =>
       makeAgreement({
         data: {
@@ -276,8 +278,21 @@ export function AdminEngagementPanel({
         },
       }),
     onSuccess: () => {
-      toast.success("SOW sent for signature");
+      toast.success(
+        sowReviseMode
+          ? "Revised SOW generated as a draft — review it, then send for signature"
+          : "SOW generated as a draft — review it, then send for signature",
+      );
       setSowReviseMode(false);
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const sendSowMutation = useMutation({
+    mutationFn: () => sendSow({ data: { agreementId: agreement!.id } }),
+    onSuccess: () => {
+      toast.success("SOW sent for signature");
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
