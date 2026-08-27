@@ -305,10 +305,11 @@ export async function renderPdf(doc: ProjectDocument): Promise<Uint8Array> {
     drawText("Accepted By:", { size: 10, font: bold });
     drawText(`Name: ${doc.acceptance.signerName ?? ""}`, { size: 10 });
     drawText(`Date: ${doc.acceptance.signedAt ?? ""}`, { size: 10 });
-    drawText(
-      `Signature: ${doc.acceptance.signatureText ?? ""}`,
-      { size: 10, font: doc.acceptance.signatureText ? bold : regular },
-    );
+    if (doc.acceptance.signatureText) {
+      drawText(`Signature: ${doc.acceptance.signatureText}`, { size: 14, font: script });
+    } else {
+      drawText("Signature:", { size: 10, font: regular });
+    }
     if (doc.acceptance.signatureText) {
       drawText(
         "Signed electronically through the BLEXware client portal. This electronic signature is legally binding.",
@@ -376,6 +377,7 @@ function docxParagraph(
     spacing?: number;
     before?: number;
     align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+    font?: string;
   } = {},
 ) {
   return new Paragraph({
@@ -387,7 +389,7 @@ function docxParagraph(
         bold: options.bold ?? false,
         size: options.size ?? 20,
         color: options.color ?? BODY_HEX,
-        font: FONT,
+        font: options.font ?? FONT,
       }),
     ],
   });
@@ -600,9 +602,12 @@ export async function renderDocx(doc: ProjectDocument): Promise<Uint8Array> {
     children.push(docxParagraph(`Name: ${doc.acceptance.signerName ?? ""}`));
     children.push(docxParagraph(`Date: ${doc.acceptance.signedAt ?? ""}`));
     children.push(
-      docxParagraph(`Signature: ${doc.acceptance.signatureText ?? ""}`, {
-        bold: Boolean(doc.acceptance.signatureText),
-      }),
+      doc.acceptance.signatureText
+        ? docxParagraph(`Signature: ${doc.acceptance.signatureText}`, {
+            size: 28,
+            font: SCRIPT_FONT,
+          })
+        : docxParagraph("Signature:"),
     );
     const countersign = doc.acceptance.countersign;
     if (countersign) {
@@ -611,7 +616,9 @@ export async function renderDocx(doc: ProjectDocument): Promise<Uint8Array> {
         docxParagraph(`Name: ${countersign.name}${countersign.title ? ` — ${countersign.title}` : ""}`),
       );
       children.push(docxParagraph(`Date: ${countersign.signedAt}`));
-      children.push(docxParagraph(`Signature: ${countersign.signatureText}`, { bold: true }));
+      children.push(
+        docxParagraph(`Signature: ${countersign.signatureText}`, { size: 28, font: SCRIPT_FONT }),
+      );
       if (countersign.startDate) {
         children.push(docxParagraph(`Project start date: ${countersign.startDate}`));
       }
