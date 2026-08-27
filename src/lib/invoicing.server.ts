@@ -85,6 +85,8 @@ export async function dispatchInvoice(invoiceId: string) {
     first: Number(invoice.sequence) === 1,
   });
 
+  await renderInvoiceDocument(invoice.id as string);
+
   await writeAudit({
     actorLabel: "system",
     action: "invoice.sent",
