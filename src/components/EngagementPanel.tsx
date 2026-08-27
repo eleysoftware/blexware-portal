@@ -264,6 +264,7 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-semibold">{formatMoney(Number(invoice.amount_cents))}</span>
+                  <DownloadRow docs={docsFor("invoice", invoice.id)} onOpen={openDoc} />
                   {invoice.status === "paid" ? (
                     <Badge variant="secondary">Paid</Badge>
                   ) : (
