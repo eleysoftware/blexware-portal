@@ -482,7 +482,8 @@ export function buildInvoiceDoc(input: {
     {
       heading: "Charges",
       table: {
-        headers: ["Description", "Amount"],
+        columns: ["Description", "Amount"],
+        numeric: true,
         rows: [
           [
             invoice.description?.trim() || `Professional services — ${paymentLine}`,

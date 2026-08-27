@@ -482,11 +482,16 @@ export const suggestInvoiceSchedule = createServerFn({ method: "POST" })
   );
 
 /** AI draft of the scope/assumptions addendum that goes into the SOW. */
-export const draftSowScopeWithAi = createServerFn({ method: "POST" })
+/**
+ * AI assistant for the SOW body: drafts the full scope content into the
+ * editable markdown area. It does not create an agreement — press
+ * "Generate SOW" for that.
+ */
+export const draftSowWithAi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { estimateId: string; provider?: string; model?: string }) => data)
   .handler(
-    guarded("draftSowScopeWithAi", "drafting the statement of work", async ({ data, context }) => {
+    guarded("draftSowWithAi", "drafting the statement of work", async ({ data, context }) => {
       const { requireAdmin, adminDb } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const db = adminDb();
