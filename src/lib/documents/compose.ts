@@ -427,3 +427,93 @@ export function buildSowDoc(
     },
   };
 }
+
+export function buildInvoiceDoc(input: {
+  invoice: {
+    invoice_number: string;
+    sequence: number;
+    amount_cents: number;
+    amount_paid_cents?: number | null;
+    status: string;
+    due_date?: string | null;
+    issue_date?: string | null;
+    description?: string | null;
+  };
+  quote: { contact_name: string; contact_email: string; company?: string | null; quote_number?: string | null };
+  agreement?: { agreement_number: string; total_cents: number } | null;
+  invoiceCount?: number;
+  payUrl: string;
+}): ProjectDocument {
+  const { invoice, quote, agreement, invoiceCount, payUrl } = input;
+  const total = Number(invoice.amount_cents);
+  const paid = Math.max(0, Number(invoice.amount_paid_cents ?? 0));
+  const balance = Math.max(0, total - paid);
+  const paidInFull = invoice.status === "paid" || balance <= 0;
+
+  const projectLine =
+    quote.company?.trim() && quote.company.trim() !== quote.contact_name.trim()
+      ? `for ${quote.company.trim()}`
+      : `for ${quote.contact_name}`;
+
+  const facts: [string, string][] = [
+    ["Invoice number", invoice.invoice_number],
+    ...(agreement ? [["Agreement", agreement.agreement_number] as [string, string]] : []),
+    ...(quote.quote_number ? [["Quote", quote.quote_number] as [string, string]] : []),
+    ["Issue date", invoice.issue_date ?? "—"],
+    ["Due date", invoice.due_date ?? "Due on receipt"],
+  ];
+  if (invoiceCount && invoiceCount > 1) {
+    facts.push(["Installment", `${invoice.sequence} of ${invoiceCount}`]);
+  }
+
+  const paymentLine = agreement
+    ? `${invoiceCount && invoiceCount > 1 ? `Installment ${invoice.sequence} of ${invoiceCount} ` : ""}toward agreement ${agreement.agreement_number} (${formatMoney(Number(agreement.total_cents))} project total)`
+    : `Installment ${invoice.sequence}`;
+
+  return {
+    documentTitle: paidInFull ? "Invoice — Paid in Full" : "Invoice",
+    clientName: quote.contact_name,
+    clientCompany: quote.company ?? null,
+    greetingName: firstName(quote.contact_name),
+    date: invoice.issue_date ?? today(),
+    ...(quote.quote_number ? { reference: `Quote ${quote.quote_number}` } : {}),
+    intro: `Here's invoice ${invoice.invoice_number} ${projectLine}.${
+      paidInFull
+        ? " It's been paid in full — thank you."
+        : ` ${formatMoney(balance)} is due ${invoice.due_date ? `by ${invoice.due_date}` : "on receipt"}.`
+    }`,
+    sections: [
+      {
+        heading: "Billing Summary",
+        kind: "table",
+        headers: ["Detail", "Value"],
+        rows: facts,
+      },
+      {
+        heading: "Charges",
+        kind: "table",
+        headers: ["Description", "Amount"],
+        rows: [
+          [invoice.description?.trim() || `Professional services — ${paymentLine}`, formatMoney(total)],
+          ...(paid > 0
+            ? [
+                ["Payments received to date", `−${formatMoney(paid)}`],
+                ["Balance due", formatMoney(balance)],
+              ]
+            : []),
+        ],
+      },
+      {
+        heading: "How to Pay",
+        kind: "body",
+        body: paidInFull
+          ? "This invoice has been paid in full. No further action is needed — thank you for your business."
+          : `Pay securely online by bank transfer (ACH) or card: ${payUrl}\n\nThe link is private to you. Questions about this invoice? Just reply to the email it arrived in.`,
+      },
+    ],
+    closing: paidInFull ? "Thanks again for your business." : "Thanks for your business.",
+    signatureName: "Kamal Eley",
+    signatureRole: "Founder, BLEXware",
+    contactLine: "BLEXware · hello@blexware.com",
+  };
+}
