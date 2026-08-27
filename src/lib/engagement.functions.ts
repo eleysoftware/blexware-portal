@@ -604,11 +604,15 @@ export const sendEstimate = createServerFn({ method: "POST" })
   );
 
 /** Turns an approved estimate into a SOW agreement and sends it for signature. */
-export const createAgreement = createServerFn({ method: "POST" })
+/**
+ * Step 1 of the SOW flow: builds the agreement record and renders the PDF/Word
+ * files. The SOW stays in `draft` until `sendAgreement` emails it to the client.
+ */
+export const generateAgreement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { estimateId: string; addendum?: string; revise?: boolean }) => data)
   .handler(
-    guarded("createAgreement", "creating the agreement", async ({ data, context }) => {
+    guarded("generateAgreement", "generating the statement of work", async ({ data, context }) => {
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const { buildSowDoc, markdownToSections } = await import("@/lib/documents/compose");
