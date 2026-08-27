@@ -201,7 +201,12 @@ export function DocumentPreview({ doc }: { doc: ProjectDocument }) {
           <p className="text-[10pt]">
             Signature:{" "}
             {doc.acceptance.signatureText ? (
-              <span className="font-semibold">{doc.acceptance.signatureText}</span>
+              <span
+                className="text-[16pt]"
+                style={{ fontFamily: '"Segoe Script","Brush Script MT","Snell Roundhand",cursive' }}
+              >
+                {doc.acceptance.signatureText}
+              </span>
             ) : (
               ""
             )}
