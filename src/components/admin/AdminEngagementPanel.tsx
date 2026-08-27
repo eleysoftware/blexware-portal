@@ -961,43 +961,45 @@ export function AdminEngagementPanel({
           ) : null}
 
 
-          {sowEstimate.status !== "approved" ? (
+          {sowEditable && sowEstimate.status !== "approved" ? (
             <p className="mt-3 text-sm text-slate">
               The client hasn't approved the estimate yet. Approve it from the Estimate tab (or use
               “Mark estimate approved” if they approved offline) before generating the SOW.
             </p>
           ) : null}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button
-              className="shadow-cta"
-              data-testid="sow-generate"
-              disabled={
-                generateMutation.isPending ||
-                sowEstimate.status !== "approved" ||
-                (agreement != null && agreement.status !== "draft" && !sowReviseMode)
-              }
-              onClick={() => generateMutation.mutate()}
-            >
-              {generateMutation.isPending
-                ? "Generating…"
-                : sowReviseMode
-                  ? "Void & generate revised SOW"
-                  : agreement
-                    ? "Regenerate SOW"
-                    : "Generate SOW"}
-            </Button>
-            {agreement?.status === "draft" ? (
+          {sowEditable ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button
-                variant="outline"
-                data-testid="sow-send"
-                disabled={sendSowMutation.isPending}
-                onClick={() => sendSowMutation.mutate()}
+                className="shadow-cta"
+                data-testid="sow-generate"
+                disabled={
+                  generateMutation.isPending ||
+                  sowEstimate.status !== "approved" ||
+                  (agreement != null && agreement.status !== "draft" && !sowReviseMode)
+                }
+                onClick={() => generateMutation.mutate()}
               >
-                {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
+                {generateMutation.isPending
+                  ? "Generating…"
+                  : sowReviseMode
+                    ? "Void & generate revised SOW"
+                    : agreement
+                      ? "Regenerate SOW"
+                      : "Generate SOW"}
               </Button>
-            ) : null}
-          </div>
+              {agreement?.status === "draft" ? (
+                <Button
+                  variant="outline"
+                  data-testid="sow-send"
+                  disabled={sendSowMutation.isPending}
+                  onClick={() => sendSowMutation.mutate()}
+                >
+                  {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1036,26 +1038,6 @@ export function AdminEngagementPanel({
             }}
             countersign={countersigned ?? null}
           />
-
-          {agreement.status !== "draft" && agreement.status !== "void" ? (
-            <label className="mt-4 flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={sowReviseMode}
-                data-testid="sow-revise"
-                onChange={(event) => setSowReviseMode(event.target.checked)}
-              />
-              <span>
-                <span className="font-medium">Revise the statement of work</span>
-                <span className="block text-slate">
-                  {sowLocked
-                    ? "This SOW is locked. Tick this to draft a new version — the current SOW is voided and the client must sign the new one."
-                    : "The current SOW will be voided and the client must sign the new version. Issued invoices must be voided first."}
-                </span>
-              </span>
-            </label>
-          ) : null}
 
           {agreement.status === "signed" ? (
             countersigned ? (
