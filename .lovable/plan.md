@@ -26,9 +26,11 @@
 
 ## 4. Invoices become real documents
 
-Yes — invoices are currently plain text. This plan gives them the same treatment:
+Yes — invoices are currently plain text. This plan gives them the same polished letter layout as the proposal, estimate and SOW, so every document a client receives looks like it came from the same desk:
 
-- Each invoice renders a formatted invoice document: BLEXware header, bill-to block, invoice number, issue and due dates, line description tied to the payment schedule ("Payment 2 of 4"), amount due, amount paid, balance, and payment instructions with the pay link.
+- **Same visual system** — navy running header and footer, "Prepared for / Prepared by" party blocks, and the navy table band, matching the proposal family.
+- **Invoice anatomy** — the invoice number and BLEXware contact details up top; a billing summary box (issue date, due date, project, agreement number); a charges table showing the payment description ("Payment 2 of 4"), amount due, amount paid to date, and the outstanding balance in the total row; and a "How to pay" section with the secure pay link and card/ACH options, plus a note that the receipt confirms automatically.
+- **Status-aware** — a paid invoice re-renders with the balance at $0 and a "Paid — thank you" treatment, so downloaded copies always reflect reality. The stored hash of the original issued version is kept for the audit trail.
 - The PDF and Word file are stored alongside the proposal/estimate/SOW documents, previewable and downloadable from the Invoices tab (admin) and the client portal.
 - The invoice email links to the same document; the pay page shows the formatted invoice above the payment method chooser.
 
