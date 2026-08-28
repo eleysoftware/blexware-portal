@@ -85,20 +85,8 @@ export function AdminEngagementPanel({
     queryFn: () => fetchEngagement({ data: { quoteId } }),
   });
 
-  const paymentMethods = useQuery({
-    queryKey: ["payment-method-settings"],
-    queryFn: () => getPaymentMethodSettingsFn(),
-  });
 
-  const paymentMethodMutation = useMutation({
-    mutationFn: (input: { method: "bank" | "card"; enabled: boolean }) =>
-      setPaymentMethodEnabledFn({ data: input }),
-    onSuccess: (result) => {
-      queryClient.setQueryData(["payment-method-settings"], result);
-      toast.success("Payment methods updated.");
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
+
 
   const aiStatus = useQuery({
     queryKey: ["ai-status"],
