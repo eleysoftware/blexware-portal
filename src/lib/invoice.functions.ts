@@ -47,7 +47,8 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
         : null;
 
       return {
-        paymentsEnabled: isPaymentsConfigured(),
+        paymentsEnabled: isPaymentsConfigured() && availableMethods.length > 0,
+        availableMethods,
         doc,
         invoice: {
           number: String(invoice["invoice_number"]),
