@@ -12,16 +12,17 @@ Add a **Settings** card to the main admin page (`/admin`), visible to admins rig
 - Saves immediately, toasts on success, writes to the audit log (already implemented server-side).
 - Remove the duplicate card from the quote workspace's Invoices tab, and instead show a one-line read-only note there ("Clients can currently pay by card. Change this in Admin → Settings.") so the context is still visible where invoices are managed.
 
-## 3. Remove "Load Build Financial Wellness" entirely
+## 3. Replace the seeder with a prefill on the import page
 
-You're right — there's nothing to keep. Nothing in the test suite or any tooling calls it: the only references are the admin button, the `seedWellnessProject` server function, and the hardcoded Build Financial Wellness content it seeds. "Import existing project" fully replaces it. So the whole path gets deleted:
+The two things are different: the old button was a *seeder* — it wrote rows straight into the database with no review. "Import existing project" is a *form* you fill in and submit. So there is nothing to seed, but you do still need her content on hand, and today it only exists inside the seeder's code.
 
-- the button on the admin dashboard,
-- the `seedWellnessProject` server function,
-- `src/lib/seed-wellness.server.ts`,
-- `src/content/build-financial-wellness.ts` (its hardcoded proposal/estimate data has no other consumer).
+So instead of deleting that content outright:
 
-Before deleting the seeder, we confirm Tamara West's quote actually exists in the database (see step 4). If it doesn't, the seeder is removed only after her project is re-created through "Import existing project", so nothing is lost.
+- Delete the seeder path: the dashboard button, the `seedWellnessProject` server function, and `src/lib/seed-wellness.server.ts` (nothing else calls them, and no test references them).
+- Keep the Build Financial Wellness content and reuse it as a **prefill template** on the import page: a "Prefill: Build Financial Wellness" button at the top of the form fills in the client details, proposal markdown, stage, line items and duration. You review/edit and press "Import project" as normal.
+- The template list is a simple array, so more prefills can be added later.
+
+That way you can still recreate Tamara West's project in a couple of clicks, but it goes through the same reviewed import path as everything else.
 
 ## 4. Find Tamara West's project first
 
@@ -31,7 +32,8 @@ Step one of the build is to look up the quote by contact email and report back w
 
 - **It exists and is visible** — nothing to do; it was a filter/search issue.
 - **It exists but is soft-deleted** — the new archive view (below) will surface it and let you restore it.
-- **It doesn't exist** — re-create it through "Import existing project" before the seeder is removed.
+- **It doesn't exist** — recreate it with the import prefill from step 3.
+
 
 ## 5. Archive / delete for quotes
 
