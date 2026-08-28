@@ -1107,7 +1107,17 @@ export function AdminEngagementPanel({
             {invoices.map((invoice) => {
               const paid = Number(invoice.amount_paid_cents ?? 0);
               const balance = Math.max(0, Number(invoice.amount_cents) - paid);
-              const attempts = payments.filter((payment) => payment.invoice_id === invoice.id);
+              const allAttempts = payments.filter((payment) => payment.invoice_id === invoice.id);
+              // Abandoned checkouts (client closed the page) are noise — keep them
+              // collapsed so only real money movement shows by default.
+              const abandoned = allAttempts.filter((payment) =>
+                ["created", "action_required", "expired"].includes(String(payment.status)),
+              );
+              const meaningful = allAttempts.filter((payment) => !abandoned.includes(payment));
+              const attempts = showAbandoned[invoice.id as string]
+                ? [...meaningful, ...abandoned]
+                : meaningful;
+
               return (
                 <li key={invoice.id} className="rounded-xl border border-border px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
