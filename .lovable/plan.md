@@ -26,7 +26,9 @@ Tamara West's existing project data already lives in the database, so removing t
 
 ## Technical notes
 
-- `src/routes/_authenticated/admin/index.tsx`: remove the `seedWellnessProject` button and its `seeding` state/import; add a small `PaymentMethodSettingsCard` render.
+- `src/routes/_authenticated/admin/index.tsx`: remove the `seedWellnessProject` button, its `seeding` state and import; add the settings card.
 - New `src/components/admin/PaymentMethodSettingsCard.tsx` holding the query/mutation currently inline in `AdminEngagementPanel.tsx` (`getPaymentMethodSettingsFn` / `setPaymentMethodEnabledFn`).
 - `src/components/admin/AdminEngagementPanel.tsx`: delete the toggles block (lines ~1100-1131) plus the now-unused query/mutation, replace with the read-only note.
-- No database or server-function changes; `007_app_settings.sql` is already applied.
+- Delete `src/lib/seed-wellness.server.ts`, `src/content/build-financial-wellness.ts`, and `seedWellnessProject` in `src/lib/engagement.functions.ts` (verified: no test or other module imports them).
+- No database or server-function schema changes; `007_app_settings.sql` is already applied.
+
