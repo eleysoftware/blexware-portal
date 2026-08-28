@@ -62,7 +62,9 @@ function InvoicePage() {
   });
 
   const start = useMutation({
-    mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice, scope } }),
+    mutationFn: (choice: "bank" | "card") =>
+      beginPayment({ data: { token, method: choice, scope: canPayInFull ? scope : "invoice" } }),
+
     onSuccess: (result) => setSession(result as CheckoutSession),
     onError: (error: Error, choice) => {
       toast.error(error.message);
