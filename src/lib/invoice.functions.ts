@@ -21,7 +21,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
         return { invoice: null, client: null, paymentsEnabled: false, doc: null, availableMethods: [] };
       }
 
-      const { invoice, quote, agreement } = loaded;
+      const { invoice, quote, agreement, project } = loaded;
       const status = String(invoice["status"]);
       if (HIDDEN_STATUSES.includes(status)) {
         return { invoice: null, client: null, paymentsEnabled: false, availableMethods: [] };
@@ -50,6 +50,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
         paymentsEnabled: isPaymentsConfigured() && availableMethods.length > 0,
         availableMethods,
         doc,
+        project,
         invoice: {
           number: String(invoice["invoice_number"]),
           sequence: Number(invoice["sequence"]),

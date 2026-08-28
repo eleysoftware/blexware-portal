@@ -125,6 +125,7 @@ function InvoicePage() {
   const client = invoice.data?.client;
   const paid = data.status === "paid";
   const balance = data.balanceCents;
+  const project = invoice.data?.project;
 
   return (
     <>
@@ -189,6 +190,30 @@ function InvoicePage() {
             ) : null}
           </dl>
 
+          {project && project.installments.length > 1 ? (
+            <section className="mt-8 border-t border-border pt-6" aria-labelledby="payment-schedule-heading">
+              <h2 id="payment-schedule-heading" className="text-lg font-semibold">Project payment schedule</h2>
+              <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                <div><dt className="text-slate">Project total</dt><dd className="font-semibold">{formatMoney(project.totalCents)}</dd></div>
+                <div><dt className="text-slate">Paid to date</dt><dd className="font-semibold">{formatMoney(project.paidCents)}</dd></div>
+                <div><dt className="text-slate">Remaining</dt><dd className="font-semibold" data-testid="project-balance">{formatMoney(project.balanceCents)}</dd></div>
+              </dl>
+              <ol className="mt-4 divide-y divide-border border-y border-border text-sm">
+                {project.installments.map((installment) => (
+                  <li key={installment.sequence} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                    <span>Installment {installment.sequence}</span>
+                    <span className="text-slate">
+                      {formatMoney(installment.amountCents)} · {statusLabel(installment.status)}
+                      {installment.scheduledSendAt && installment.status === "scheduled"
+                        ? ` · sends ${new Date(installment.scheduledSendAt).toLocaleDateString()}`
+                        : installment.dueDate ? ` · due ${new Date(installment.dueDate).toLocaleDateString()}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
+
           {outcome ? (
             <div
               className="mt-8 rounded-xl border border-border bg-surface p-4 text-sm"
@@ -226,7 +251,7 @@ function InvoicePage() {
                 </div>
                 <div className="flex justify-between">
                   <dt>Remaining balance</dt>
-                  <dd>{formatMoney(balance)}</dd>
+                  <dd>{formatMoney(project?.balanceCents ?? balance)}</dd>
                 </div>
               </dl>
               <p className="mt-3 text-slate">

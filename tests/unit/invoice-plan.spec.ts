@@ -54,3 +54,16 @@ test("custom amounts keep the first invoice on sign and the rest manual", () => 
   expect(plan.rows[1]?.send).toBe("manual");
   expect(plan.rows.map((row) => row.amountCents)).toEqual([40_000, 64_000]);
 });
+
+test("supports a $1,000 first invoice followed by six $600 installments", () => {
+  const plan = buildPaymentPlan("custom", 460_000, [
+    { label: "Project start", amountCents: 100_000 },
+    ...Array.from({ length: 6 }, (_, index) => ({
+      label: `Installment ${index + 2}`,
+      amountCents: 60_000,
+    })),
+  ]);
+  expect(plan.rows).toHaveLength(7);
+  expect(plan.rows.reduce((sum, row) => sum + row.amountCents, 0)).toBe(460_000);
+  expect(plan.rows.slice(1).map((row) => row.amountCents)).toEqual(Array(6).fill(60_000));
+});

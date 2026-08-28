@@ -63,10 +63,31 @@ export async function emailInvoice(input: { to: string; name: string; invoiceNum
   return sendEmail({ to: input.to, toName: input.name, subject: `Invoice ${input.invoiceNumber} — ${formatMoney(input.amountCents)}`, ...mail });
 }
 
-export async function emailReceipt(input: { to: string; name: string; invoiceNumber: string; amountCents: number }) {
+export async function emailReceipt(input: {
+  to: string;
+  name: string;
+  invoiceNumber: string;
+  amountCents: number;
+  projectBalanceCents?: number;
+  remainingInvoices?: number;
+  nextScheduledSendAt?: string | null;
+}) {
+  const remaining = input.projectBalanceCents ?? 0;
+  const scheduleCopy = remaining > 0
+    ? [
+        `Remaining project balance: ${formatMoney(remaining)} across ${input.remainingInvoices ?? 0} upcoming invoice${input.remainingInvoices === 1 ? "" : "s"}.`,
+        ...(input.nextScheduledSendAt
+          ? [`The next invoice is scheduled for ${new Date(input.nextScheduledSendAt).toLocaleDateString()}.`]
+          : []),
+      ]
+    : ["Your project balance is paid in full."];
   const mail = renderEmail({
     heading: "Payment received — thank you",
-    paragraphs: [`Hi ${input.name},`, `We've received your ${formatMoney(input.amountCents)} payment for ${input.invoiceNumber}. This email is your receipt.`],
+    paragraphs: [
+      `Hi ${input.name},`,
+      `We've received your ${formatMoney(input.amountCents)} payment for ${input.invoiceNumber}. This email is your receipt.`,
+      ...scheduleCopy,
+    ],
   });
   return sendEmail({ to: input.to, toName: input.name, subject: `Receipt — ${input.invoiceNumber}`, ...mail });
 }

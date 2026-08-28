@@ -468,6 +468,7 @@ export function AdminEngagementPanel({
     due_date: string | null;
     pay_token?: string | null;
   }[];
+  const projectPayment = engagement.data?.projectPayment;
   const payments = (engagement.data?.payments ?? []) as {
     id: string;
     invoice_id: string;
@@ -1095,6 +1096,13 @@ export function AdminEngagementPanel({
       {invoices.length && tab === "invoices" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h2 className="text-xl">Invoices &amp; payments</h2>
+          {projectPayment ? (
+            <dl className="mt-4 grid gap-3 border-y border-border py-4 text-sm sm:grid-cols-3">
+              <div><dt className="text-slate">Project total</dt><dd className="font-semibold">{formatMoney(projectPayment.totalCents)}</dd></div>
+              <div><dt className="text-slate">Paid to date</dt><dd className="font-semibold">{formatMoney(projectPayment.paidCents)}</dd></div>
+              <div><dt className="text-slate">Remaining</dt><dd className="font-semibold">{formatMoney(projectPayment.balanceCents)}</dd></div>
+            </dl>
+          ) : null}
           <ul className="mt-4 space-y-4 text-sm">
             {invoices.map((invoice) => {
               const paid = Number(invoice.amount_paid_cents ?? 0);

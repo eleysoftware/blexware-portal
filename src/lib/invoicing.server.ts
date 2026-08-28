@@ -13,19 +13,26 @@ export async function createInvoiceSchedule(
   const db = adminDb();
   const { data: agreement } = await db
     .from("agreements")
-    .select("id, quote_id, total_cents, doc")
+    .select("id, quote_id, total_cents, doc, created_at")
     .eq("id", agreementId)
     .maybeSingle();
   if (!agreement) throw new Error("Agreement not found");
 
-  const { data: existing } = await db.from("invoices").select("id").eq("agreement_id", agreementId).limit(1);
-  if (existing?.length) return { created: 0 };
-
   const totalCents = Number(agreement.total_cents);
   const stored = (agreement.doc as ProjectDocument | null)?.paymentPlan;
   const paymentPlan: PaymentPlan = stored?.rows?.length ? stored : buildPaymentPlan("installments", totalCents);
-  const plan = paymentPlanToInvoiceEntries(paymentPlan);
-  const rows = plan.map((entry) => ({
+  const { data: existing } = await db
+    .from("invoices")
+    .select("id, sequence, scheduled_send_at")
+    .eq("agreement_id", agreementId)
+    .order("sequence");
+  const firstScheduled = existing?.find((row) => Number(row.sequence) === 1)?.scheduled_send_at;
+  const anchor = firstScheduled
+    ? new Date(firstScheduled as string)
+    : new Date(agreement.created_at as string);
+  const plan = paymentPlanToInvoiceEntries(paymentPlan, anchor);
+  const existingSequences = new Set((existing ?? []).map((row) => Number(row.sequence)));
+  const rows = plan.filter((entry) => !existingSequences.has(entry.sequence)).map((entry) => ({
     quote_id: agreement.quote_id,
     agreement_id: agreement.id,
     sequence: entry.sequence,
@@ -35,17 +42,116 @@ export async function createInvoiceSchedule(
     status: "scheduled",
   }));
 
-  const { data: inserted, error } = await db.from("invoices").insert(rows).select("id, sequence");
+  const { data: inserted, error } = rows.length
+    ? await db.from("invoices").insert(rows).select("id, sequence")
+    : { data: [], error: null };
   if (error) throw new Error(error.message);
 
   await db.from("quotes").update({ status: "invoicing" }).eq("id", agreement.quote_id);
 
-  for (const entry of plan.filter((item) => item.send === "on_sign")) {
+  for (const entry of plan.filter((item) => item.send === "on_sign" && !existingSequences.has(item.sequence))) {
     const row = (inserted ?? []).find((invoice) => invoice.sequence === entry.sequence);
     if (row) await dispatchInvoice(row.id as string);
   }
 
   return { created: rows.length };
+}
+
+export type ProjectPaymentSummary = {
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  remainingInvoices: number;
+  installments: Array<{
+    sequence: number;
+    amountCents: number;
+    paidCents: number;
+    balanceCents: number;
+    status: string;
+    scheduledSendAt: string | null;
+    dueDate: string | null;
+    issued: boolean;
+  }>;
+};
+
+/** Reconciles the contractual payment plan with issued and scheduled invoice rows. */
+export async function getProjectPaymentSummary(quoteId: string): Promise<ProjectPaymentSummary> {
+  const db = adminDb();
+  const [{ data: agreement }, { data: invoiceRows }] = await Promise.all([
+    db
+      .from("agreements")
+      .select("id, total_cents, doc, created_at")
+      .eq("quote_id", quoteId)
+      .neq("status", "void")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from("invoices")
+      .select("sequence, amount_cents, amount_paid_cents, status, scheduled_send_at, due_date, sent_at")
+      .eq("quote_id", quoteId)
+      .not("status", "in", "(void,cancelled)")
+      .order("sequence"),
+  ]);
+
+  const invoices = (invoiceRows ?? []) as InvoiceRow[];
+  const totalCents = agreement
+    ? Number(agreement.total_cents)
+    : invoices.reduce((sum, row) => sum + Number(row["amount_cents"]), 0);
+  const storedPlan = (agreement?.doc as ProjectDocument | null)?.paymentPlan;
+  const firstScheduled = invoices.find((row) => Number(row["sequence"]) === 1)?.["scheduled_send_at"];
+  const anchorValue = firstScheduled ?? agreement?.created_at ?? new Date().toISOString();
+  const plan = storedPlan?.rows?.length
+    ? paymentPlanToInvoiceEntries(storedPlan, new Date(String(anchorValue)))
+    : invoices.map((row) => ({
+        sequence: Number(row["sequence"]),
+        amountCents: Number(row["amount_cents"]),
+        dueDate: (row["due_date"] as string | null) ?? null,
+        scheduledSendAt: (row["scheduled_send_at"] as string | null) ?? null,
+        send: "manual" as const,
+        label: `Invoice ${String(row["sequence"])}`,
+      }));
+  const bySequence = new Map(invoices.map((row) => [Number(row["sequence"]), row]));
+  const installments = plan.map((entry) => {
+    const row = bySequence.get(entry.sequence);
+    const amountCents = row ? Number(row["amount_cents"]) : entry.amountCents;
+    const paidCents = row ? Number(row["amount_paid_cents"] ?? 0) : 0;
+    const status = row ? String(row["status"]) : "scheduled";
+    return {
+      sequence: entry.sequence,
+      amountCents,
+      paidCents,
+      balanceCents: Math.max(0, amountCents - paidCents),
+      status,
+      scheduledSendAt: row
+        ? ((row["scheduled_send_at"] as string | null) ?? null)
+        : entry.scheduledSendAt,
+      dueDate: row ? ((row["due_date"] as string | null) ?? null) : entry.dueDate,
+      issued: Boolean(row && status !== "scheduled"),
+    };
+  });
+  const paidCents = installments.reduce((sum, row) => sum + row.paidCents, 0);
+  return {
+    totalCents,
+    paidCents,
+    balanceCents: Math.max(0, totalCents - paidCents),
+    remainingInvoices: installments.filter((row) => row.balanceCents > 0).length,
+    installments,
+  };
+}
+
+/** Repairs a partially-created schedule without changing existing invoices. */
+export async function ensureInvoiceScheduleForQuote(quoteId: string) {
+  const db = adminDb();
+  const { data: agreement } = await db
+    .from("agreements")
+    .select("id")
+    .eq("quote_id", quoteId)
+    .neq("status", "void")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return agreement ? createInvoiceSchedule(agreement.id as string) : { created: 0 };
 }
 
 /** Marks an invoice as sent and emails the client a pay link. */
@@ -181,17 +287,21 @@ export async function loadInvoiceByToken(payToken: string) {
 
   const { data: agreement } = await db
     .from("agreements")
-    .select("agreement_number, total_cents")
+    .select("id, agreement_number, total_cents")
     .eq("quote_id", invoice.quote_id)
     .neq("status", "void")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  if (agreement?.id) await createInvoiceSchedule(agreement.id as string);
+  const project = await getProjectPaymentSummary(invoice.quote_id as string);
+
   return {
     invoice: invoice as InvoiceRow,
     quote: (quote ?? null) as InvoiceRow | null,
     agreement: (agreement ?? null) as InvoiceRow | null,
+    project,
   };
 }
 
@@ -361,24 +471,20 @@ export async function applyPaymentStatus(input: {
     // Re-render the invoice document so downloads show the new paid/balance state.
     await renderInvoiceDocument(invoice.id as string);
 
+    const project = await getProjectPaymentSummary(invoice.quote_id as string);
+    const nextInstallment = project.installments.find((row) => row.balanceCents > 0);
+
     if (quote) {
       await emailReceipt({
         to: quote.contact_email as string,
         name: quote.contact_name as string,
         invoiceNumber: invoice.invoice_number as string,
         amountCents: credited,
+        projectBalanceCents: project.balanceCents,
+        remainingInvoices: project.remainingInvoices,
+        nextScheduledSendAt: nextInstallment?.scheduledSendAt ?? null,
       });
-      if (balance > 0) {
-        await emailPaymentUpdate({
-          to: quote.contact_email as string,
-          name: quote.contact_name as string,
-          invoiceNumber: invoice.invoice_number as string,
-          amountCents: credited,
-          kind: "submitted",
-          balanceCents: balance,
-          url,
-        });
-      } else {
+      if (project.balanceCents === 0) {
         await emailPaymentUpdate({
           to: quote.contact_email as string,
           name: quote.contact_name as string,
@@ -389,19 +495,13 @@ export async function applyPaymentStatus(input: {
       }
       await notifyTeam(`Payment received — ${invoice.invoice_number as string}`, [
         `${quote.contact_name as string} (${quote.contact_email as string}) paid ${invoice.invoice_number as string}.`,
+        `Project balance: ${project.balanceCents === 0 ? "paid in full" : `$${(project.balanceCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}.`,
         Number(invoice.sequence) === 1 && balance === 0 ? "This was the first invoice — work can begin." : "",
       ].filter(Boolean));
     }
 
-    if (balance === 0) {
-      const { data: outstanding } = await db
-        .from("invoices")
-        .select("id")
-        .eq("quote_id", invoice.quote_id)
-        .not("status", "in", "(paid,void,cancelled)");
-      if (!outstanding?.length) {
-        await db.from("quotes").update({ status: "completed" }).eq("id", invoice.quote_id);
-      }
+    if (project.balanceCents === 0) {
+      await db.from("quotes").update({ status: "completed" }).eq("id", invoice.quote_id);
     }
   }
 

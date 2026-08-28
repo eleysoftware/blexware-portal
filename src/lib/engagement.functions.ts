@@ -27,6 +27,9 @@ export const getEngagement = createServerFn({ method: "POST" })
       await requireAdmin(context.supabase, context.userId);
       const db = adminDb();
 
+      const { ensureInvoiceScheduleForQuote, getProjectPaymentSummary } = await import("@/lib/invoicing.server");
+      await ensureInvoiceScheduleForQuote(data.quoteId);
+
       const [proposals, estimates, agreements, invoices, documents, versions] = await Promise.all([
         db.from("proposals").select("*").eq("quote_id", data.quoteId).order("created_at", { ascending: false }),
         db.from("estimates").select("*").eq("quote_id", data.quoteId).order("created_at", { ascending: false }),
@@ -71,6 +74,7 @@ export const getEngagement = createServerFn({ method: "POST" })
         refunds: refunds ?? [],
         documents: documents.data ?? [],
         versions: versions.data ?? [],
+        projectPayment: await getProjectPaymentSummary(data.quoteId),
       };
     }),
   );
