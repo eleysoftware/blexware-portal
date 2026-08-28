@@ -435,6 +435,52 @@ export async function startInvoicePayment(
   };
 }
 
+/**
+ * Spreads money that exceeds the paid invoice across the remaining open
+ * installments in sequence order. Scheduled installments are issued as paid
+ * (no client email) so nothing is invoiced again later.
+ */
+async function settleRemainingInstallments(input: {
+  quoteId: string;
+  excludeInvoiceId: string;
+  amountCents: number;
+}) {
+  const db = adminDb();
+  const { data: rows } = await db
+    .from("invoices")
+    .select("id, amount_cents, amount_paid_cents, status")
+    .eq("quote_id", input.quoteId)
+    .neq("id", input.excludeInvoiceId)
+    .not("status", "in", "(void,cancelled,paid)")
+    .order("sequence");
+
+  let remaining = input.amountCents;
+  const now = new Date().toISOString();
+  for (const row of rows ?? []) {
+    if (remaining <= 0) break;
+    const owed = Math.max(0, Number(row.amount_cents) - Number(row.amount_paid_cents ?? 0));
+    if (owed <= 0) continue;
+    const applied = Math.min(owed, remaining);
+    remaining -= applied;
+    const paid = Number(row.amount_paid_cents ?? 0) + applied;
+    const settled = paid >= Number(row.amount_cents);
+    await db
+      .from("invoices")
+      .update({
+        amount_paid_cents: paid,
+        status: settled ? "paid" : "partially_paid",
+        ...(settled ? { paid_at: now } : {}),
+        ...(String(row.status) === "scheduled"
+          ? { sent_at: now, issue_date: now.slice(0, 10), scheduled_send_at: null }
+          : {}),
+      })
+      .eq("id", row.id);
+    await renderInvoiceDocument(row.id as string);
+  }
+
+  return { remainingCents: remaining };
+}
+
 
 /**
  * Applies an authoritative payment status to BLEXware records. Idempotent:
