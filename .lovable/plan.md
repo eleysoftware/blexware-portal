@@ -50,7 +50,7 @@ The `quotes` table already has a `deleted_at` column that nothing in the UI uses
 - `src/routes/_authenticated/admin/index.tsx`: remove the `seedWellnessProject` button, its `seeding` state and import; add the settings card, the "Archived" filter chip, and the per-row actions menu.
 - New `src/components/admin/PaymentMethodSettingsCard.tsx` holding the query/mutation currently inline in `AdminEngagementPanel.tsx` (`getPaymentMethodSettingsFn` / `setPaymentMethodEnabledFn`).
 - `src/components/admin/AdminEngagementPanel.tsx`: delete the toggles block (lines ~1100-1131) plus the now-unused query/mutation, replace with the read-only note.
-- Delete `src/lib/seed-wellness.server.ts`, `src/content/build-financial-wellness.ts`, and `seedWellnessProject` in `src/lib/engagement.functions.ts` (verified: no test or other module imports them).
+- Delete `src/lib/seed-wellness.server.ts` and `seedWellnessProject` in `src/lib/engagement.functions.ts` (verified: no test or other module imports them). Keep `src/content/build-financial-wellness.ts`, re-exported as an import prefill template consumed by `src/routes/_authenticated/admin/import.tsx`.
 - `src/lib/admin.functions.ts`: `listQuotes` gains an `archived` mode (`deleted_at` not null) instead of always filtering `is deleted_at null`; new admin-gated `archiveQuote`, `restoreQuote`, and `deleteQuotePermanently` server functions, all writing to the audit log, with the delete guarded by the signed-agreement / issued-invoice check and cascading cleanup of that quote's stored files and documents.
 - No schema migration needed — `quotes.deleted_at` already exists; `007_app_settings.sql` is already applied.
 
