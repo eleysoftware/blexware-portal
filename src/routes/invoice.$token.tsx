@@ -298,11 +298,55 @@ function InvoicePage() {
               />
             </>
           ) : (
+            <>
+            {canPayInFull ? (
+              <fieldset className="mt-8">
+                <legend className="text-sm font-semibold">How much would you like to pay?</legend>
+                <div className="mt-3 space-y-3">
+                  {[
+                    {
+                      value: "invoice" as const,
+                      title: `This installment — ${formatMoney(balance)}`,
+                      copy: `Installment #${data.sequence} of ${project!.installments.length}.`,
+                      testId: "amount-invoice",
+                    },
+                    {
+                      value: "project" as const,
+                      title: `Pay the remaining balance in full — ${formatMoney(project!.balanceCents)}`,
+                      copy: "Settles every remaining installment on this project in one payment.",
+                      testId: "amount-project",
+                    },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-ring ${
+                        scope === option.value ? "border-primary bg-surface" : "border-border"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payment-amount"
+                        className="mt-1 accent-primary"
+                        value={option.value}
+                        checked={scope === option.value}
+                        data-testid={option.testId}
+                        onChange={() => setScope(option.value)}
+                      />
+                      <span>
+                        <span className="block font-semibold">{option.title}</span>
+                        <span className="mt-1 block text-slate">{option.copy}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             <fieldset className="mt-8">
               <legend className="text-sm font-semibold">
                 {enabledMethods.length > 1 ? "How would you like to pay?" : "Payment method"}
               </legend>
               <div className="mt-3 space-y-3">
+
                 {(
                   [
                     {
