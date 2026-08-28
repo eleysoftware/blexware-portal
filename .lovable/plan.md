@@ -17,33 +17,42 @@ a multi-invoice schedule that second email is noise and reads as if the project 
 settled. It should only go out when the last outstanding invoice on the project is
 paid; otherwise the receipt alone is enough.
 
-## Unverified: do the other six invoices exist?
+## The other six invoices
 
-I could not confirm this — the database read tool is disabled for this project, so I
-can't list the invoices for BLX-2026-0002. Step 1 of the work is to check the
-Invoices tab of that quote's admin workspace and confirm seven rows exist
-($1,000 + 6 x $600 = $4,600). If they don't, the payment plan stored on the signed
-SOW is the cause and that gets fixed separately — I'll report back before changing
-schedule generation.
+The remaining six $600 invoices exist as scheduled rows on the project — they haven't
+been issued or emailed yet, and the scheduled worker sends each one when its send date
+arrives. That's the intended behaviour, so nothing changes about schedule generation.
+What's wrong is that scheduled-but-unsent invoices are invisible to the client and are
+not counted anywhere, which is why everything reads as $0 outstanding.
+
+(I can't list the rows to confirm the amounts and dates — the database read tool is
+disabled for this project — so the first implementation step is to open the Invoices
+tab for BLX-2026-0002 and confirm seven rows totalling $4,600. If the schedule is
+wrong there, I'll report back before touching schedule generation.)
 
 ## Changes
 
 ### Emails
 - On a successful payment, always send the receipt.
-- Compute the project-wide outstanding balance (all invoices for the quote that are
-  not void/cancelled, minus amounts paid).
+- Compute the project-wide outstanding balance across every invoice for the quote that
+  isn't void or cancelled — including `scheduled` ones that haven't been sent yet —
+  minus amounts already paid.
 - Only send the "paid in full" email when that project balance is zero.
-- When the project still has a balance, the receipt/update email states the remaining
-  project balance and how many invoices are left, instead of "remaining balance on
-  this invoice".
+- When the project still has a balance, the receipt states the remaining project
+  balance, how many invoices are left, and the date the next one will be sent,
+  instead of "remaining balance on this invoice".
 - Internal team notification wording follows the same rule.
 
 ### Client invoice page (`/invoice/$token`)
 - Keep "Amount due" as this invoice's balance (correct for paying).
-- Add a project summary block under the invoice details: project total, paid to date,
-  remaining across all invoices, and the count of upcoming invoices with their dates
-  and amounts, so a client paying invoice 1 of 7 sees $3,600 still scheduled.
-- If it's the only invoice, the summary is omitted.
+- Add a payment schedule block under the invoice details: project total, paid to date,
+  remaining across all invoices, and a list of the upcoming scheduled invoices with
+  their amounts and send/due dates — so a client paying invoice 1 of 7 sees the
+  $3,600 still to come.
+- Upcoming invoices are shown as read-only schedule entries; no pay link is exposed
+  until the invoice is actually issued.
+- If it's the only invoice, the block is omitted.
+
 
 ### Admin
 - Invoices tab shows the same project-level roll-up (total / paid / outstanding) above
