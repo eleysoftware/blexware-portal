@@ -386,7 +386,7 @@ export async function startInvoicePayment(
       amount_cents: amountCents,
       currency: String(invoice["currency"] ?? "usd"),
       status: "created",
-      metadata: { method_choice: method },
+      metadata: { method_choice: method, scope },
     })
     .select("id, payment_reference")
     .single();
