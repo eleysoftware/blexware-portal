@@ -1187,9 +1187,9 @@ export function AdminEngagementPanel({
                           className="flex flex-wrap items-center justify-between gap-3"
                         >
                           <span className="text-slate">
-                            {formatMoney(Number(payment.amount_cents))} ·{" "}
-                            {payment.payment_method ?? "—"} ·{" "}
-                            {payment.hyperswitch_connector ?? "unassigned connector"}
+                            {formatMoney(Number(payment.amount_cents))}
+                            {payment.payment_method ? ` · ${payment.payment_method}` : ""}
+                            {payment.hyperswitch_connector ? ` · ${payment.hyperswitch_connector}` : ""}
                             {payment.processor_transaction_id
                               ? ` · ${payment.processor_transaction_id}`
                               : ""}
@@ -1199,7 +1199,10 @@ export function AdminEngagementPanel({
                             {payment.failure_message ? ` · ${payment.failure_message}` : ""}
                           </span>
                           <span className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">{payment.status}</Badge>
+                            <Badge variant="outline">
+                              {String(payment.status).replace(/_/g, " ")}
+                            </Badge>
+
                             {payment.hyperswitch_payment_id ? (
                               <Button
                                 size="sm"
