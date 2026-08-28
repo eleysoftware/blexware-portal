@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type HyperWidgets = {
-  create: (type: string, options: Record<string, unknown>) => { mount: (selector: string | HTMLElement) => void };
+  // The SDK parses this as a CSS selector string — never pass a DOM element.
+  create: (type: string, options: Record<string, unknown>) => { mount: (selector: string) => void };
 };
 type HyperInstance = {
   widgets: (options: Record<string, unknown>) => HyperWidgets;
