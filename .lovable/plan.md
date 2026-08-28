@@ -1,74 +1,84 @@
-# Fix invoice balance display and the wrong "paid in full" email
+# Fix project balance, installment schedule, and payment emails
 
-## What went wrong
+## Goal
 
-Two separate problems came out of the $1,000 payment on BLX-2026-0002.
+After the $1,000 first payment on BLX-2026-0002, show the client that the current
+invoice is paid while the project still has six $600 installments ($3,600) remaining.
+Send the receipt, but do not send a paid-in-full message until the complete project
+payment plan has been settled.
 
-**1. "Remaining balance $0" is the wrong number to show.**
-The invoice page only ever shows the balance of *that one invoice*. Invoice #1 was
-$1,000 and $1,000 was paid, so it correctly reads $0 — but what you (and the client)
-want to see is the remaining balance on the whole project: the six later $600
-invoices, $3,600 outstanding.
+## Confirm and repair BLX-2026-0002
 
-**2. The "invoice paid in full" email is per-invoice, not per-project.**
-On a successful payment the system sends a receipt, and then — when that single
-invoice reaches a zero balance — a second "This invoice is paid in full" email. For
-a multi-invoice schedule that second email is noise and reads as if the project is
-settled. It should only go out when the last outstanding invoice on the project is
-paid; otherwise the receipt alone is enough.
+- Inspect the quote's signed agreement, stored payment plan, invoice rows, payment
+  records, and scheduled send dates before changing its data.
+- The current implementation is designed to create every invoice row when BLEXware
+  countersigns the SOW, keep future rows in `scheduled` status, and issue/email them
+  later through the scheduled worker. Database access is currently disabled, so the
+  actual rows for BLX-2026-0002 are not yet confirmed.
+- If all seven rows exist, preserve them and correct only the calculations and UI.
+- If only invoice 1 exists, idempotently create the six missing $600 scheduled rows
+  from the signed agreement's stored payment plan. Preserve the paid invoice and its
+  payment/audit history; never duplicate an existing sequence.
+- If the stored payment plan itself does not total $4,600, stop and report the mismatch
+  rather than inventing installment amounts or dates.
 
-## The other six invoices
+## Correct the source of truth
 
-The remaining six $600 invoices exist as scheduled rows on the project — they haven't
-been issued or emailed yet, and the scheduled worker sends each one when its send date
-arrives. That's the intended behaviour, so nothing changes about schedule generation.
-What's wrong is that scheduled-but-unsent invoices are invisible to the client and are
-not counted anywhere, which is why everything reads as $0 outstanding.
+- Add one server-side project payment summary that reconciles the signed agreement's
+  payment plan with invoice rows. It returns project total, paid to date, remaining
+  balance, installment count, and upcoming schedule.
+- Count scheduled/unissued installments in the remaining project balance. Exclude only
+  void/cancelled invoices and avoid double-counting a payment-plan entry that already
+  has an invoice row.
+- Keep the current invoice balance separate from the project balance: invoice 1 can be
+  `$0 due` while the project correctly shows `$3,600 remaining`.
+- Make schedule creation idempotent so retries or repeated countersigning cannot create
+  duplicate installments.
 
-(I can't list the rows to confirm the amounts and dates — the database read tool is
-disabled for this project — so the first implementation step is to open the Invoices
-tab for BLX-2026-0002 and confirm seven rows totalling $4,600. If the schedule is
-wrong there, I'll report back before touching schedule generation.)
+## Emails
 
-## Changes
+- Continue sending one receipt for each successful payment.
+- Remove the automatic second `paid_in_full` email when only the current invoice reaches
+  zero. Send that message only when the project-wide remaining balance is zero.
+- For an intermediate payment, include the $3,600 project balance, six remaining
+  installments, and the next scheduled send date in the receipt when available.
+- Apply the same project-level wording to the internal team notification.
 
-### Emails
-- On a successful payment, always send the receipt.
-- Compute the project-wide outstanding balance across every invoice for the quote that
-  isn't void or cancelled — including `scheduled` ones that haven't been sent yet —
-  minus amounts already paid.
-- Only send the "paid in full" email when that project balance is zero.
-- When the project still has a balance, the receipt states the remaining project
-  balance, how many invoices are left, and the date the next one will be sent,
-  instead of "remaining balance on this invoice".
-- Internal team notification wording follows the same rule.
+## Client invoice page
 
-### Client invoice page (`/invoice/$token`)
-- Keep "Amount due" as this invoice's balance (correct for paying).
-- Add a payment schedule block under the invoice details: project total, paid to date,
-  remaining across all invoices, and a list of the upcoming scheduled invoices with
-  their amounts and send/due dates — so a client paying invoice 1 of 7 sees the
-  $3,600 still to come.
-- Upcoming invoices are shown as read-only schedule entries; no pay link is exposed
-  until the invoice is actually issued.
-- If it's the only invoice, the block is omitted.
+- Keep **Amount due** tied to the currently payable invoice.
+- Add a **Project payment schedule** showing project total, paid to date, project balance,
+  and each future installment's amount and scheduled send/due date.
+- Show future installments as read-only schedule entries. Do not expose a pay action or
+  active payment link until an installment is issued.
+- After payment confirmation, refresh both the invoice and project summary so the success
+  panel immediately shows `$3,600 remaining`, not `$0`.
 
+## Admin invoices tab
 
-### Admin
-- Invoices tab shows the same project-level roll-up (total / paid / outstanding) above
-  the invoice list.
+- Add the same total / paid / remaining summary above the invoice list.
+- Clearly distinguish scheduled, issued, partially paid, and paid installments so the
+  team can confirm all seven parts of the $4,600 plan.
 
-## Technical notes
+## Technical implementation
 
-- `src/lib/invoicing.server.ts` `applyPaymentOutcome` (~lines 346-405): the
-  `balance === 0` branch already queries outstanding invoices for the quote to mark it
-  completed. Move that query above the email block and gate the `paid_in_full` email
-  on it; pass the project balance into `emailPaymentUpdate`.
-- `src/lib/engagement-email.server.ts`: `emailPaymentUpdate` gains a
-  `projectBalanceCents` / `remainingInvoices` shape and its copy is reworded.
-- `src/lib/invoice.functions.ts` `getInvoiceByToken`: return a `project` object
-  (totalCents, paidCents, balanceCents, upcoming invoice rows) alongside the invoice.
-- `src/routes/invoice.$token.tsx` and
-  `src/components/admin/AdminEngagementPanel.tsx` render the new summary.
-- No database migration is needed; all values are derived from existing
-  `invoices.amount_cents` / `amount_paid_cents`.
+- Update `src/lib/invoicing.server.ts` to centralize the project summary, repair missing
+  schedule rows safely, and gate completion/email behavior on the project balance.
+- Update `src/lib/engagement-email.server.ts` so receipt and paid-in-full copy receives
+  project-level balance details.
+- Extend `getInvoiceByToken` in `src/lib/invoice.functions.ts` with a client-safe project
+  summary and upcoming schedule; keep scheduled invoice tokens private.
+- Render the summary in `src/routes/invoice.$token.tsx` and
+  `src/components/admin/AdminEngagementPanel.tsx`.
+- No schema migration is expected; the signed agreement document and existing invoice
+  columns already hold the required payment-plan data.
+
+## Verification
+
+- Add regression coverage for a $4,600 plan split into $1,000 + six $600 installments.
+- Verify paying invoice 1 leaves `$3,600` project balance, sends one receipt, does not
+  send `paid_in_full`, and does not mark the quote completed.
+- Verify the final installment produces a zero project balance, marks completion, and
+  sends the final paid-in-full notification once.
+- Verify schedule repair creates only missing sequences and is safe to run repeatedly.
+- Verify the client cannot pay or obtain pay links for unissued scheduled installments.
