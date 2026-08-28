@@ -140,7 +140,32 @@ export async function getProjectPaymentSummary(quoteId: string): Promise<Project
   };
 }
 
+/**
+ * Marks checkout attempts the client abandoned (never reached the gateway, or
+ * stalled awaiting customer action) as expired so the admin ledger stays clean.
+ * Money is never touched — only `created`/`action_required` rows older than 30
+ * minutes are affected, so in-flight checkouts are left alone.
+ */
+export async function expireStaleAttempts(quoteId: string) {
+  const db = adminDb();
+  const { data: invoices } = await db.from("invoices").select("id").eq("quote_id", quoteId);
+  const ids = (invoices ?? []).map((row) => row.id as string);
+  if (!ids.length) return { expired: 0 };
+
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data: expired } = await db
+    .from("invoice_payments")
+    .update({ status: "expired" })
+    .in("invoice_id", ids)
+    .in("status", ["created", "action_required"])
+    .lt("created_at", cutoff)
+    .select("id");
+
+  return { expired: expired?.length ?? 0 };
+}
+
 /** Repairs a partially-created schedule without changing existing invoices. */
+
 export async function ensureInvoiceScheduleForQuote(quoteId: string) {
   const db = adminDb();
   const [{ data: agreement }, { count: existingInvoiceCount }] = await Promise.all([
