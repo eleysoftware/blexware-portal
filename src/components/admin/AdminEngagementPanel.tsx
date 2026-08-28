@@ -1098,37 +1098,12 @@ export function AdminEngagementPanel({
       ) : null}
 
       {tab === "invoices" ? (
-        <div className="mb-6 rounded-2xl border border-border bg-background p-6 shadow-card">
-          <h2 className="text-xl">Payment methods</h2>
-          <p className="mt-1 text-sm text-slate">
-            Choose what clients can select on their invoice pages. Turn Bank (ACH) on once the connector is
-            approved.
-          </p>
-          <div className="mt-4 space-y-3 text-sm">
-            {(
-              [
-                { key: "card" as const, label: "Credit or debit card" },
-                { key: "bank" as const, label: "Bank transfer (ACH)" },
-              ]
-            ).map((option) => (
-              <div
-                key={option.key}
-                className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
-              >
-                <span>{option.label}</span>
-                <Switch
-                  aria-label={`${option.label} payments enabled`}
-                  checked={Boolean(paymentMethods.data?.[option.key])}
-                  disabled={paymentMethods.isLoading || paymentMethodMutation.isPending}
-                  onCheckedChange={(enabled) =>
-                    paymentMethodMutation.mutate({ method: option.key, enabled })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="mb-6 text-sm text-slate">
+          Payment methods offered to clients are set for the whole studio on the{" "}
+          <span className="font-medium text-foreground">team dashboard</span>.
+        </p>
       ) : null}
+
 
       {invoices.length && tab === "invoices" ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
