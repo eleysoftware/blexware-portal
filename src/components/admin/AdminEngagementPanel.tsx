@@ -88,7 +88,7 @@ export function AdminEngagementPanel({
 
   const paymentMethods = useQuery({
     queryKey: ["payment-method-settings"],
-    queryFn: () => getPaymentMethodSettingsFn({ data: {} }),
+    queryFn: () => getPaymentMethodSettingsFn(),
   });
 
   const paymentMethodMutation = useMutation({
