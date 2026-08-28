@@ -71,8 +71,10 @@ export type QuoteRecord = {
   company: string | null;
   phone: string | null;
   internal_notes: string | null;
+  deleted_at: string | null;
   created_at: string;
 };
+
 
 export type QuoteFileRecord = {
   id: string;
