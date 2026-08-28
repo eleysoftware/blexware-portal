@@ -429,7 +429,9 @@ export async function startInvoicePayment(
     environment: config.environment,
     amountCents,
     method,
+    scope,
     reference: attempt.payment_reference as string,
+
   };
 }
 
