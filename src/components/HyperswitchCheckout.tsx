@@ -70,7 +70,7 @@ export function HyperswitchCheckout({
   onChangeMethod?: () => void;
 }) {
 
-  const mountRef = useRef<HTMLDivElement | null>(null);
+  const MOUNT_ID = "blex-payment-element";
   const hyperRef = useRef<HyperInstance | null>(null);
   const widgetsRef = useRef<HyperWidgets | null>(null);
   const [ready, setReady] = useState(false);
