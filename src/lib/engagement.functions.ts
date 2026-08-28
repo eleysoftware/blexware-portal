@@ -1028,23 +1028,3 @@ export const setPaymentMethodEnabledFn = createServerFn({ method: "POST" })
       });
     }),
   );
-
-/** Seeds the live Build Financial Wellness engagement at the estimate stage. */
-export const seedWellnessProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((data: Record<string, never>) => data ?? {})
-  .handler(
-    guarded("seedWellnessProject", "seeding the project", async ({ context }) => {
-      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
-      await requireAdmin(context.supabase, context.userId);
-      const { seedBuildFinancialWellness } = await import("@/lib/seed-wellness.server");
-      const result = await seedBuildFinancialWellness();
-      await writeAudit({
-        actorId: context.userId,
-        action: "seed.build_financial_wellness",
-        entity: "quote",
-        entityId: result.quoteId,
-      });
-      return result;
-    }),
-  );

@@ -103,17 +103,19 @@ export const listQuotes = createServerFn({ method: "POST" })
     guarded("listQuotes", "loading quotes", async ({ data, context }) => {
       const { requireAdmin, adminDb } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
+      const archived = data.status === "archived";
 
       let query = adminDb()
         .from("quotes")
         .select(
-          "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, created_at",
+          "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, created_at, deleted_at",
         )
-        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(200);
 
-      if (data.status && data.status !== "all") query = query.eq("status", data.status);
+      query = archived ? query.not("deleted_at", "is", null) : query.is("deleted_at", null);
+
+      if (data.status && data.status !== "all" && !archived) query = query.eq("status", data.status);
       if (data.search?.trim()) {
         const term = `%${data.search.trim()}%`;
         query = query.or(
@@ -134,9 +136,155 @@ export const listQuotes = createServerFn({ method: "POST" })
         counts[row.status] = (counts[row.status] ?? 0) + 1;
       }
 
+      const { count: archivedCount } = await adminDb()
+        .from("quotes")
+        .select("id", { count: "exact", head: true })
+        .not("deleted_at", "is", null);
+      counts["archived"] = archivedCount ?? 0;
+
       return { quotes: (rows ?? []) as Partial<QuoteRecord>[], counts };
     }),
   );
+
+/** Soft-archives a quote so it drops out of the working queue (reversible). */
+export const archiveQuote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { id: string; archived: boolean }) => data)
+  .handler(
+    guarded("archiveQuote", "archiving the quote", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+
+      const { error } = await adminDb()
+        .from("quotes")
+        .update({ deleted_at: data.archived ? new Date().toISOString() : null })
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? context.userId),
+        action: data.archived ? "quote.archived" : "quote.restored",
+        entity: "quote",
+        entityId: data.id,
+      });
+      return { ok: true, archived: data.archived };
+    }),
+  );
+
+/**
+ * Permanently removes an archived quote and everything attached to it.
+ * Blocked when the engagement has legal/financial records worth keeping.
+ */
+export const deleteQuotePermanently = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { id: string; confirmQuoteNumber: string }) => data)
+  .handler(
+    guarded("deleteQuotePermanently", "deleting the quote", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit, QUOTE_BUCKET } = await import(
+        "@/lib/blex.server"
+      );
+      const { DOCUMENT_BUCKET } = await import("@/lib/document-storage.server");
+
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: quote } = await db
+        .from("quotes")
+        .select("id, quote_number, deleted_at")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (!quote) throw new Error("Quote not found");
+      if (!quote.deleted_at) throw new Error("Archive this quote before deleting it");
+      if (
+        data.confirmQuoteNumber.trim().toLowerCase() !== String(quote.quote_number).toLowerCase()
+      ) {
+        throw new Error("The quote number you typed doesn't match");
+      }
+
+      const { data: signed } = await db
+        .from("agreements")
+        .select("id")
+        .eq("quote_id", data.id)
+        .eq("status", "signed")
+        .limit(1);
+      if (signed?.length) {
+        throw new Error(
+          "This project has a signed Statement of Work, so it has to be kept. It stays archived instead.",
+        );
+      }
+
+      const { data: issued } = await db
+        .from("invoices")
+        .select("id")
+        .eq("quote_id", data.id)
+        .not("status", "in", "(draft,scheduled,void,cancelled)")
+        .limit(1);
+      if (issued?.length) {
+        throw new Error(
+          "This project has issued invoices, so it has to be kept for your records. It stays archived instead.",
+        );
+      }
+
+      const { data: uploads } = await db
+        .from("quote_files")
+        .select("storage_path")
+        .eq("quote_id", data.id);
+      const uploadPaths = (uploads ?? []).map((row: { storage_path: string }) => row.storage_path);
+      if (uploadPaths.length) await db.storage.from(QUOTE_BUCKET).remove(uploadPaths);
+
+      const { data: docs } = await db
+        .from("documents")
+        .select("storage_path")
+        .eq("quote_id", data.id);
+      const docPaths = (docs ?? []).map((row: { storage_path: string }) => row.storage_path);
+      if (docPaths.length) await db.storage.from(DOCUMENT_BUCKET).remove(docPaths);
+
+      const { data: agreements } = await db.from("agreements").select("id").eq("quote_id", data.id);
+      const { data: invoices } = await db.from("invoices").select("id").eq("quote_id", data.id);
+      const invoiceIds = (invoices ?? []).map((row: { id: string }) => row.id);
+      if (invoiceIds.length) {
+        const { data: attempts } = await db
+          .from("invoice_payments")
+          .select("id")
+          .in("invoice_id", invoiceIds);
+        const attemptIds = (attempts ?? []).map((row: { id: string }) => row.id);
+        if (attemptIds.length) {
+          await db.from("refunds").delete().in("invoice_payment_id", attemptIds);
+          await db.from("payment_events").delete().in("invoice_payment_id", attemptIds);
+        }
+        await db.from("invoice_payments").delete().in("invoice_id", invoiceIds);
+        await db.from("payments").delete().in("invoice_id", invoiceIds);
+      }
+      await db.from("invoices").delete().eq("quote_id", data.id);
+      if (agreements?.length) await db.from("agreements").delete().eq("quote_id", data.id);
+
+      const { data: proposals } = await db.from("proposals").select("id").eq("quote_id", data.id);
+      const proposalIds = (proposals ?? []).map((row: { id: string }) => row.id);
+      if (proposalIds.length) {
+        await db.from("proposal_versions").delete().in("proposal_id", proposalIds);
+      }
+      await db.from("estimates").delete().eq("quote_id", data.id);
+      await db.from("proposals").delete().eq("quote_id", data.id);
+      await db.from("documents").delete().eq("quote_id", data.id);
+      await db.from("quote_files").delete().eq("quote_id", data.id);
+
+      const { error } = await db.from("quotes").delete().eq("id", data.id);
+      if (error) throw new Error(error.message);
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? context.userId),
+        action: "quote.deleted",
+        entity: "quote",
+        entityId: data.id,
+        metadata: { quoteNumber: quote.quote_number },
+      });
+
+      return { ok: true };
+    }),
+  );
+
 
 export const getQuoteDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

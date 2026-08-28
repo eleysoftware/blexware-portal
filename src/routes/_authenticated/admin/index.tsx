@@ -7,12 +7,18 @@ import { toast } from "sonner";
 import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
+import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { getAdminStatus, listQuotes, refreshProposalDocuments } from "@/lib/admin.functions";
-import { seedWellnessProject } from "@/lib/engagement.functions";
+import {
+  archiveQuote,
+  deleteQuotePermanently,
+  getAdminStatus,
+  listQuotes,
+  refreshProposalDocuments,
+} from "@/lib/admin.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
@@ -27,11 +33,12 @@ function AdminDashboard() {
   const queryClient = useQueryClient();
   const status = useServerFn(getAdminStatus);
   const fetchQuotes = useServerFn(listQuotes);
+  const setArchived = useServerFn(archiveQuote);
+  const deleteQuote = useServerFn(deleteQuotePermanently);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [seeding, setSeeding] = useState(false);
   const [converting, setConverting] = useState(false);
-  const seed = useServerFn(seedWellnessProject);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const convertProposals = useServerFn(refreshProposalDocuments);
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
@@ -45,6 +52,39 @@ function AdminDashboard() {
     await supabase.auth.signOut();
     queryClient.clear();
     navigate({ to: "/auth" });
+  };
+
+  const toggleArchive = async (id: string, archived: boolean, label: string) => {
+    if (archived && !window.confirm(`Archive ${label}? You can restore it from the Archived view.`)) {
+      return;
+    }
+    setBusyId(id);
+    try {
+      await setArchived({ data: { id, archived } });
+      toast.success(archived ? `${label} archived.` : `${label} restored.`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const permanentlyDelete = async (id: string, label: string) => {
+    const typed = window.prompt(
+      `This permanently deletes ${label} and everything attached to it. Type the quote number to confirm.`,
+    );
+    if (!typed) return;
+    setBusyId(id);
+    try {
+      await deleteQuote({ data: { id, confirmQuoteNumber: typed } });
+      toast.success(`${label} deleted.`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusyId(null);
+    }
   };
 
   if (access.isLoading) {
@@ -78,6 +118,7 @@ function AdminDashboard() {
   }
 
   const counts = quotes.data?.counts ?? {};
+  const viewingArchived = filter === "archived";
 
   return (
     <>
@@ -93,25 +134,6 @@ function AdminDashboard() {
           </Button>
           <Button variant="secondary" size="sm" asChild>
             <Link to="/admin/import">Import existing project</Link>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={seeding}
-            onClick={async () => {
-              setSeeding(true);
-              try {
-                const result = await seed({ data: {} });
-                toast.success(`Build Financial Wellness ready (${result.quoteNumber})`);
-                void queryClient.invalidateQueries({ queryKey: ["quotes"] });
-              } catch (error) {
-                toast.error((error as Error).message);
-              } finally {
-                setSeeding(false);
-              }
-            }}
-          >
-            {seeding ? "Loading…" : "Load Build Financial Wellness"}
           </Button>
           <Button
             variant="ghost"
@@ -141,7 +163,7 @@ function AdminDashboard() {
 
       <Section tone="surface">
         <div className="flex flex-wrap items-center gap-2">
-          {["all", ...quoteStatuses].map((value) => (
+          {["all", ...quoteStatuses, "archived"].map((value) => (
             <button
               key={value}
               type="button"
@@ -152,7 +174,11 @@ function AdminDashboard() {
                   : "border-border bg-background text-slate hover:border-primary/50"
               }`}
             >
-              {value === "all" ? "All" : quoteStatusLabels[value as keyof typeof quoteStatusLabels]}
+              {value === "all"
+                ? "All"
+                : value === "archived"
+                  ? "Archived"
+                  : quoteStatusLabels[value as keyof typeof quoteStatusLabels]}
               {value !== "all" && counts[value] ? ` (${counts[value]})` : ""}
             </button>
           ))}
@@ -166,7 +192,7 @@ function AdminDashboard() {
         </div>
 
         <div className="mt-8 overflow-x-auto rounded-2xl border border-border bg-background shadow-card">
-          <table className="w-full min-w-[860px] text-left text-sm">
+          <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="border-b border-border text-xs uppercase tracking-wide text-slate">
               <tr>
                 <th className="px-5 py-4">Quote</th>
@@ -175,57 +201,93 @@ function AdminDashboard() {
                 <th className="px-5 py-4">Budget</th>
                 <th className="px-5 py-4">Status</th>
                 <th className="px-5 py-4">Received</th>
+                <th className="px-5 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {quotes.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-slate">
+                  <td colSpan={7} className="px-5 py-8 text-slate">
                     Loading quotes…
                   </td>
                 </tr>
               ) : (quotes.data?.quotes.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-slate">
-                    No quote requests match this view yet.
+                  <td colSpan={7} className="px-5 py-8 text-slate">
+                    {viewingArchived
+                      ? "Nothing is archived right now."
+                      : "No quote requests match this view yet."}
                   </td>
                 </tr>
               ) : (
-                quotes.data?.quotes.map((quote) => (
-                  <tr key={quote.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-5 py-4 font-medium">
-                      <Link
-                        to="/admin/quotes/$id"
-                        params={{ id: quote.id as string }}
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        {quote.quote_number}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="block">{quote.contact_name}</span>
-                      <span className="text-xs text-slate">
-                        {quote.company ?? quote.contact_email}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 text-slate">
-                      {quote.project_type} · {quote.industry}
-                    </td>
-                    <td className="px-5 py-4 text-slate">{quote.budget}</td>
-                    <td className="px-5 py-4">
-                      <Badge variant="secondary">
-                        {quoteStatusLabels[quote.status as keyof typeof quoteStatusLabels]}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-4 text-slate">
-                      {new Date(quote.created_at as string).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
+                quotes.data?.quotes.map((quote) => {
+                  const id = quote.id as string;
+                  const label = String(quote.quote_number);
+                  const archived = Boolean(quote.deleted_at);
+                  return (
+                    <tr key={id} className="border-b border-border/60 last:border-0">
+                      <td className="px-5 py-4 font-medium">
+                        <Link
+                          to="/admin/quotes/$id"
+                          params={{ id }}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {label}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="block">{quote.contact_name}</span>
+                        <span className="text-xs text-slate">
+                          {quote.company ?? quote.contact_email}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-slate">
+                        {quote.project_type} · {quote.industry}
+                      </td>
+                      <td className="px-5 py-4 text-slate">{quote.budget}</td>
+                      <td className="px-5 py-4">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">
+                            {quoteStatusLabels[quote.status as keyof typeof quoteStatusLabels]}
+                          </Badge>
+                          {archived ? <Badge variant="outline">Archived</Badge> : null}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-slate">
+                        {new Date(quote.created_at as string).toLocaleDateString()}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busyId === id}
+                            onClick={() => void toggleArchive(id, !archived, label)}
+                          >
+                            {archived ? "Restore" : "Archive"}
+                          </Button>
+                          {archived ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              disabled={busyId === id}
+                              onClick={() => void permanentlyDelete(id, label)}
+                            >
+                              Delete
+                            </Button>
+                          ) : null}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        <PaymentMethodSettingsCard />
 
         <CreateTeamMemberCard />
       </Section>

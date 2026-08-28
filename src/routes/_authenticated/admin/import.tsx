@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/documents/types";
+import { importTemplates } from "@/content/import-templates";
 import { importProject, type ImportStage } from "@/lib/import.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/import")({
@@ -59,6 +60,33 @@ function ImportProjectPage() {
   const [stage, setStage] = useState<ImportStage>("approved");
   const [durationNote, setDurationNote] = useState("");
   const [rows, setRows] = useState<LineRow[]>([{ label: "", amount: "", duration: "" }]);
+  const [discount, setDiscount] = useState("");
+  const [discountLabel, setDiscountLabel] = useState("Discount");
+
+  const applyTemplate = (id: string) => {
+    const template = importTemplates.find((entry) => entry.id === id);
+    if (!template) return;
+    const values = template.build();
+    setContactName(values.contactName);
+    setContactEmail(values.contactEmail);
+    setCompany(values.company);
+    setPhone(values.phone);
+    setProjectType(values.projectType);
+    setIndustry(values.industry);
+    setServices(values.services);
+    setBudget(values.budget);
+    setTimeline(values.timeline);
+    setGoals(values.goals);
+    setFeatures(values.features);
+    setDocumentTitle(values.documentTitle);
+    setProposalMarkdown(values.proposalMarkdown);
+    setStage(values.stage);
+    setDurationNote(values.durationNote);
+    setDiscount(values.discount);
+    setDiscountLabel(values.discountLabel);
+    setRows(values.rows);
+    toast.success(`Prefilled ${template.label} — review before importing.`);
+  };
 
   const needsEstimate = ESTIMATE_STAGES.includes(stage);
   const lineItems = rows
@@ -68,7 +96,9 @@ function ImportProjectPage() {
       amountCents: Math.round(Number(row.amount) * 100),
       ...(row.duration.trim() ? { durationLabel: row.duration.trim() } : {}),
     }));
-  const total = lineItems.reduce((sum, item) => sum + item.amountCents, 0);
+  const discountCents = Math.max(0, Math.round(Number(discount || 0) * 100));
+  const total =
+    lineItems.reduce((sum, item) => sum + item.amountCents, 0) - (needsEstimate ? discountCents : 0);
 
   const readFile = async (file: File) => {
     const text = await file.text();
@@ -97,7 +127,9 @@ function ImportProjectPage() {
           documentTitle,
           proposalMarkdown,
           stage,
-          ...(needsEstimate ? { lineItems, durationNote } : {}),
+          ...(needsEstimate
+            ? { lineItems, durationNote, discountCents, discountLabel }
+            : {}),
         },
       }),
     onSuccess: (result) => {
@@ -116,6 +148,26 @@ function ImportProjectPage() {
       />
       <Section>
         <div className="mx-auto max-w-3xl space-y-8">
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-xl">Start from a saved project</h2>
+            <p className="mt-1 text-sm text-slate">
+              Prefills the form below with a project we already have on file. Nothing is saved until you
+              review it and press “Import project”.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {importTemplates.map((template) => (
+                <Button
+                  key={template.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyTemplate(template.id)}
+                >
+                  Prefill: {template.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Client</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -288,6 +340,26 @@ function ImportProjectPage() {
                 >
                   Add line item
                 </Button>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium">
+                  Discount ($)
+                  <Input
+                    className="mt-1"
+                    inputMode="decimal"
+                    value={discount}
+                    placeholder="0"
+                    onChange={(e) => setDiscount(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm font-medium">
+                  Discount label
+                  <Input
+                    className="mt-1"
+                    value={discountLabel}
+                    onChange={(e) => setDiscountLabel(e.target.value)}
+                  />
+                </label>
               </div>
               <label className="mt-4 block text-sm font-medium">
                 Duration summary
