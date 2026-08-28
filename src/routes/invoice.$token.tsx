@@ -400,13 +400,15 @@ function InvoicePage() {
               >
                 {start.isPending
                   ? "Opening secure checkout…"
-                  : `Continue to pay ${formatMoney(balance)}`}
+                  : `Continue to pay ${formatMoney(payAmountCents)}`}
               </Button>
               <p className="mt-3 text-center text-xs text-slate">
                 Secure payment powered by BLEXware. We never see or store your bank or card details.
               </p>
             </fieldset>
+            </>
           )}
+
 
         </div>
       </Section>
