@@ -143,15 +143,22 @@ export async function getProjectPaymentSummary(quoteId: string): Promise<Project
 /** Repairs a partially-created schedule without changing existing invoices. */
 export async function ensureInvoiceScheduleForQuote(quoteId: string) {
   const db = adminDb();
-  const { data: agreement } = await db
+  const [{ data: agreement }, { count: existingInvoiceCount }] = await Promise.all([
+    db
     .from("agreements")
     .select("id")
     .eq("quote_id", quoteId)
-    .neq("status", "void")
+    .eq("status", "signed")
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle();
-  return agreement ? createInvoiceSchedule(agreement.id as string) : { created: 0 };
+    .maybeSingle(),
+    db.from("invoices").select("id", { count: "exact", head: true }).eq("quote_id", quoteId),
+  ]);
+  // Repair only projects whose invoice lifecycle has already started. Initial
+  // schedule creation remains the explicit countersign action.
+  return agreement && (existingInvoiceCount ?? 0) > 0
+    ? createInvoiceSchedule(agreement.id as string)
+    : { created: 0 };
 }
 
 /** Marks an invoice as sent and emails the client a pay link. */
