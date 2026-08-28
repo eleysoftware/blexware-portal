@@ -12,13 +12,23 @@ Add a **Settings** card to the main admin page (`/admin`), visible to admins rig
 - Saves immediately, toasts on success, writes to the audit log (already implemented server-side).
 - Remove the duplicate card from the quote workspace's Invoices tab, and instead show a one-line read-only note there ("Clients can currently pay by card. Change this in Admin → Settings.") so the context is still visible where invoices are managed.
 
-## 3. Remove "Load Build Financial Wellness"
+## 3. Remove "Load Build Financial Wellness" entirely
 
-Drop that button from the admin dashboard header; importing a project is now handled by "Import existing project". The underlying seed server function stays in place (it is still referenced by tests/seed tooling) but is no longer reachable from the UI.
+You're right — there's nothing to keep. Nothing in the test suite or any tooling calls it: the only references are the admin button, the `seedWellnessProject` server function, and the hardcoded Build Financial Wellness content it seeds. "Import existing project" fully replaces it. So the whole path gets deleted:
+
+- the button on the admin dashboard,
+- the `seedWellnessProject` server function,
+- `src/lib/seed-wellness.server.ts`,
+- `src/content/build-financial-wellness.ts` (its hardcoded proposal/estimate data has no other consumer).
+
+Tamara West's existing project data already lives in the database, so removing the seeder doesn't affect it.
+
 
 ## Technical notes
 
-- `src/routes/_authenticated/admin/index.tsx`: remove the `seedWellnessProject` button and its `seeding` state/import; add a small `PaymentMethodSettingsCard` render.
+- `src/routes/_authenticated/admin/index.tsx`: remove the `seedWellnessProject` button, its `seeding` state and import; add the settings card.
 - New `src/components/admin/PaymentMethodSettingsCard.tsx` holding the query/mutation currently inline in `AdminEngagementPanel.tsx` (`getPaymentMethodSettingsFn` / `setPaymentMethodEnabledFn`).
 - `src/components/admin/AdminEngagementPanel.tsx`: delete the toggles block (lines ~1100-1131) plus the now-unused query/mutation, replace with the read-only note.
-- No database or server-function changes; `007_app_settings.sql` is already applied.
+- Delete `src/lib/seed-wellness.server.ts`, `src/content/build-financial-wellness.ts`, and `seedWellnessProject` in `src/lib/engagement.functions.ts` (verified: no test or other module imports them).
+- No database or server-function schema changes; `007_app_settings.sql` is already applied.
+
