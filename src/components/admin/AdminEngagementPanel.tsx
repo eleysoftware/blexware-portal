@@ -109,6 +109,8 @@ export function AdminEngagementPanel({
   const [estimateNote, setEstimateNote] = useState("");
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
+  const [showAbandoned, setShowAbandoned] = useState<Record<string, boolean>>({});
+
   const [startDate, setStartDate] = useState("");
   const [reviseMode, setReviseMode] = useState(false);
   const [sowAddendum, setSowAddendum] = useState("");
