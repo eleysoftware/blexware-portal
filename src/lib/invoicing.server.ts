@@ -292,8 +292,6 @@ export async function loadInvoiceByToken(payToken: string) {
     .eq("id", invoice.quote_id)
     .maybeSingle();
 
-  await ensureInvoiceScheduleForQuote(invoice.quote_id as string);
-
   const { data: agreement } = await db
     .from("agreements")
     .select("id, agreement_number, total_cents")
