@@ -1,5 +1,19 @@
 import { readEnv, requireEnv } from "./env";
 
+/**
+ * Fallback payment methods when the admin setting hasn't been stored yet.
+ * `PAYMENT_METHODS` is a comma list, e.g. "card" or "card,bank".
+ */
+export function defaultPaymentMethods(): { bank: boolean; card: boolean } {
+  const raw = readEnv("PAYMENT_METHODS", "VITE_PAYMENT_METHODS");
+  if (!raw) return { bank: false, card: true };
+  const list = raw
+    .toLowerCase()
+    .split(",")
+    .map((entry) => entry.trim());
+  return { bank: list.includes("bank") || list.includes("ach"), card: list.includes("card") };
+}
+
 export type PaymentEnvironment = "sandbox" | "production";
 
 export function paymentsProvider(): string {
