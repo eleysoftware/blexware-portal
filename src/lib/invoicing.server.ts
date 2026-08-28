@@ -292,16 +292,17 @@ export async function loadInvoiceByToken(payToken: string) {
     .eq("id", invoice.quote_id)
     .maybeSingle();
 
+  await ensureInvoiceScheduleForQuote(invoice.quote_id as string);
+
   const { data: agreement } = await db
     .from("agreements")
     .select("id, agreement_number, total_cents")
     .eq("quote_id", invoice.quote_id)
-    .neq("status", "void")
+    .eq("status", "signed")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (agreement?.id) await createInvoiceSchedule(agreement.id as string);
   const project = await getProjectPaymentSummary(invoice.quote_id as string);
 
   return {
