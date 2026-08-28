@@ -128,6 +128,12 @@ function InvoicePage() {
   const paid = data.status === "paid";
   const balance = data.balanceCents;
   const project = invoice.data?.project;
+  // Offer a full-balance payment only when later installments are still owed.
+  const canPayInFull = Boolean(
+    project && project.installments.length > 1 && project.balanceCents > balance,
+  );
+  const payAmountCents = canPayInFull && scope === "project" ? project!.balanceCents : balance;
+
 
   return (
     <>
