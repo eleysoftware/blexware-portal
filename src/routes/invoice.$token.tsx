@@ -97,7 +97,8 @@ function InvoicePage() {
     if (enabledMethods.length && !enabledMethods.includes(method)) {
       setMethod(enabledMethods[0]!);
     }
-  }, [enabledMethods, method]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabledMethods.join(","), method]);
 
   if (invoice.isLoading) {
     return (
