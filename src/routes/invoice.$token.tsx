@@ -272,7 +272,9 @@ function InvoicePage() {
             </>
           ) : (
             <fieldset className="mt-8">
-              <legend className="text-sm font-semibold">How would you like to pay?</legend>
+              <legend className="text-sm font-semibold">
+                {enabledMethods.length > 1 ? "How would you like to pay?" : "Payment method"}
+              </legend>
               <div className="mt-3 space-y-3">
                 {(
                   [
@@ -295,7 +297,7 @@ function InvoicePage() {
                     testId: string;
                   }[]
                 )
-                  .filter((option) => !unavailable.includes(option.value))
+                  .filter((option) => enabledMethods.includes(option.value))
                   .map((option) => (
                   <label
                     key={option.value}
