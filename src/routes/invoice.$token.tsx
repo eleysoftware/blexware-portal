@@ -46,6 +46,7 @@ function InvoicePage() {
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [method, setMethod] = useState<"bank" | "card">("card");
+  const [scope, setScope] = useState<"invoice" | "project">("invoice");
   const [unavailable, setUnavailable] = useState<("bank" | "card")[]>([]);
   const [outcome, setOutcome] = useState<{
     status: "succeeded" | "processing";
@@ -61,7 +62,7 @@ function InvoicePage() {
   });
 
   const start = useMutation({
-    mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice } }),
+    mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice, scope } }),
     onSuccess: (result) => setSession(result as CheckoutSession),
     onError: (error: Error, choice) => {
       toast.error(error.message);
@@ -72,6 +73,7 @@ function InvoicePage() {
       }
     },
   });
+
 
   const confirm = useMutation({
     mutationFn: (reference: string) => confirmPayment({ data: { token, reference } }),
