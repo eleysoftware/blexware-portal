@@ -491,7 +491,12 @@ export async function applyPaymentStatus(input: {
 
   if (input.status === "succeeded" && !alreadySucceeded) {
     const credited = Number(input.amountCents ?? attempt.amount_cents);
-    const paid = Number(invoice.amount_paid_cents ?? 0) + credited;
+    const invoiceBalance = Math.max(
+      0,
+      Number(invoice.amount_cents) - Number(invoice.amount_paid_cents ?? 0),
+    );
+    const appliedHere = Math.min(credited, invoiceBalance);
+    const paid = Number(invoice.amount_paid_cents ?? 0) + appliedHere;
     const balance = Math.max(0, Number(invoice.amount_cents) - paid);
     const nextStatus = balance === 0 ? "paid" : "partially_paid";
 
@@ -504,8 +509,20 @@ export async function applyPaymentStatus(input: {
       })
       .eq("id", invoice.id);
 
+    // A full-balance payment covers later installments too — settle them in
+    // sequence order instead of leaving them scheduled for a future email.
+    const overflow = credited - appliedHere;
+    if (overflow > 0) {
+      await settleRemainingInstallments({
+        quoteId: invoice.quote_id as string,
+        excludeInvoiceId: invoice.id as string,
+        amountCents: overflow,
+      });
+    }
+
     // Re-render the invoice document so downloads show the new paid/balance state.
     await renderInvoiceDocument(invoice.id as string);
+
 
     const project = await getProjectPaymentSummary(invoice.quote_id as string);
     const nextInstallment = project.installments.find((row) => row.balanceCents > 0);
