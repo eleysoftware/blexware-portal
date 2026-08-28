@@ -353,6 +353,7 @@ export async function markInvoiceViewed(invoiceId: string, status: string, viewe
 export async function startInvoicePayment(
   payToken: string,
   method: "bank" | "card" = "bank",
+  scope: "invoice" | "project" = "invoice",
 ) {
   const { PaymentService } = await import("@/lib/payments/service.server");
   const { getPaymentMethodSettings } = await import("@/lib/settings.server");
@@ -368,13 +369,15 @@ export async function startInvoicePayment(
   const loaded = await loadInvoiceByToken(payToken);
   if (!loaded) throw new Error("Invoice not found");
 
-  const { invoice, quote } = loaded;
+  const { invoice, quote, project } = loaded;
   const status = String(invoice["status"]);
   if (!OPEN_STATUSES.includes(status)) {
     throw new Error("This invoice is not open for payment.");
   }
-  const amountCents = balanceOf(invoice);
+  const invoiceBalance = balanceOf(invoice);
+  const amountCents = scope === "project" ? Math.max(invoiceBalance, project.balanceCents) : invoiceBalance;
   if (amountCents <= 0) throw new Error("This invoice is already paid in full.");
+
 
   const { data: attempt, error: attemptError } = await db
     .from("invoice_payments")
