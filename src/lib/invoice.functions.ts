@@ -14,15 +14,21 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
     guarded("getInvoiceByToken", "loading the invoice", async ({ data }) => {
       const { loadInvoiceByToken, markInvoiceViewed } = await import("@/lib/invoicing.server");
       const { isPaymentsConfigured } = await import("@/lib/payments/hyperswitch.server");
+      const { getPaymentMethodSettings } = await import("@/lib/settings.server");
 
       const loaded = await loadInvoiceByToken(data.token);
-      if (!loaded) return { invoice: null, client: null, paymentsEnabled: false, doc: null };
+      if (!loaded) {
+        return { invoice: null, client: null, paymentsEnabled: false, doc: null, availableMethods: [] };
+      }
 
       const { invoice, quote, agreement } = loaded;
       const status = String(invoice["status"]);
       if (HIDDEN_STATUSES.includes(status)) {
-        return { invoice: null, client: null, paymentsEnabled: false };
+        return { invoice: null, client: null, paymentsEnabled: false, availableMethods: [] };
       }
+
+      const methods = await getPaymentMethodSettings();
+      const availableMethods = (["bank", "card"] as const).filter((method) => methods[method]);
 
       await markInvoiceViewed(invoice["id"] as string, status, invoice["viewed_at"]);
 
