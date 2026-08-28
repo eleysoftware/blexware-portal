@@ -48,7 +48,9 @@ export type CheckoutSession = {
   environment: "sandbox" | "production";
   amountCents: number;
   method: "bank" | "card";
+  scope?: "invoice" | "project";
   reference: string;
+
 };
 
 /**
