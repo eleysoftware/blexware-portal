@@ -181,9 +181,11 @@ export const deleteQuotePermanently = createServerFn({ method: "POST" })
   .validator((data: { id: string; confirmQuoteNumber: string }) => data)
   .handler(
     guarded("deleteQuotePermanently", "deleting the quote", async ({ data, context }) => {
-      const { requireAdmin, adminDb, writeAudit, QUOTE_BUCKET, DOCUMENT_BUCKET } = await import(
+      const { requireAdmin, adminDb, writeAudit, QUOTE_BUCKET } = await import(
         "@/lib/blex.server"
       );
+      const { DOCUMENT_BUCKET } = await import("@/lib/document-storage.server");
+
       await requireAdmin(context.supabase, context.userId);
       const db = adminDb();
 
