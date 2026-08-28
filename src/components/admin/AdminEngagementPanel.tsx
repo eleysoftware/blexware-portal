@@ -1281,6 +1281,25 @@ export function AdminEngagementPanel({
                     </ul>
                   ) : null}
 
+                  {abandoned.length ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-xs text-slate underline underline-offset-2"
+                      onClick={() =>
+                        setShowAbandoned((current) => ({
+                          ...current,
+                          [invoice.id as string]: !current[invoice.id as string],
+                        }))
+                      }
+                    >
+                      {showAbandoned[invoice.id as string] ? "Hide" : "Show"} {abandoned.length}{" "}
+                      unfinished checkout {abandoned.length === 1 ? "attempt" : "attempts"} (no money
+                      moved)
+                    </button>
+                  ) : null}
+
+
+
 
                   {balance > 0 ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
