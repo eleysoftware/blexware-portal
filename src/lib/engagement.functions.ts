@@ -997,6 +997,38 @@ export const getPaymentSettlement = createServerFn({ method: "POST" })
   );
 
 
+/** Which payment methods clients can currently choose from. */
+export const getPaymentMethodSettingsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+    guarded("getPaymentMethodSettings", "loading the payment settings", async ({ context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { getPaymentMethodSettings } = await import("@/lib/settings.server");
+      return getPaymentMethodSettings();
+    }),
+  );
+
+/** Turns bank (ACH) or card payments on/off for every client invoice. */
+export const setPaymentMethodEnabledFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { method: "bank" | "card"; enabled: boolean }) => {
+    if (data.method !== "bank" && data.method !== "card") throw new Error("Unknown payment method");
+    return { method: data.method, enabled: Boolean(data.enabled) };
+  })
+  .handler(
+    guarded("setPaymentMethodEnabled", "saving the payment settings", async ({ data, context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { setPaymentMethodEnabled } = await import("@/lib/settings.server");
+      return setPaymentMethodEnabled({
+        method: data.method,
+        enabled: data.enabled,
+        actorId: context.userId,
+      });
+    }),
+  );
+
 /** Seeds the live Build Financial Wellness engagement at the estimate stage. */
 export const seedWellnessProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

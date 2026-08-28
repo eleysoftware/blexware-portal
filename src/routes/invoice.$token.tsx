@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DocumentPreview } from "@/components/DocumentPreview";
@@ -45,7 +45,7 @@ function InvoicePage() {
   const confirmPayment = useServerFn(confirmInvoicePayment);
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
-  const [method, setMethod] = useState<"bank" | "card">("bank");
+  const [method, setMethod] = useState<"bank" | "card">("card");
   const [unavailable, setUnavailable] = useState<("bank" | "card")[]>([]);
   const [outcome, setOutcome] = useState<{
     status: "succeeded" | "processing";
@@ -88,6 +88,17 @@ function InvoicePage() {
     },
   });
 
+  // Methods the admin currently offers, minus any the gateway rejected live.
+  const enabledMethods = ((invoice.data?.availableMethods ?? []) as ("bank" | "card")[]).filter(
+    (value) => !unavailable.includes(value),
+  );
+
+  useEffect(() => {
+    if (enabledMethods.length && !enabledMethods.includes(method)) {
+      setMethod(enabledMethods[0]!);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabledMethods.join(","), method]);
 
   if (invoice.isLoading) {
     return (
@@ -261,7 +272,9 @@ function InvoicePage() {
             </>
           ) : (
             <fieldset className="mt-8">
-              <legend className="text-sm font-semibold">How would you like to pay?</legend>
+              <legend className="text-sm font-semibold">
+                {enabledMethods.length > 1 ? "How would you like to pay?" : "Payment method"}
+              </legend>
               <div className="mt-3 space-y-3">
                 {(
                   [
@@ -284,7 +297,7 @@ function InvoicePage() {
                     testId: string;
                   }[]
                 )
-                  .filter((option) => !unavailable.includes(option.value))
+                  .filter((option) => enabledMethods.includes(option.value))
                   .map((option) => (
                   <label
                     key={option.value}

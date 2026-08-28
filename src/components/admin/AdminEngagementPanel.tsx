@@ -36,7 +36,10 @@ import {
   sendEstimate,
   sendInvoiceNow,
   suggestInvoiceSchedule,
+  getPaymentMethodSettingsFn,
+  setPaymentMethodEnabledFn,
 } from "@/lib/engagement.functions";
+import { Switch } from "@/components/ui/switch";
 
 
 import { getAiStatus } from "@/lib/admin.functions";
@@ -81,6 +84,21 @@ export function AdminEngagementPanel({
   const engagement = useQuery({
     queryKey: ["engagement-admin", quoteId],
     queryFn: () => fetchEngagement({ data: { quoteId } }),
+  });
+
+  const paymentMethods = useQuery({
+    queryKey: ["payment-method-settings"],
+    queryFn: () => getPaymentMethodSettingsFn(),
+  });
+
+  const paymentMethodMutation = useMutation({
+    mutationFn: (input: { method: "bank" | "card"; enabled: boolean }) =>
+      setPaymentMethodEnabledFn({ data: input }),
+    onSuccess: (result) => {
+      queryClient.setQueryData(["payment-method-settings"], result);
+      toast.success("Payment methods updated.");
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const aiStatus = useQuery({
@@ -1077,6 +1095,39 @@ export function AdminEngagementPanel({
         </div>
       ) : tab === "sow" && !sowEstimate ? (
         <TabEmptyState message={getTabEmptyState("sow", "admin")} />
+      ) : null}
+
+      {tab === "invoices" ? (
+        <div className="mb-6 rounded-2xl border border-border bg-background p-6 shadow-card">
+          <h2 className="text-xl">Payment methods</h2>
+          <p className="mt-1 text-sm text-slate">
+            Choose what clients can select on their invoice pages. Turn Bank (ACH) on once the connector is
+            approved.
+          </p>
+          <div className="mt-4 space-y-3 text-sm">
+            {(
+              [
+                { key: "card" as const, label: "Credit or debit card" },
+                { key: "bank" as const, label: "Bank transfer (ACH)" },
+              ]
+            ).map((option) => (
+              <div
+                key={option.key}
+                className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
+              >
+                <span>{option.label}</span>
+                <Switch
+                  aria-label={`${option.label} payments enabled`}
+                  checked={Boolean(paymentMethods.data?.[option.key])}
+                  disabled={paymentMethods.isLoading || paymentMethodMutation.isPending}
+                  onCheckedChange={(enabled) =>
+                    paymentMethodMutation.mutate({ method: option.key, enabled })
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {invoices.length && tab === "invoices" ? (

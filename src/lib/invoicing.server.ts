@@ -214,6 +214,15 @@ export async function startInvoicePayment(
   method: "bank" | "card" = "bank",
 ) {
   const { PaymentService } = await import("@/lib/payments/service.server");
+  const { getPaymentMethodSettings } = await import("@/lib/settings.server");
+  const enabled = await getPaymentMethodSettings();
+  if (!enabled[method]) {
+    throw new Error(
+      method === "bank"
+        ? "Bank (ACH) payments aren't available right now. Please pay by credit or debit card."
+        : "Card payments aren't available right now. Please contact us to arrange payment.",
+    );
+  }
   const db = adminDb();
   const loaded = await loadInvoiceByToken(payToken);
   if (!loaded) throw new Error("Invoice not found");

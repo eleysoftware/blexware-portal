@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type HyperWidgets = {
-  create: (type: string, options: Record<string, unknown>) => { mount: (selector: string | HTMLElement) => void };
+  // The SDK parses this as a CSS selector string — never pass a DOM element.
+  create: (type: string, options: Record<string, unknown>) => { mount: (selector: string) => void };
 };
 type HyperInstance = {
   widgets: (options: Record<string, unknown>) => HyperWidgets;
@@ -69,7 +70,7 @@ export function HyperswitchCheckout({
   onChangeMethod?: () => void;
 }) {
 
-  const mountRef = useRef<HTMLDivElement | null>(null);
+  const MOUNT_ID = "blex-payment-element";
   const hyperRef = useRef<HyperInstance | null>(null);
   const widgetsRef = useRef<HyperWidgets | null>(null);
   const [ready, setReady] = useState(false);
@@ -85,7 +86,7 @@ export function HyperswitchCheckout({
 
     loadSdk(session.environment)
       .then(() => {
-        if (cancelled || !window.Hyper || !mountRef.current) return;
+        if (cancelled || !window.Hyper || !document.getElementById(MOUNT_ID)) return;
         const hyper = window.Hyper(session.publishableKey);
         const widgets = hyper.widgets({
           clientSecret: session.clientSecret,
@@ -96,7 +97,7 @@ export function HyperswitchCheckout({
             layout: "tabs",
             wallets: { walletReturnUrl: returnUrl },
           })
-          .mount(mountRef.current);
+          .mount(`#${MOUNT_ID}`);
         hyperRef.current = hyper;
         widgetsRef.current = widgets;
         setReady(true);
@@ -136,7 +137,7 @@ export function HyperswitchCheckout({
 
   return (
     <div className="mt-6">
-      <div ref={mountRef} className="min-h-[220px]" />
+      <div id={MOUNT_ID} className="min-h-[220px]" />
       {error ? (
         <p role="alert" className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
           {error}
