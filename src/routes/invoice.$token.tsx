@@ -88,6 +88,16 @@ function InvoicePage() {
     },
   });
 
+  // Methods the admin currently offers, minus any the gateway rejected live.
+  const enabledMethods = ((invoice.data?.availableMethods ?? []) as ("bank" | "card")[]).filter(
+    (value) => !unavailable.includes(value),
+  );
+
+  useEffect(() => {
+    if (enabledMethods.length && !enabledMethods.includes(method)) {
+      setMethod(enabledMethods[0]!);
+    }
+  }, [enabledMethods, method]);
 
   if (invoice.isLoading) {
     return (
