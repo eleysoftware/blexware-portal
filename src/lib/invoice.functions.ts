@@ -77,18 +77,20 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
 
 /** Server creates the payment (amount computed server-side) and returns only client-safe data. */
 export const beginInvoicePayment = createServerFn({ method: "POST" })
-  .validator((data: { token: string; method?: "bank" | "card" }) => {
+  .validator((data: { token: string; method?: "bank" | "card"; scope?: "invoice" | "project" }) => {
     if (!TOKEN.test(data.token)) throw new Error("Invalid link");
     const method: "bank" | "card" = data.method === "card" ? "card" : "bank";
-    return { token: data.token, method };
+    const scope: "invoice" | "project" = data.scope === "project" ? "project" : "invoice";
+    return { token: data.token, method, scope };
   })
 
   .handler(
     guarded("beginInvoicePayment", "starting the payment", async ({ data }) => {
       const { startInvoicePayment } = await import("@/lib/invoicing.server");
-      return startInvoicePayment(data.token, data.method);
+      return startInvoicePayment(data.token, data.method, data.scope);
     }),
   );
+
 
 
 /** Backend-authoritative status check after the checkout widget finishes. */

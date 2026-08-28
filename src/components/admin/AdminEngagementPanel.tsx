@@ -109,6 +109,8 @@ export function AdminEngagementPanel({
   const [estimateNote, setEstimateNote] = useState("");
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
+  const [showAbandoned, setShowAbandoned] = useState<Record<string, boolean>>({});
+
   const [startDate, setStartDate] = useState("");
   const [reviseMode, setReviseMode] = useState(false);
   const [sowAddendum, setSowAddendum] = useState("");
@@ -1107,7 +1109,17 @@ export function AdminEngagementPanel({
             {invoices.map((invoice) => {
               const paid = Number(invoice.amount_paid_cents ?? 0);
               const balance = Math.max(0, Number(invoice.amount_cents) - paid);
-              const attempts = payments.filter((payment) => payment.invoice_id === invoice.id);
+              const allAttempts = payments.filter((payment) => payment.invoice_id === invoice.id);
+              // Abandoned checkouts (client closed the page) are noise — keep them
+              // collapsed so only real money movement shows by default.
+              const abandoned = allAttempts.filter((payment) =>
+                ["created", "action_required", "expired"].includes(String(payment.status)),
+              );
+              const meaningful = allAttempts.filter((payment) => !abandoned.includes(payment));
+              const attempts = showAbandoned[invoice.id as string]
+                ? [...meaningful, ...abandoned]
+                : meaningful;
+
               return (
                 <li key={invoice.id} className="rounded-xl border border-border px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1175,9 +1187,9 @@ export function AdminEngagementPanel({
                           className="flex flex-wrap items-center justify-between gap-3"
                         >
                           <span className="text-slate">
-                            {formatMoney(Number(payment.amount_cents))} ·{" "}
-                            {payment.payment_method ?? "—"} ·{" "}
-                            {payment.hyperswitch_connector ?? "unassigned connector"}
+                            {formatMoney(Number(payment.amount_cents))}
+                            {payment.payment_method ? ` · ${payment.payment_method}` : ""}
+                            {payment.hyperswitch_connector ? ` · ${payment.hyperswitch_connector}` : ""}
                             {payment.processor_transaction_id
                               ? ` · ${payment.processor_transaction_id}`
                               : ""}
@@ -1187,7 +1199,10 @@ export function AdminEngagementPanel({
                             {payment.failure_message ? ` · ${payment.failure_message}` : ""}
                           </span>
                           <span className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">{payment.status}</Badge>
+                            <Badge variant="outline">
+                              {String(payment.status).replace(/_/g, " ")}
+                            </Badge>
+
                             {payment.hyperswitch_payment_id ? (
                               <Button
                                 size="sm"
@@ -1265,6 +1280,25 @@ export function AdminEngagementPanel({
                       ))}
                     </ul>
                   ) : null}
+
+                  {abandoned.length ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-xs text-slate underline underline-offset-2"
+                      onClick={() =>
+                        setShowAbandoned((current) => ({
+                          ...current,
+                          [invoice.id as string]: !current[invoice.id as string],
+                        }))
+                      }
+                    >
+                      {showAbandoned[invoice.id as string] ? "Hide" : "Show"} {abandoned.length}{" "}
+                      unfinished checkout {abandoned.length === 1 ? "attempt" : "attempts"} (no money
+                      moved)
+                    </button>
+                  ) : null}
+
+
 
 
                   {balance > 0 ? (

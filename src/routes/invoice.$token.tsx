@@ -46,6 +46,7 @@ function InvoicePage() {
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [method, setMethod] = useState<"bank" | "card">("card");
+  const [scope, setScope] = useState<"invoice" | "project">("invoice");
   const [unavailable, setUnavailable] = useState<("bank" | "card")[]>([]);
   const [outcome, setOutcome] = useState<{
     status: "succeeded" | "processing";
@@ -61,7 +62,9 @@ function InvoicePage() {
   });
 
   const start = useMutation({
-    mutationFn: (choice: "bank" | "card") => beginPayment({ data: { token, method: choice } }),
+    mutationFn: (choice: "bank" | "card") =>
+      beginPayment({ data: { token, method: choice, scope: canPayInFull ? scope : "invoice" } }),
+
     onSuccess: (result) => setSession(result as CheckoutSession),
     onError: (error: Error, choice) => {
       toast.error(error.message);
@@ -72,6 +75,7 @@ function InvoicePage() {
       }
     },
   });
+
 
   const confirm = useMutation({
     mutationFn: (reference: string) => confirmPayment({ data: { token, reference } }),
@@ -126,6 +130,12 @@ function InvoicePage() {
   const paid = data.status === "paid";
   const balance = data.balanceCents;
   const project = invoice.data?.project;
+  // Offer a full-balance payment only when later installments are still owed.
+  const canPayInFull = Boolean(
+    project && project.installments.length > 1 && project.balanceCents > balance,
+  );
+  const payAmountCents = canPayInFull && scope === "project" ? project!.balanceCents : balance;
+
 
   return (
     <>
@@ -296,11 +306,55 @@ function InvoicePage() {
               />
             </>
           ) : (
+            <>
+            {canPayInFull ? (
+              <fieldset className="mt-8">
+                <legend className="text-sm font-semibold">How much would you like to pay?</legend>
+                <div className="mt-3 space-y-3">
+                  {[
+                    {
+                      value: "invoice" as const,
+                      title: `This installment — ${formatMoney(balance)}`,
+                      copy: `Installment #${data.sequence} of ${project!.installments.length}.`,
+                      testId: "amount-invoice",
+                    },
+                    {
+                      value: "project" as const,
+                      title: `Pay the remaining balance in full — ${formatMoney(project!.balanceCents)}`,
+                      copy: "Settles every remaining installment on this project in one payment.",
+                      testId: "amount-project",
+                    },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-ring ${
+                        scope === option.value ? "border-primary bg-surface" : "border-border"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payment-amount"
+                        className="mt-1 accent-primary"
+                        value={option.value}
+                        checked={scope === option.value}
+                        data-testid={option.testId}
+                        onChange={() => setScope(option.value)}
+                      />
+                      <span>
+                        <span className="block font-semibold">{option.title}</span>
+                        <span className="mt-1 block text-slate">{option.copy}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             <fieldset className="mt-8">
               <legend className="text-sm font-semibold">
                 {enabledMethods.length > 1 ? "How would you like to pay?" : "Payment method"}
               </legend>
               <div className="mt-3 space-y-3">
+
                 {(
                   [
                     {
@@ -354,13 +408,15 @@ function InvoicePage() {
               >
                 {start.isPending
                   ? "Opening secure checkout…"
-                  : `Continue to pay ${formatMoney(balance)}`}
+                  : `Continue to pay ${formatMoney(payAmountCents)}`}
               </Button>
               <p className="mt-3 text-center text-xs text-slate">
                 Secure payment powered by BLEXware. We never see or store your bank or card details.
               </p>
             </fieldset>
+            </>
           )}
+
 
         </div>
       </Section>

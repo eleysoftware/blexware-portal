@@ -140,7 +140,32 @@ export async function getProjectPaymentSummary(quoteId: string): Promise<Project
   };
 }
 
+/**
+ * Marks checkout attempts the client abandoned (never reached the gateway, or
+ * stalled awaiting customer action) as expired so the admin ledger stays clean.
+ * Money is never touched — only `created`/`action_required` rows older than 30
+ * minutes are affected, so in-flight checkouts are left alone.
+ */
+export async function expireStaleAttempts(quoteId: string) {
+  const db = adminDb();
+  const { data: invoices } = await db.from("invoices").select("id").eq("quote_id", quoteId);
+  const ids = (invoices ?? []).map((row) => row.id as string);
+  if (!ids.length) return { expired: 0 };
+
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data: expired } = await db
+    .from("invoice_payments")
+    .update({ status: "expired" })
+    .in("invoice_id", ids)
+    .in("status", ["created", "action_required"])
+    .lt("created_at", cutoff)
+    .select("id");
+
+  return { expired: expired?.length ?? 0 };
+}
+
 /** Repairs a partially-created schedule without changing existing invoices. */
+
 export async function ensureInvoiceScheduleForQuote(quoteId: string) {
   const db = adminDb();
   const [{ data: agreement }, { count: existingInvoiceCount }] = await Promise.all([
@@ -328,6 +353,7 @@ export async function markInvoiceViewed(invoiceId: string, status: string, viewe
 export async function startInvoicePayment(
   payToken: string,
   method: "bank" | "card" = "bank",
+  scope: "invoice" | "project" = "invoice",
 ) {
   const { PaymentService } = await import("@/lib/payments/service.server");
   const { getPaymentMethodSettings } = await import("@/lib/settings.server");
@@ -343,13 +369,15 @@ export async function startInvoicePayment(
   const loaded = await loadInvoiceByToken(payToken);
   if (!loaded) throw new Error("Invoice not found");
 
-  const { invoice, quote } = loaded;
+  const { invoice, quote, project } = loaded;
   const status = String(invoice["status"]);
   if (!OPEN_STATUSES.includes(status)) {
     throw new Error("This invoice is not open for payment.");
   }
-  const amountCents = balanceOf(invoice);
+  const invoiceBalance = balanceOf(invoice);
+  const amountCents = scope === "project" ? Math.max(invoiceBalance, project.balanceCents) : invoiceBalance;
   if (amountCents <= 0) throw new Error("This invoice is already paid in full.");
+
 
   const { data: attempt, error: attemptError } = await db
     .from("invoice_payments")
@@ -358,7 +386,7 @@ export async function startInvoicePayment(
       amount_cents: amountCents,
       currency: String(invoice["currency"] ?? "usd"),
       status: "created",
-      metadata: { method_choice: method },
+      metadata: { method_choice: method, scope },
     })
     .select("id, payment_reference")
     .single();
@@ -401,8 +429,56 @@ export async function startInvoicePayment(
     environment: config.environment,
     amountCents,
     method,
+    scope,
     reference: attempt.payment_reference as string,
+
   };
+}
+
+/**
+ * Spreads money that exceeds the paid invoice across the remaining open
+ * installments in sequence order. Scheduled installments are issued as paid
+ * (no client email) so nothing is invoiced again later.
+ */
+async function settleRemainingInstallments(input: {
+  quoteId: string;
+  excludeInvoiceId: string;
+  amountCents: number;
+}) {
+  const db = adminDb();
+  const { data: rows } = await db
+    .from("invoices")
+    .select("id, amount_cents, amount_paid_cents, status")
+    .eq("quote_id", input.quoteId)
+    .neq("id", input.excludeInvoiceId)
+    .not("status", "in", "(void,cancelled,paid)")
+    .order("sequence");
+
+  let remaining = input.amountCents;
+  const now = new Date().toISOString();
+  for (const row of rows ?? []) {
+    if (remaining <= 0) break;
+    const owed = Math.max(0, Number(row.amount_cents) - Number(row.amount_paid_cents ?? 0));
+    if (owed <= 0) continue;
+    const applied = Math.min(owed, remaining);
+    remaining -= applied;
+    const paid = Number(row.amount_paid_cents ?? 0) + applied;
+    const settled = paid >= Number(row.amount_cents);
+    await db
+      .from("invoices")
+      .update({
+        amount_paid_cents: paid,
+        status: settled ? "paid" : "partially_paid",
+        ...(settled ? { paid_at: now } : {}),
+        ...(String(row.status) === "scheduled"
+          ? { sent_at: now, issue_date: now.slice(0, 10), scheduled_send_at: null }
+          : {}),
+      })
+      .eq("id", row.id);
+    await renderInvoiceDocument(row.id as string);
+  }
+
+  return { remainingCents: remaining };
 }
 
 
@@ -461,7 +537,12 @@ export async function applyPaymentStatus(input: {
 
   if (input.status === "succeeded" && !alreadySucceeded) {
     const credited = Number(input.amountCents ?? attempt.amount_cents);
-    const paid = Number(invoice.amount_paid_cents ?? 0) + credited;
+    const invoiceBalance = Math.max(
+      0,
+      Number(invoice.amount_cents) - Number(invoice.amount_paid_cents ?? 0),
+    );
+    const appliedHere = Math.min(credited, invoiceBalance);
+    const paid = Number(invoice.amount_paid_cents ?? 0) + appliedHere;
     const balance = Math.max(0, Number(invoice.amount_cents) - paid);
     const nextStatus = balance === 0 ? "paid" : "partially_paid";
 
@@ -474,8 +555,20 @@ export async function applyPaymentStatus(input: {
       })
       .eq("id", invoice.id);
 
+    // A full-balance payment covers later installments too — settle them in
+    // sequence order instead of leaving them scheduled for a future email.
+    const overflow = credited - appliedHere;
+    if (overflow > 0) {
+      await settleRemainingInstallments({
+        quoteId: invoice.quote_id as string,
+        excludeInvoiceId: invoice.id as string,
+        amountCents: overflow,
+      });
+    }
+
     // Re-render the invoice document so downloads show the new paid/balance state.
     await renderInvoiceDocument(invoice.id as string);
+
 
     const project = await getProjectPaymentSummary(invoice.quote_id as string);
     const nextInstallment = project.installments.find((row) => row.balanceCents > 0);
