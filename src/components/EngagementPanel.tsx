@@ -22,7 +22,69 @@ import { getTabEmptyState } from "@/lib/workflow-guidance";
 
 type DocRow = { id: string; entity: string; entity_id: string; kind: string; format: string };
 
+type PortalInvoice = {
+  id: string;
+  invoice_number: string;
+  sequence: number;
+  amount_cents: number;
+  amount_paid_cents: number | null;
+  status: string;
+  issue_date: string | null;
+  due_date: string | null;
+  pay_token: string;
+};
+
+type PortalPayment = {
+  invoice_id: string;
+  amount_cents: number;
+  payment_method: string | null;
+  status: string;
+  paid_at: string | null;
+};
+
+type ProjectSummary = {
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  installments: {
+    sequence: number;
+    amountCents: number;
+    paidCents: number;
+    balanceCents: number;
+    status: string;
+    scheduledSendAt: string | null;
+    dueDate: string | null;
+    issued: boolean;
+  }[];
+};
+
+/** Plain-language state for one invoice row, and whether the client can pay it. */
+function invoiceState(invoice: PortalInvoice): {
+  label: string;
+  tone: "default" | "secondary" | "outline" | "destructive";
+  payable: boolean;
+} {
+  const balance = Math.max(0, Number(invoice.amount_cents) - Number(invoice.amount_paid_cents ?? 0));
+  if (invoice.status === "paid" || balance === 0) return { label: "Paid", tone: "secondary", payable: false };
+  if (invoice.status === "void" || invoice.status === "cancelled") {
+    return { label: "Cancelled", tone: "outline", payable: false };
+  }
+  if (invoice.status === "scheduled" || invoice.status === "draft") {
+    return { label: "Upcoming", tone: "outline", payable: false };
+  }
+  const overdue =
+    invoice.status === "overdue" ||
+    Boolean(invoice.due_date && invoice.due_date < new Date().toISOString().slice(0, 10));
+  if (overdue) return { label: "Overdue", tone: "destructive", payable: true };
+  return {
+    label: Number(invoice.amount_paid_cents ?? 0) > 0 ? "Partly paid" : "Awaiting payment",
+    tone: "default",
+    payable: true,
+  };
+}
+
 export type ClientEngagementTab = "estimate" | "sow" | "invoices";
+
 
 export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: ClientEngagementTab }) {
   const show = (section: ClientEngagementTab) => !tab || tab === section;
