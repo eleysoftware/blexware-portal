@@ -87,7 +87,10 @@ function QuoteDetailPage() {
     guidanceContext,
   );
   // Direct-billed projects have no proposal/estimate/SOW — only show invoicing.
-  const directBilled = (detail.data?.proposals.length ?? 0) === 0 && detail.data !== undefined;
+  const directBilled =
+    detail.data !== undefined &&
+    detail.data.proposals.length === 0 &&
+    ["invoicing", "completed"].includes(String(detail.data.quote.status));
   const tabs: WorkspaceTab[] = [
     { id: "intake", label: "Intake" },
     ...(directBilled
