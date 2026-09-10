@@ -100,6 +100,7 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
   const [note, setNote] = useState("");
   const [signature, setSignature] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [completionNote, setCompletionNote] = useState("");
 
   const engagement = useQuery({
     queryKey: ["engagement", quoteId],
@@ -130,6 +131,22 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
       sign({ data: { agreementId: agreement!.id as string, fullName: signature, agreed } }),
     onSuccess: () => {
       toast.success("Signed — your first invoice is on its way by email.");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const respondCompletion = useServerFn(respondToProjectCompletion);
+  const completionMutation = useMutation({
+    mutationFn: (action: "confirm" | "request_changes") =>
+      respondCompletion({ data: { quoteId, action, note: completionNote } }),
+    onSuccess: (result) => {
+      toast.success(
+        result.completed
+          ? "Thank you — your project is closed out."
+          : "Thanks — we'll pick up the outstanding items and follow up.",
+      );
+      setCompletionNote("");
       invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
