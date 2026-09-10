@@ -37,6 +37,8 @@ function AdminDashboard() {
   const deleteQuote = useServerFn(deleteQuotePermanently);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<string[]>([]);
+
   const [converting, setConverting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const convertProposals = useServerFn(refreshProposalDocuments);
