@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { formatMoney } from "@/lib/documents/types";
+
 import {
   archiveQuote,
   deleteQuotePermanently,
@@ -37,6 +39,8 @@ function AdminDashboard() {
   const deleteQuote = useServerFn(deleteQuotePermanently);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<string[]>([]);
+
   const [converting, setConverting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const convertProposals = useServerFn(refreshProposalDocuments);
@@ -119,6 +123,49 @@ function AdminDashboard() {
 
   const counts = quotes.data?.counts ?? {};
   const viewingArchived = filter === "archived";
+  const billing = quotes.data?.billing ?? {};
+
+  // Quotes come back flat; the queue is presented grouped by client email.
+  const clients = (() => {
+    const map = new Map<
+      string,
+      {
+        email: string;
+        name: string;
+        company: string | null;
+        outstandingCents: number;
+        lastActivity: string;
+        quotes: NonNullable<typeof quotes.data>["quotes"];
+      }
+    >();
+    for (const quote of quotes.data?.quotes ?? []) {
+      const email = String(quote.contact_email ?? "").toLowerCase();
+      const created = String(quote.created_at ?? "");
+      const entry = map.get(email) ?? {
+        email,
+        name: String(quote.contact_name ?? email),
+        company: (quote.company as string | null) ?? null,
+        outstandingCents: 0,
+        lastActivity: created,
+        quotes: [],
+      };
+      entry.quotes.push(quote);
+      entry.outstandingCents += billing[quote.id as string]?.outstandingCents ?? 0;
+      if (created > entry.lastActivity) {
+        entry.lastActivity = created;
+        entry.name = String(quote.contact_name ?? email);
+        entry.company = (quote.company as string | null) ?? null;
+      }
+      map.set(email, entry);
+    }
+    return [...map.values()].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  })();
+
+  // A search that lands on a specific quote opens that client automatically.
+  const searching = search.trim().length > 0;
+  const isOpen = (email: string) =>
+    expanded.includes(email) || (searching && clients.length <= 3) || clients.length === 1;
+
 
   return (
     <>
@@ -191,101 +238,152 @@ function AdminDashboard() {
           />
         </div>
 
-        <div className="mt-8 overflow-x-auto rounded-2xl border border-border bg-background shadow-card">
-          <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="border-b border-border text-xs uppercase tracking-wide text-slate">
-              <tr>
-                <th className="px-5 py-4">Quote</th>
-                <th className="px-5 py-4">Contact</th>
-                <th className="px-5 py-4">Project</th>
-                <th className="px-5 py-4">Budget</th>
-                <th className="px-5 py-4">Status</th>
-                <th className="px-5 py-4">Received</th>
-                <th className="px-5 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quotes.isLoading ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-8 text-slate">
-                    Loading quotes…
-                  </td>
-                </tr>
-              ) : (quotes.data?.quotes.length ?? 0) === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-8 text-slate">
-                    {viewingArchived
-                      ? "Nothing is archived right now."
-                      : "No quote requests match this view yet."}
-                  </td>
-                </tr>
-              ) : (
-                quotes.data?.quotes.map((quote) => {
-                  const id = quote.id as string;
-                  const label = String(quote.quote_number);
-                  const archived = Boolean(quote.deleted_at);
-                  return (
-                    <tr key={id} className="border-b border-border/60 last:border-0">
-                      <td className="px-5 py-4 font-medium">
-                        <Link
-                          to="/admin/quotes/$id"
-                          params={{ id }}
-                          className="text-primary underline-offset-4 hover:underline"
-                        >
-                          {label}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="block">{quote.contact_name}</span>
-                        <span className="text-xs text-slate">
-                          {quote.company ?? quote.contact_email}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-slate">
-                        {quote.project_type} · {quote.industry}
-                      </td>
-                      <td className="px-5 py-4 text-slate">{quote.budget}</td>
-                      <td className="px-5 py-4">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary">
-                            {quoteStatusLabels[quote.status as keyof typeof quoteStatusLabels]}
-                          </Badge>
-                          {archived ? <Badge variant="outline">Archived</Badge> : null}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-slate">
-                        {new Date(quote.created_at as string).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busyId === id}
-                            onClick={() => void toggleArchive(id, !archived, label)}
-                          >
-                            {archived ? "Restore" : "Archive"}
-                          </Button>
-                          {archived ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              disabled={busyId === id}
-                              onClick={() => void permanentlyDelete(id, label)}
-                            >
-                              Delete
-                            </Button>
-                          ) : null}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+        <div className="mt-8 space-y-4">
+          {quotes.isLoading ? (
+            <p className="text-slate">Loading clients…</p>
+          ) : clients.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-background p-8 text-slate shadow-card">
+              {viewingArchived
+                ? "Nothing is archived right now."
+                : "No clients match this view yet."}
+            </div>
+          ) : (
+            clients.map((client) => {
+              const open = isOpen(client.email);
+              return (
+                <div
+                  key={client.email}
+                  className="overflow-hidden rounded-2xl border border-border bg-background shadow-card"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpanded((current) =>
+                        current.includes(client.email)
+                          ? current.filter((value) => value !== client.email)
+                          : [...current, client.email],
+                      )
+                    }
+                    aria-expanded={open}
+                    className="flex w-full flex-wrap items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-surface"
+                  >
+                    <span>
+                      <span className="block font-semibold text-foreground">
+                        {client.company ?? client.name}
+                      </span>
+                      <span className="block text-xs text-slate">
+                        {client.name} · {client.email}
+                      </span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-4 text-sm text-slate">
+                      <span>
+                        {client.quotes.length} project{client.quotes.length === 1 ? "" : "s"}
+                      </span>
+                      <span
+                        className={
+                          client.outstandingCents > 0 ? "font-semibold text-foreground" : undefined
+                        }
+                      >
+                        {client.outstandingCents > 0
+                          ? `${formatMoney(client.outstandingCents)} outstanding`
+                          : "Nothing outstanding"}
+                      </span>
+                      <span className="text-xs">
+                        Last activity {new Date(client.lastActivity).toLocaleDateString()}
+                      </span>
+                      <span aria-hidden>{open ? "▴" : "▾"}</span>
+                    </span>
+                  </button>
+
+                  {open ? (
+                    <div className="overflow-x-auto border-t border-border">
+                      <table className="w-full min-w-[860px] text-left text-sm">
+                        <thead className="border-b border-border text-xs uppercase tracking-wide text-slate">
+                          <tr>
+                            <th className="px-5 py-3">Quote</th>
+                            <th className="px-5 py-3">Project</th>
+                            <th className="px-5 py-3">Budget</th>
+                            <th className="px-5 py-3">Status</th>
+                            <th className="px-5 py-3">Outstanding</th>
+                            <th className="px-5 py-3">Received</th>
+                            <th className="px-5 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {client.quotes.map((quote) => {
+                            const id = quote.id as string;
+                            const label = String(quote.quote_number);
+                            const archived = Boolean(quote.deleted_at);
+                            const owed = billing[id]?.outstandingCents ?? 0;
+                            return (
+                              <tr key={id} className="border-b border-border/60 last:border-0">
+                                <td className="px-5 py-4 font-medium">
+                                  <Link
+                                    to="/admin/quotes/$id"
+                                    params={{ id }}
+                                    className="text-primary underline-offset-4 hover:underline"
+                                  >
+                                    {label}
+                                  </Link>
+                                </td>
+                                <td className="px-5 py-4 text-slate">
+                                  {quote.project_type} · {quote.industry}
+                                </td>
+                                <td className="px-5 py-4 text-slate">{quote.budget}</td>
+                                <td className="px-5 py-4">
+                                  <span className="flex flex-wrap items-center gap-2">
+                                    <Badge variant="secondary">
+                                      {
+                                        quoteStatusLabels[
+                                          quote.status as keyof typeof quoteStatusLabels
+                                        ]
+                                      }
+                                    </Badge>
+                                    {archived ? <Badge variant="outline">Archived</Badge> : null}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4 text-slate">
+                                  {owed > 0 ? formatMoney(owed) : "—"}
+                                </td>
+                                <td className="px-5 py-4 text-slate">
+                                  {new Date(quote.created_at as string).toLocaleDateString()}
+                                </td>
+                                <td className="px-5 py-4">
+                                  <span className="flex justify-end gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={busyId === id}
+                                      onClick={() => void toggleArchive(id, !archived, label)}
+                                    >
+                                      {archived ? "Restore" : "Archive"}
+                                    </Button>
+                                    {archived ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive"
+                                        disabled={busyId === id}
+                                        onClick={() => void permanentlyDelete(id, label)}
+                                      >
+                                        Delete
+                                      </Button>
+                                    ) : null}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </div>
+
 
         <PaymentMethodSettingsCard />
 

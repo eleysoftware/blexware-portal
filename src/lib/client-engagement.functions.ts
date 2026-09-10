@@ -27,7 +27,8 @@ export const getMyEngagement = createServerFn({ method: "POST" })
     guarded("getMyEngagement", "loading your documents", async ({ data, context }) => {
       const db = viewerDb(context.supabase);
 
-      const [estimates, agreements, invoices, documents] = await Promise.all([
+      const [quote, estimates, agreements, invoices, documents] = await Promise.all([
+        db.from("quotes").select("id").eq("id", data.quoteId).maybeSingle(),
         db
           .from("estimates")
           .select("id, status, doc, total_cents, duration_note, sent_at, expires_at, responded_at, response_note")
@@ -40,7 +41,9 @@ export const getMyEngagement = createServerFn({ method: "POST" })
           .order("created_at", { ascending: false }),
         db
           .from("invoices")
-          .select("id, invoice_number, sequence, amount_cents, status, due_date, sent_at, paid_at, pay_token")
+          .select(
+            "id, invoice_number, sequence, amount_cents, amount_paid_cents, currency, description, status, issue_date, due_date, sent_at, paid_at, pay_token",
+          )
           .eq("quote_id", data.quoteId)
           .order("sequence"),
         db
@@ -50,14 +53,46 @@ export const getMyEngagement = createServerFn({ method: "POST" })
           .order("created_at", { ascending: false }),
       ]);
 
+      // Only once the quote itself is proven visible do we read the schedule
+      // and payment records with elevated access.
+      let project: Awaited<
+        ReturnType<(typeof import("@/lib/invoicing.server"))["getProjectPaymentSummary"]>
+      > | null = null;
+      let payments: {
+        invoice_id: string;
+        amount_cents: number;
+        payment_method: string | null;
+        status: string;
+        paid_at: string | null;
+      }[] = [];
+
+      if (quote.data) {
+        const { getProjectPaymentSummary } = await import("@/lib/invoicing.server");
+        project = await getProjectPaymentSummary(data.quoteId);
+
+        const invoiceIds = ((invoices.data ?? []) as { id: string }[]).map((row) => row.id);
+        if (invoiceIds.length) {
+          const { data: paymentRows } = await db
+            .from("invoice_payments")
+            .select("invoice_id, amount_cents, payment_method, status, paid_at")
+            .in("invoice_id", invoiceIds)
+            .eq("status", "succeeded")
+            .order("paid_at", { ascending: false });
+          payments = (paymentRows ?? []) as typeof payments;
+        }
+      }
+
       return {
         estimate: (estimates.data ?? [])[0] ?? null,
         agreement: (agreements.data ?? [])[0] ?? null,
         invoices: invoices.data ?? [],
         documents: documents.data ?? [],
+        payments,
+        project,
       };
     }),
   );
+
 
 export const getMyDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

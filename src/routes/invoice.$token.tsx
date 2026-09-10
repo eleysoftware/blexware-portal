@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -16,6 +16,11 @@ import { beginInvoicePayment, confirmInvoicePayment, getInvoiceByToken } from "@
 
 export const Route = createFileRoute("/invoice/$token")({
   ssr: false,
+  // Only same-site portal destinations are honoured as a "back" target.
+  validateSearch: (search: Record<string, unknown>) => {
+    const value = typeof search["return"] === "string" ? search["return"] : "";
+    return { return: /^\/portal\/quotes\/[0-9a-f-]{36}$/i.test(value) ? value : "" };
+  },
   head: () => ({
     meta: [
       { title: "Pay your invoice — BLEXware" },
@@ -30,6 +35,7 @@ export const Route = createFileRoute("/invoice/$token")({
   component: InvoicePage,
 });
 
+
 function statusLabel(status: string): string {
   return status
     .split("_")
@@ -37,8 +43,26 @@ function statusLabel(status: string): string {
     .join(" ");
 }
 
+/** Link back to the project this invoice belongs to, when the client came from the portal. */
+function BackToProject({ returnTo, label }: { returnTo: string; label: string }) {
+  const id = returnTo.split("/").pop() ?? "";
+  if (!id) return null;
+  return (
+    <Link
+      to="/portal/quotes/$id"
+      params={{ id }}
+      className="text-sm text-primary underline"
+      data-testid="invoice-back-to-project"
+    >
+      {label}
+    </Link>
+  );
+}
+
 function InvoicePage() {
   const { token } = Route.useParams();
+  const { return: returnTo } = Route.useSearch();
+
   const queryClient = useQueryClient();
   const fetchInvoice = useServerFn(getInvoiceByToken);
   const beginPayment = useServerFn(beginInvoicePayment);
@@ -145,6 +169,16 @@ function InvoicePage() {
         description={`${client?.company ?? client?.name ?? ""} · project ${client?.quoteNumber ?? ""}`}
       />
       <Section tone="surface">
+        <div className="mx-auto mb-6 max-w-3xl">
+          {returnTo ? (
+            <BackToProject returnTo={returnTo} label="← Back to your project" />
+          ) : (
+            <Link to="/portal" className="text-sm text-primary underline">
+              Sign in to your portal to see all your invoices
+            </Link>
+          )}
+        </div>
+
         {invoice.data?.doc ? (
           <div className="mx-auto mb-8 max-w-3xl">
             <DocumentPreview doc={invoice.data.doc} />
@@ -269,7 +303,13 @@ function InvoicePage() {
                   ? "A receipt has been emailed to you."
                   : "We'll update this invoice and email you once your bank confirms the payment."}
               </p>
+              {returnTo ? (
+                <p className="mt-3">
+                  <BackToProject returnTo={returnTo} label="Return to your project" />
+                </p>
+              ) : null}
             </div>
+
           ) : null}
 
           {paid ? (

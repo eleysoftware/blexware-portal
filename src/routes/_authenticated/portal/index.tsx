@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getViewerRole } from "@/lib/auth.functions";
+import { formatMoney } from "@/lib/documents/types";
+
 import { listMyQuotes } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
 
@@ -59,6 +61,9 @@ function PortalHome() {
     );
   }
 
+  const totals = quotes.data?.totals;
+  const billing = quotes.data?.billing ?? {};
+
   return (
     <>
       <PageHero
@@ -67,7 +72,19 @@ function PortalHome() {
         description={`Signed in as ${role.data?.email ?? ""}. Quotes submitted with this email address appear here.`}
       />
       <Section tone="surface">
-        <div className="mb-6 flex justify-end">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          {totals ? (
+            <p className="text-sm text-slate" data-testid="account-billing-summary">
+              <span className="font-semibold text-foreground">{formatMoney(totals.paidCents)}</span>{" "}
+              paid to date ·{" "}
+              <span className="font-semibold text-foreground">
+                {formatMoney(totals.outstandingCents)}
+              </span>{" "}
+              currently outstanding
+            </p>
+          ) : (
+            <span />
+          )}
           <Button variant="outline" onClick={signOut}>
             Sign out
           </Button>
@@ -87,30 +104,55 @@ function PortalHome() {
           </div>
         ) : (
           <ul className="grid gap-4">
-            {quotes.data?.quotes.map((quote) => (
-              <li key={quote.id}>
-                <Link
-                  to="/portal/quotes/$id"
-                  params={{ id: quote.id as string }}
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-6 shadow-card transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {quote.quote_number} — {quote.project_type}
-                    </p>
-                    <p className="mt-1 text-xs text-slate">
-                      {quote.industry} · {quote.budget} · {quote.timeline}
-                    </p>
-                  </div>
-                  <Badge variant="secondary">
-                    {quoteStatusLabels[quote.status as QuoteStatus] ?? quote.status}
-                  </Badge>
-                </Link>
-              </li>
-            ))}
+            {quotes.data?.quotes.map((quote) => {
+              const money = billing[quote.id as string];
+              return (
+                <li key={quote.id}>
+                  <Link
+                    to="/portal/quotes/$id"
+                    params={{ id: quote.id as string }}
+                    className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-6 shadow-card transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {quote.quote_number} — {quote.project_type}
+                      </p>
+                      <p className="mt-1 text-xs text-slate">
+                        {quote.industry} · {quote.budget} · {quote.timeline}
+                      </p>
+                      <p className="mt-2 text-xs">
+                        {!money || money.billedCents === 0 ? (
+                          <span className="text-slate">No invoices yet</span>
+                        ) : money.outstandingCents === 0 ? (
+                          <span className="text-slate">
+                            Paid in full · {formatMoney(money.paidCents)}
+                          </span>
+                        ) : (
+                          <span
+                            className={
+                              money.payableCount ? "font-semibold text-primary" : "text-slate"
+                            }
+                          >
+                            {formatMoney(money.outstandingCents)} outstanding
+                            {money.payableCount
+                              ? ` · ${money.payableCount} invoice${money.payableCount === 1 ? "" : "s"} to pay`
+                              : ""}
+                            {money.overdueCount ? " · overdue" : ""}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <Badge variant="secondary">
+                      {quoteStatusLabels[quote.status as QuoteStatus] ?? quote.status}
+                    </Badge>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Section>
     </>
   );
 }
+
