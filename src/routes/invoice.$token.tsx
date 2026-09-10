@@ -169,6 +169,16 @@ function InvoicePage() {
         description={`${client?.company ?? client?.name ?? ""} · project ${client?.quoteNumber ?? ""}`}
       />
       <Section tone="surface">
+        <div className="mx-auto mb-6 max-w-3xl">
+          {returnTo ? (
+            <BackToProject returnTo={returnTo} label="← Back to your project" />
+          ) : (
+            <Link to="/portal" className="text-sm text-primary underline">
+              Sign in to your portal to see all your invoices
+            </Link>
+          )}
+        </div>
+
         {invoice.data?.doc ? (
           <div className="mx-auto mb-8 max-w-3xl">
             <DocumentPreview doc={invoice.data.doc} />
