@@ -114,9 +114,13 @@ function QuoteDetailPage() {
   useEffect(() => {
     if (!loadedStatus || autoTabbed.current) return;
     autoTabbed.current = true;
+    if (directBilled) {
+      setTab("invoices");
+      return;
+    }
     const step = getNextStep(loadedStatus, "admin");
     if (step.actionable) setTab(step.tab);
-  }, [loadedStatus]);
+  }, [loadedStatus, directBilled]);
 
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
