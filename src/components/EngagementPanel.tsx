@@ -435,6 +435,48 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
         )
       ) : null}
 
+      {show("invoices") && quoteRow ? (
+        quoteRow.completed_at ? (
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-xl">Project complete</h2>
+            <p className="mt-2 text-sm text-slate">
+              Closed out on {new Date(quoteRow.completed_at).toLocaleDateString()}. Thank you for
+              working with us.
+            </p>
+          </div>
+        ) : quoteRow.completion_requested_at ? (
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-xl">Confirm your project is complete</h2>
+            <p className="mt-2 text-sm text-slate">
+              {quoteRow.completion_note ??
+                "We believe everything has been delivered. Confirm below, or tell us what's still outstanding."}
+            </p>
+            <Textarea
+              className="mt-4"
+              rows={3}
+              placeholder="Anything still outstanding? (required if you're asking for changes)"
+              value={completionNote}
+              onChange={(event) => setCompletionNote(event.target.value)}
+            />
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button
+                disabled={completionMutation.isPending}
+                onClick={() => completionMutation.mutate("confirm")}
+              >
+                Confirm the work is complete
+              </Button>
+              <Button
+                variant="outline"
+                disabled={completionMutation.isPending}
+                onClick={() => completionMutation.mutate("request_changes")}
+              >
+                Something's still outstanding
+              </Button>
+            </div>
+          </div>
+        ) : null
+      ) : null}
+
     </div>
   );
 }
