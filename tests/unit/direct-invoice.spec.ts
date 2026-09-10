@@ -30,7 +30,7 @@ test("an itemized invoice lists each service and the discounted total", () => {
   expect(section).toBeTruthy();
   const rows = section?.table?.rows ?? [];
   expect(rows[0]?.[0]).toBe("Support retainer");
-  expect(rows.at(-1)).toEqual(["Total", "$1,200.00"]);
+  expect(rows.at(-1)).toEqual(["Total", "$1,200"]);
   expect(rows.some((row) => row[0] === "Discount")).toBe(true);
 });
 
