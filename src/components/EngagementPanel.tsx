@@ -244,50 +244,123 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
         <TabEmptyState message={getTabEmptyState("sow", "client")} />
       ) : null}
 
-      {invoices.length && show("invoices") ? (
-        <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">Invoices</h2>
-          <ul className="mt-4 space-y-3">
-            {invoices.map((invoice) => (
-              <li
-                key={invoice.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm"
-              >
+      {show("invoices") ? (
+        invoices.length ? (
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate">Billing</h2>
+
+            {project ? (
+              <dl className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div>
-                  <p className="font-medium">{invoice.invoice_number}</p>
-                  <p className="text-xs text-slate">
-                    Installment #{invoice.sequence}
-                    {invoice.due_date
-                      ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
-                      : ""}
-                  </p>
+                  <dt className="text-xs uppercase tracking-wide text-slate">Project total</dt>
+                  <dd className="mt-1 text-lg font-semibold">{formatMoney(project.totalCents)}</dd>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold">{formatMoney(Number(invoice.amount_cents))}</span>
-                  <DownloadRow docs={docsFor("invoice", invoice.id)} onOpen={openDoc} />
-                  {invoice.status === "paid" ? (
-                    <Badge variant="secondary">Paid</Badge>
-                  ) : (
-                    <a
-                      href={`/invoice/${invoice.pay_token}`}
-                      data-testid="invoice-pay-link"
-                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
-                    >
-                      Pay now
-                    </a>
-                  )}
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate">Paid to date</dt>
+                  <dd className="mt-1 text-lg font-semibold">{formatMoney(project.paidCents)}</dd>
                 </div>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-slate">
-            Work begins once the first invoice is paid; the remaining invoices are issued every two
-            weeks.
-          </p>
-        </div>
-      ) : tab === "invoices" ? (
-        <TabEmptyState message={getTabEmptyState("invoices", "client")} />
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate">Remaining balance</dt>
+                  <dd className="mt-1 text-lg font-semibold" data-testid="portal-project-balance">
+                    {formatMoney(project.balanceCents)}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
+
+            <ul className="mt-6 space-y-3">
+              {sortedInvoices.map((invoice) => {
+                const amount = Number(invoice.amount_cents);
+                const paidCents = Number(invoice.amount_paid_cents ?? 0);
+                const balance = Math.max(0, amount - paidCents);
+                const state = invoiceState(invoice);
+                const payment = payments.find((row) => row.invoice_id === invoice.id) ?? null;
+                return (
+                  <li
+                    key={invoice.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">{invoice.invoice_number}</p>
+                      <p className="text-xs text-slate">
+                        Installment #{invoice.sequence}
+                        {invoice.issue_date
+                          ? ` · issued ${new Date(invoice.issue_date).toLocaleDateString()}`
+                          : ""}
+                        {invoice.due_date
+                          ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
+                          : ""}
+                      </p>
+                      {payment ? (
+                        <p className="text-xs text-slate">
+                          Paid
+                          {payment.paid_at
+                            ? ` ${new Date(payment.paid_at).toLocaleDateString()}`
+                            : ""}
+                          {payment.payment_method ? ` · ${payment.payment_method}` : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="font-semibold">{formatMoney(amount)}</span>
+                      {paidCents > 0 && balance > 0 ? (
+                        <span className="text-xs text-slate">
+                          {formatMoney(paidCents)} paid · {formatMoney(balance)} left
+                        </span>
+                      ) : null}
+                      <DownloadRow docs={docsFor("invoice", invoice.id)} onOpen={openDoc} />
+                      <Badge variant={state.tone}>{state.label}</Badge>
+                      {state.payable ? (
+                        <Link
+                          to="/invoice/$token"
+                          params={{ token: invoice.pay_token }}
+                          search={{ return: `/portal/quotes/${quoteId}` }}
+                          data-testid="invoice-pay-link"
+                          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                        >
+                          Pay
+                        </Link>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {upcoming.length ? (
+              <div className="mt-6 border-t border-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate">
+                  Upcoming installments
+                </p>
+                <ul className="mt-3 space-y-2 text-sm text-slate">
+                  {upcoming.map((installment) => (
+                    <li key={installment.sequence} className="flex justify-between gap-3">
+                      <span>Installment #{installment.sequence}</span>
+                      <span>
+                        {formatMoney(installment.amountCents)}
+                        {installment.scheduledSendAt
+                          ? ` · sends ${new Date(installment.scheduledSendAt).toLocaleDateString()}`
+                          : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-slate">
+                  These aren't payable yet — we'll email each one when it's issued.
+                </p>
+              </div>
+            ) : null}
+
+            <p className="mt-4 text-xs text-slate">
+              Work begins once the first invoice is paid; the remaining invoices are issued on the
+              schedule above.
+            </p>
+          </div>
+        ) : (
+          <TabEmptyState message={getTabEmptyState("invoices", "client")} />
+        )
       ) : null}
+
     </div>
   );
 }
