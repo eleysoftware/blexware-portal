@@ -43,8 +43,26 @@ function statusLabel(status: string): string {
     .join(" ");
 }
 
+/** Link back to the project this invoice belongs to, when the client came from the portal. */
+function BackToProject({ returnTo, label }: { returnTo: string; label: string }) {
+  const id = returnTo.split("/").pop() ?? "";
+  if (!id) return null;
+  return (
+    <Link
+      to="/portal/quotes/$id"
+      params={{ id }}
+      className="text-sm text-primary underline"
+      data-testid="invoice-back-to-project"
+    >
+      {label}
+    </Link>
+  );
+}
+
 function InvoicePage() {
   const { token } = Route.useParams();
+  const { return: returnTo } = Route.useSearch();
+
   const queryClient = useQueryClient();
   const fetchInvoice = useServerFn(getInvoiceByToken);
   const beginPayment = useServerFn(beginInvoicePayment);
