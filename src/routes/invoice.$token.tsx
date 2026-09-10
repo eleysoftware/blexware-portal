@@ -303,7 +303,13 @@ function InvoicePage() {
                   ? "A receipt has been emailed to you."
                   : "We'll update this invoice and email you once your bank confirms the payment."}
               </p>
+              {returnTo ? (
+                <p className="mt-3">
+                  <BackToProject returnTo={returnTo} label="Return to your project" />
+                </p>
+              ) : null}
             </div>
+
           ) : null}
 
           {paid ? (
