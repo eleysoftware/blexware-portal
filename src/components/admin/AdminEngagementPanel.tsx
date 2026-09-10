@@ -36,6 +36,8 @@ import {
   sendEstimate,
   sendInvoiceNow,
   suggestInvoiceSchedule,
+  requestProjectCompletion,
+  closeProjectWithoutClient,
 } from "@/lib/engagement.functions";
 
 
@@ -110,6 +112,7 @@ export function AdminEngagementPanel({
   const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
   const [offlineAmounts, setOfflineAmounts] = useState<Record<string, string>>({});
   const [showAbandoned, setShowAbandoned] = useState<Record<string, boolean>>({});
+  const [completionNote, setCompletionNote] = useState("");
 
   const [startDate, setStartDate] = useState("");
   const [reviseMode, setReviseMode] = useState(false);
@@ -417,6 +420,29 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const requestCompletionFn = useServerFn(requestProjectCompletion);
+  const closeProjectFn = useServerFn(closeProjectWithoutClient);
+
+  const requestCompletionMutation = useMutation({
+    mutationFn: () => requestCompletionFn({ data: { quoteId, note: completionNote } }),
+    onSuccess: () => {
+      toast.success("Completion request sent to the client");
+      setCompletionNote("");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const closeProjectMutation = useMutation({
+    mutationFn: () => closeProjectFn({ data: { quoteId, note: completionNote } }),
+    onSuccess: () => {
+      toast.success("Project closed out");
+      setCompletionNote("");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const openDoc = async (documentId: string) => {
     try {
       const { url } = await docUrl({ data: { documentId } });
@@ -471,6 +497,7 @@ export function AdminEngagementPanel({
     pay_token?: string | null;
   }[];
   const projectPayment = engagement.data?.projectPayment;
+  const engagementQuote = engagement.data?.quote ?? null;
   const payments = (engagement.data?.payments ?? []) as {
     id: string;
     invoice_id: string;
@@ -1337,6 +1364,62 @@ export function AdminEngagementPanel({
         </div>
       ) : tab === "invoices" ? (
         <TabEmptyState message={getTabEmptyState("invoices", "admin")} />
+      ) : null}
+
+      {tab === "invoices" && projectPayment && projectPayment.totalCents > 0 ? (
+        <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+          <h2 className="text-xl">Project completion</h2>
+          {engagementQuote?.completed_at ? (
+            <p className="mt-3 text-sm text-slate">
+              Closed out on {new Date(engagementQuote.completed_at).toLocaleDateString()}
+              {engagementQuote.completion_confirmed_by === "client"
+                ? " — confirmed by the client."
+                : " — closed by the team."}
+            </p>
+          ) : projectPayment.balanceCents > 0 ? (
+            <p className="mt-3 text-sm text-slate">
+              There's still {formatMoney(projectPayment.balanceCents)} outstanding. You can ask the client to
+              sign off once the balance is paid.
+            </p>
+          ) : (
+            <>
+              {engagementQuote?.completion_change_request ? (
+                <p className="mt-3 rounded-lg border border-border bg-mist/40 p-3 text-sm">
+                  Client asked for changes: {engagementQuote.completion_change_request}
+                </p>
+              ) : null}
+              <p className="mt-3 text-sm text-slate">
+                {engagementQuote?.completion_requested_at
+                  ? `Waiting on the client to confirm since ${new Date(engagementQuote.completion_requested_at).toLocaleDateString()}.`
+                  : "Paid in full. Ask the client to confirm the work is delivered to close this project out."}
+              </p>
+              <Textarea
+                className="mt-4"
+                rows={3}
+                placeholder="Optional note to the client about what was delivered"
+                value={completionNote}
+                onChange={(event) => setCompletionNote(event.target.value)}
+              />
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  disabled={requestCompletionMutation.isPending}
+                  onClick={() => requestCompletionMutation.mutate()}
+                >
+                  {engagementQuote?.completion_requested_at
+                    ? "Resend completion request"
+                    : "Ask the client to confirm completion"}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={closeProjectMutation.isPending}
+                  onClick={() => closeProjectMutation.mutate()}
+                >
+                  Close out without the client
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       ) : null}
 
       {tabDocuments.length ? (

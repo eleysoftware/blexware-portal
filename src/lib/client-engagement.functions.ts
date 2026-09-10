@@ -28,7 +28,13 @@ export const getMyEngagement = createServerFn({ method: "POST" })
       const db = viewerDb(context.supabase);
 
       const [quote, estimates, agreements, invoices, documents] = await Promise.all([
-        db.from("quotes").select("id").eq("id", data.quoteId).maybeSingle(),
+        db
+          .from("quotes")
+          .select(
+            "id, status, quote_number, completion_requested_at, completion_note, completed_at, completion_confirmed_by, completion_change_request",
+          )
+          .eq("id", data.quoteId)
+          .maybeSingle(),
         db
           .from("estimates")
           .select("id, status, doc, total_cents, duration_note, sent_at, expires_at, responded_at, response_note")
@@ -83,6 +89,16 @@ export const getMyEngagement = createServerFn({ method: "POST" })
       }
 
       return {
+        quote: (quote.data ?? null) as {
+          id: string;
+          status: string;
+          quote_number: string;
+          completion_requested_at: string | null;
+          completion_note: string | null;
+          completed_at: string | null;
+          completion_confirmed_by: string | null;
+          completion_change_request: string | null;
+        } | null,
         estimate: (estimates.data ?? [])[0] ?? null,
         agreement: (agreements.data ?? [])[0] ?? null,
         invoices: invoices.data ?? [],
@@ -359,5 +375,79 @@ export const signMyAgreement = createServerFn({ method: "POST" })
       });
 
       return { signed: true };
+    }),
+  );
+
+/** Client confirms the delivered work, or tells us what's still outstanding. */
+export const respondToProjectCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; action: "confirm" | "request_changes"; note?: string }) => {
+    if (!UUID.test(data.quoteId)) throw new Error("Unknown project");
+    if (!["confirm", "request_changes"].includes(data.action)) throw new Error("Unknown action");
+    if (data.action === "request_changes" && !data.note?.trim()) {
+      throw new Error("Tell us what's still outstanding.");
+    }
+    return { ...data, note: data.note?.slice(0, 2000) };
+  })
+  .handler(
+    guarded("respondToProjectCompletion", "saving your response", async ({ data, context }) => {
+      const { data: visible } = await viewerDb(context.supabase)
+        .from("quotes")
+        .select("id, quote_number, contact_name, contact_email, completion_requested_at, completed_at")
+        .eq("id", data.quoteId)
+        .maybeSingle();
+      if (!visible) throw new Error("Project not found");
+      if (!visible.completion_requested_at) throw new Error("We haven't asked you to sign off on this project yet.");
+      if (visible.completed_at) throw new Error("This project is already closed out.");
+
+      const { adminDb, writeAudit } = await import("@/lib/blex.server");
+      const { notifyTeam, emailProjectCompleted } = await import("@/lib/engagement-email.server");
+      const db = adminDb();
+
+      const confirmed = data.action === "confirm";
+      const { error } = await db
+        .from("quotes")
+        .update(
+          confirmed
+            ? {
+                status: "completed",
+                completed_at: new Date().toISOString(),
+                completion_confirmed_by: "client",
+                completion_change_request: null,
+              }
+            : { completion_requested_at: null, completion_change_request: data.note ?? null },
+        )
+        .eq("id", data.quoteId);
+      if (error) throw new Error(error.message);
+
+      if (confirmed) {
+        await emailProjectCompleted({
+          to: visible.contact_email as string,
+          name: visible.contact_name as string,
+          quoteNumber: visible.quote_number as string,
+        });
+      }
+
+      await notifyTeam(
+        confirmed
+          ? `Project confirmed complete — ${visible.quote_number as string}`
+          : `Changes requested before completion — ${visible.quote_number as string}`,
+        [
+          `${visible.contact_name as string} ${confirmed ? "confirmed the project is complete." : "asked for changes before sign-off."}`,
+          data.note ? `Note: ${data.note}` : "",
+        ].filter(Boolean),
+        visible.contact_email as string,
+      );
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? ""),
+        action: confirmed ? "project.completion_confirmed" : "project.completion_changes_requested",
+        entity: "quote",
+        entityId: data.quoteId,
+        metadata: data.note ? { note: data.note } : {},
+      });
+
+      return { completed: confirmed };
     }),
   );

@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -64,12 +65,15 @@ export function HyperswitchCheckout({
   payLabel,
   onDone,
   onChangeMethod,
+  processing = false,
 }: {
   session: CheckoutSession;
   returnUrl: string;
   payLabel: string;
   onDone: (status: "succeeded" | "processing" | "failed") => void;
   onChangeMethod?: () => void;
+  /** True while the parent is still recording the payment after the provider replied. */
+  processing?: boolean;
 }) {
 
   const MOUNT_ID = "blex-payment-element";
@@ -125,33 +129,50 @@ export function HyperswitchCheckout({
       });
       if (result.error) {
         setError(result.error.message ?? "We were unable to process your payment. Please try again.");
+        setBusy(false);
         onDone("failed");
         return;
       }
+      // Stay busy: the parent still has to record the payment.
       onDone(result.status === "succeeded" ? "succeeded" : "processing");
     } catch {
       setError("We were unable to process your payment. Please try again.");
-      onDone("failed");
-    } finally {
       setBusy(false);
+      onDone("failed");
     }
   }
 
+  const working = busy || processing;
+
   return (
-    <div className="mt-6">
-      <div id={MOUNT_ID} className="min-h-[220px]" />
+    <div className="mt-6" aria-busy={working}>
+      <div className={working ? "pointer-events-none opacity-60" : undefined}>
+        <div id={MOUNT_ID} className="min-h-[220px]" />
+      </div>
       {error ? (
         <p role="alert" className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
           {error}
         </p>
       ) : null}
-      <Button className="mt-6 w-full shadow-cta" disabled={!ready || busy} onClick={pay}>
-        {busy ? "Processing…" : payLabel}
+      <Button className="mt-6 w-full shadow-cta" disabled={!ready || working} onClick={pay}>
+        {working ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+            Processing your payment…
+          </>
+        ) : (
+          payLabel
+        )}
       </Button>
       {onChangeMethod ? (
-        <Button variant="ghost" className="mt-2 w-full" disabled={busy} onClick={onChangeMethod}>
+        <Button variant="ghost" className="mt-2 w-full" disabled={working} onClick={onChangeMethod}>
           Choose a different payment method
         </Button>
+      ) : null}
+      {working ? (
+        <p className="mt-3 text-center text-xs text-slate" role="status">
+          Please don't close or refresh this page.
+        </p>
       ) : null}
       <p className="mt-3 text-center text-xs text-slate">
         Secure payment powered by BLEXware. Your bank and card details are handled by our payment provider —

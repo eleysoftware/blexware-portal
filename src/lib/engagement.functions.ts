@@ -67,7 +67,24 @@ export const getEngagement = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
         : { data: [] };
 
+      const { data: quoteRow } = await db
+        .from("quotes")
+        .select(
+          "id, status, completion_requested_at, completion_note, completed_at, completion_confirmed_by, completion_change_request",
+        )
+        .eq("id", data.quoteId)
+        .maybeSingle();
+
       return {
+        quote: (quoteRow ?? null) as {
+          id: string;
+          status: string;
+          completion_requested_at: string | null;
+          completion_note: string | null;
+          completed_at: string | null;
+          completion_confirmed_by: string | null;
+          completion_change_request: string | null;
+        } | null,
         proposals: proposals.data ?? [],
         estimates: estimates.data ?? [],
         agreements: agreements.data ?? [],
@@ -1032,5 +1049,120 @@ export const setPaymentMethodEnabledFn = createServerFn({ method: "POST" })
         enabled: data.enabled,
         actorId: context.userId,
       });
+    }),
+  );
+
+/** Asks the client to confirm the delivered work so the project can close. */
+export const requestProjectCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; note?: string }) => ({
+    ...data,
+    note: data.note?.slice(0, 2000),
+  }))
+  .handler(
+    guarded("requestProjectCompletion", "requesting completion", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { getProjectPaymentSummary } = await import("@/lib/invoicing.server");
+      const { emailCompletionRequest, siteUrl } = await import("@/lib/engagement-email.server");
+      const db = adminDb();
+
+      const { data: quote } = await db
+        .from("quotes")
+        .select("id, quote_number, contact_name, contact_email, completed_at")
+        .eq("id", data.quoteId)
+        .maybeSingle();
+      if (!quote) throw new Error("Project not found");
+      if (quote.completed_at) throw new Error("This project is already closed out.");
+
+      const project = await getProjectPaymentSummary(data.quoteId);
+      if (project.balanceCents > 0) {
+        throw new Error("There is still an outstanding balance on this project.");
+      }
+
+      const { error } = await db
+        .from("quotes")
+        .update({
+          completion_requested_at: new Date().toISOString(),
+          completion_note: data.note ?? null,
+          completion_change_request: null,
+        })
+        .eq("id", data.quoteId);
+      if (error) throw new Error(error.message);
+
+      await emailCompletionRequest({
+        to: quote.contact_email as string,
+        name: quote.contact_name as string,
+        quoteNumber: quote.quote_number as string,
+        note: data.note ?? null,
+        url: `${siteUrl()}/portal/quotes/${data.quoteId}`,
+      });
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "project.completion_requested",
+        entity: "quote",
+        entityId: data.quoteId,
+        metadata: data.note ? { note: data.note } : {},
+      });
+
+      return { requested: true };
+    }),
+  );
+
+/** Closes the project out without waiting on the client (e.g. no response). */
+export const closeProjectWithoutClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; note?: string }) => ({
+    ...data,
+    note: data.note?.slice(0, 2000),
+  }))
+  .handler(
+    guarded("closeProjectWithoutClient", "closing the project", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { getProjectPaymentSummary } = await import("@/lib/invoicing.server");
+      const { emailProjectCompleted } = await import("@/lib/engagement-email.server");
+      const db = adminDb();
+
+      const { data: quote } = await db
+        .from("quotes")
+        .select("id, quote_number, contact_name, contact_email, completed_at")
+        .eq("id", data.quoteId)
+        .maybeSingle();
+      if (!quote) throw new Error("Project not found");
+      if (quote.completed_at) throw new Error("This project is already closed out.");
+
+      const project = await getProjectPaymentSummary(data.quoteId);
+      if (project.balanceCents > 0) {
+        throw new Error("There is still an outstanding balance on this project.");
+      }
+
+      const { error } = await db
+        .from("quotes")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          completion_confirmed_by: "admin",
+          completion_note: data.note ?? null,
+        })
+        .eq("id", data.quoteId);
+      if (error) throw new Error(error.message);
+
+      await emailProjectCompleted({
+        to: quote.contact_email as string,
+        name: quote.contact_name as string,
+        quoteNumber: quote.quote_number as string,
+      });
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "project.closed_by_admin",
+        entity: "quote",
+        entityId: data.quoteId,
+        metadata: data.note ? { note: data.note } : {},
+      });
+
+      return { completed: true };
     }),
   );

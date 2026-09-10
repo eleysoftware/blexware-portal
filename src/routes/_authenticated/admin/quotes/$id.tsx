@@ -28,7 +28,7 @@ import {
   sendProposal,
   updateQuoteStatus,
 } from "@/lib/admin.functions";
-import { getDocumentUrl } from "@/lib/engagement.functions";
+import { getDocumentUrl, getEngagement } from "@/lib/engagement.functions";
 import { type QuoteStatus } from "@/lib/quote-schema";
 import { getNextStep, getTabPurpose } from "@/lib/workflow-guidance";
 
@@ -70,8 +70,22 @@ function QuoteDetailPage() {
   const aiReady = aiStatus.data?.configured !== false;
   const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
+  const fetchEngagement = useServerFn(getEngagement);
+  const engagement = useQuery({
+    queryKey: ["engagement-admin", id],
+    queryFn: () => fetchEngagement({ data: { quoteId: id } }),
+  });
+  const guidanceContext = {
+    balanceCents: engagement.data?.projectPayment?.balanceCents ?? null,
+    completionRequestedAt: engagement.data?.quote?.completion_requested_at ?? null,
+  };
+
   const [tab, setTab] = useState("intake");
-  const nextStep = getNextStep((detail.data?.quote.status ?? "new") as QuoteStatus, "admin");
+  const nextStep = getNextStep(
+    (detail.data?.quote.status ?? "new") as QuoteStatus,
+    "admin",
+    guidanceContext,
+  );
   const tabs: WorkspaceTab[] = [
     { id: "intake", label: "Intake" },
     { id: "proposal", label: "Proposal" },

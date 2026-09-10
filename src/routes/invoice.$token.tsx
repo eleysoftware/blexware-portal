@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -310,6 +311,7 @@ function InvoicePage() {
               </div>
               <HyperswitchCheckout
                 session={session}
+                processing={confirm.isPending}
                 returnUrl={`${window.location.origin}/invoice/${token}`}
                 payLabel={`Pay ${formatMoney(session.amountCents)}`}
                 onChangeMethod={() => setSession(null)}
@@ -423,9 +425,14 @@ function InvoicePage() {
                 disabled={start.isPending}
                 onClick={() => start.mutate(method)}
               >
-                {start.isPending
-                  ? "Opening secure checkout…"
-                  : `Continue to pay ${formatMoney(payAmountCents)}`}
+                {start.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Opening secure checkout…
+                  </>
+                ) : (
+                  `Continue to pay ${formatMoney(payAmountCents)}`
+                )}
               </Button>
               <p className="mt-3 text-center text-xs text-slate">
                 Secure payment powered by BLEXware. We never see or store your bank or card details.

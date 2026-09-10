@@ -599,9 +599,9 @@ export async function applyPaymentStatus(input: {
       ].filter(Boolean));
     }
 
-    if (project.balanceCents === 0) {
-      await db.from("quotes").update({ status: "completed" }).eq("id", invoice.quote_id);
-    }
+    // The project is NOT marked complete here: payment in full and delivery
+    // sign-off are separate. Completion is requested by an admin and confirmed
+    // by the client (see requestProjectCompletion / respondToProjectCompletion).
   }
 
   if (input.status === "processing" && previous !== "processing" && quote) {
