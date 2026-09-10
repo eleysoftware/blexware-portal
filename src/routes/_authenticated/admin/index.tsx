@@ -119,6 +119,49 @@ function AdminDashboard() {
 
   const counts = quotes.data?.counts ?? {};
   const viewingArchived = filter === "archived";
+  const billing = quotes.data?.billing ?? {};
+
+  // Quotes come back flat; the queue is presented grouped by client email.
+  const clients = (() => {
+    const map = new Map<
+      string,
+      {
+        email: string;
+        name: string;
+        company: string | null;
+        outstandingCents: number;
+        lastActivity: string;
+        quotes: NonNullable<typeof quotes.data>["quotes"];
+      }
+    >();
+    for (const quote of quotes.data?.quotes ?? []) {
+      const email = String(quote.contact_email ?? "").toLowerCase();
+      const created = String(quote.created_at ?? "");
+      const entry = map.get(email) ?? {
+        email,
+        name: String(quote.contact_name ?? email),
+        company: (quote.company as string | null) ?? null,
+        outstandingCents: 0,
+        lastActivity: created,
+        quotes: [],
+      };
+      entry.quotes.push(quote);
+      entry.outstandingCents += billing[quote.id as string]?.outstandingCents ?? 0;
+      if (created > entry.lastActivity) {
+        entry.lastActivity = created;
+        entry.name = String(quote.contact_name ?? email);
+        entry.company = (quote.company as string | null) ?? null;
+      }
+      map.set(email, entry);
+    }
+    return [...map.values()].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  })();
+
+  // A search that lands on a specific quote opens that client automatically.
+  const searching = search.trim().length > 0;
+  const isOpen = (email: string) =>
+    expanded.includes(email) || (searching && clients.length <= 3) || clients.length === 1;
+
 
   return (
     <>
