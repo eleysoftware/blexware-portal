@@ -269,12 +269,22 @@ export async function renderInvoiceDocument(invoiceId: string) {
 
   const { buildInvoiceDoc } = await import("@/lib/documents/compose");
   const { storeDocument } = await import("@/lib/document-storage.server");
+  const lineItems = Array.isArray(invoice["line_items"])
+    ? (invoice["line_items"] as { label: string; amountCents: number; note?: string }[])
+    : [];
   const doc = buildInvoiceDoc({
     invoice: invoice as never,
     quote: quote as never,
     agreement: (agreementResult.data ?? null) as never,
     invoiceCount: count ?? 1,
     payUrl: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
+    ...(lineItems.length
+      ? {
+          lineItems,
+          subtotalCents: Number(invoice["subtotal_cents"] ?? 0),
+          discountCents: Number(invoice["discount_cents"] ?? 0),
+        }
+      : {}),
   });
 
   try {

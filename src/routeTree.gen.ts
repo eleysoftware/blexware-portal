@@ -30,6 +30,7 @@ import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin/import'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal/index'
+import { Route as AuthenticatedAdminInvoicesNewRouteImport } from './routes/_authenticated/admin/invoices/new'
 import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
 import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authenticated/portal/quotes/$id'
 import { Route as ApiPublicAuthHooksPasswordCheckRouteImport } from './routes/api/public/auth-hooks/password-check'
@@ -142,6 +143,12 @@ const AuthenticatedPortalIndexRoute =
     path: '/portal/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminInvoicesNewRoute =
+  AuthenticatedAdminInvoicesNewRouteImport.update({
+    id: '/admin/invoices/new',
+    path: '/admin/invoices/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminQuotesIdRoute =
   AuthenticatedAdminQuotesIdRouteImport.update({
     id: '/admin/quotes/$id',
@@ -193,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
+  '/admin/invoices/new': typeof AuthenticatedAdminInvoicesNewRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
   '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
@@ -220,6 +228,7 @@ export interface FileRoutesByTo {
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
+  '/admin/invoices/new': typeof AuthenticatedAdminInvoicesNewRoute
   '/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
   '/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
@@ -249,6 +258,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
+  '/_authenticated/admin/invoices/new': typeof AuthenticatedAdminInvoicesNewRoute
   '/_authenticated/admin/quotes/$id': typeof AuthenticatedAdminQuotesIdRoute
   '/_authenticated/portal/quotes/$id': typeof AuthenticatedPortalQuotesIdRoute
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/admin/import'
     | '/admin/'
     | '/portal/'
+    | '/admin/invoices/new'
     | '/admin/quotes/$id'
     | '/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/admin/import'
     | '/admin'
     | '/portal'
+    | '/admin/invoices/new'
     | '/admin/quotes/$id'
     | '/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
@@ -333,6 +345,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
+    | '/_authenticated/admin/invoices/new'
     | '/_authenticated/admin/quotes/$id'
     | '/_authenticated/portal/quotes/$id'
     | '/api/public/auth-hooks/password-check'
@@ -513,6 +526,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/invoices/new': {
+      id: '/_authenticated/admin/invoices/new'
+      path: '/admin/invoices/new'
+      fullPath: '/admin/invoices/new'
+      preLoaderRoute: typeof AuthenticatedAdminInvoicesNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/quotes/$id': {
       id: '/_authenticated/admin/quotes/$id'
       path: '/admin/quotes/$id'
@@ -555,6 +575,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedPortalIndexRoute: typeof AuthenticatedPortalIndexRoute
+  AuthenticatedAdminInvoicesNewRoute: typeof AuthenticatedAdminInvoicesNewRoute
   AuthenticatedAdminQuotesIdRoute: typeof AuthenticatedAdminQuotesIdRoute
   AuthenticatedPortalQuotesIdRoute: typeof AuthenticatedPortalQuotesIdRoute
 }
@@ -563,6 +584,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedPortalIndexRoute: AuthenticatedPortalIndexRoute,
+  AuthenticatedAdminInvoicesNewRoute: AuthenticatedAdminInvoicesNewRoute,
   AuthenticatedAdminQuotesIdRoute: AuthenticatedAdminQuotesIdRoute,
   AuthenticatedPortalQuotesIdRoute: AuthenticatedPortalQuotesIdRoute,
 }

@@ -86,11 +86,20 @@ function QuoteDetailPage() {
     "admin",
     guidanceContext,
   );
+  // Direct-billed projects have no proposal/estimate/SOW — only show invoicing.
+  const directBilled =
+    detail.data !== undefined &&
+    detail.data.proposals.length === 0 &&
+    ["invoicing", "completed"].includes(String(detail.data.quote.status));
   const tabs: WorkspaceTab[] = [
     { id: "intake", label: "Intake" },
-    { id: "proposal", label: "Proposal" },
-    { id: "estimate", label: "Estimate" },
-    { id: "sow", label: "SOW" },
+    ...(directBilled
+      ? []
+      : [
+          { id: "proposal", label: "Proposal" },
+          { id: "estimate", label: "Estimate" },
+          { id: "sow", label: "SOW" },
+        ]),
     { id: "invoices", label: "Invoices" },
     { id: "activity", label: "Activity" },
   ].map((item) =>
@@ -105,9 +114,13 @@ function QuoteDetailPage() {
   useEffect(() => {
     if (!loadedStatus || autoTabbed.current) return;
     autoTabbed.current = true;
+    if (directBilled) {
+      setTab("invoices");
+      return;
+    }
     const step = getNextStep(loadedStatus, "admin");
     if (step.actionable) setTab(step.tab);
-  }, [loadedStatus]);
+  }, [loadedStatus, directBilled]);
 
   const [content, setContent] = useState("");
   const [documentTitle, setDocumentTitle] = useState("");
