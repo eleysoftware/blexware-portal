@@ -142,9 +142,41 @@ export const listQuotes = createServerFn({ method: "POST" })
         .not("deleted_at", "is", null);
       counts["archived"] = archivedCount ?? 0;
 
-      return { quotes: (rows ?? []) as Partial<QuoteRecord>[], counts };
+      // Billing rollup per quote so the client list can show what is owed.
+      const quotes = (rows ?? []) as Partial<QuoteRecord>[];
+      const ids = quotes.map((quote) => quote.id).filter(Boolean) as string[];
+      const billing: Record<
+        string,
+        { billedCents: number; paidCents: number; outstandingCents: number }
+      > = {};
+      if (ids.length) {
+        const { data: invoices } = await adminDb()
+          .from("invoices")
+          .select("quote_id, amount_cents, amount_paid_cents")
+          .in("quote_id", ids)
+          .not("status", "in", "(void,cancelled,draft)");
+        for (const row of (invoices ?? []) as {
+          quote_id: string;
+          amount_cents: number;
+          amount_paid_cents: number | null;
+        }[]) {
+          const bucket = (billing[row.quote_id] ??= {
+            billedCents: 0,
+            paidCents: 0,
+            outstandingCents: 0,
+          });
+          const amount = Number(row.amount_cents ?? 0);
+          const paid = Number(row.amount_paid_cents ?? 0);
+          bucket.billedCents += amount;
+          bucket.paidCents += paid;
+          bucket.outstandingCents += Math.max(0, amount - paid);
+        }
+      }
+
+      return { quotes, counts, billing };
     }),
   );
+
 
 /** Soft-archives a quote so it drops out of the working queue (reversible). */
 export const archiveQuote = createServerFn({ method: "POST" })
