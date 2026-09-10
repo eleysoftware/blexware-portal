@@ -16,6 +16,11 @@ import { beginInvoicePayment, confirmInvoicePayment, getInvoiceByToken } from "@
 
 export const Route = createFileRoute("/invoice/$token")({
   ssr: false,
+  // Only same-site portal destinations are honoured as a "back" target.
+  validateSearch: (search: Record<string, unknown>) => {
+    const value = typeof search["return"] === "string" ? search["return"] : "";
+    return { return: /^\/portal\/quotes\/[0-9a-f-]{36}$/i.test(value) ? value : "" };
+  },
   head: () => ({
     meta: [
       { title: "Pay your invoice — BLEXware" },
@@ -29,6 +34,7 @@ export const Route = createFileRoute("/invoice/$token")({
   }),
   component: InvoicePage,
 });
+
 
 function statusLabel(status: string): string {
   return status
