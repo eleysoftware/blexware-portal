@@ -449,8 +449,20 @@ export function buildInvoiceDoc(input: {
   agreement?: { agreement_number: string; total_cents: number } | null;
   invoiceCount?: number;
   payUrl: string;
+  /** Itemised services/products billed on this invoice (direct-billed work). */
+  lineItems?: EstimateLineItem[];
+  subtotalCents?: number;
+  discountCents?: number;
 }): ProjectDocument {
   const { invoice, quote, agreement, invoiceCount, payUrl } = input;
+  const lineItems = input.lineItems ?? [];
+  const discountCents = Math.max(0, Math.round(input.discountCents ?? 0));
+  const subtotalCents = Math.max(
+    0,
+    Math.round(
+      input.subtotalCents ?? lineItems.reduce((sum, item) => sum + Number(item.amountCents), 0),
+    ),
+  );
   const total = Number(invoice.amount_cents);
   const paid = Math.max(0, Number(invoice.amount_paid_cents ?? 0));
   const balance = Math.max(0, total - paid);
