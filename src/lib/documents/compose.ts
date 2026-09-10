@@ -491,6 +491,31 @@ export function buildInvoiceDoc(input: {
     : `Project services — installment ${invoice.sequence}`;
 
   const sections: DocSection[] = [
+    ...(lineItems.length
+      ? [
+          {
+            heading: "Itemized Services",
+            ...(invoice.description?.trim() ? { body: [invoice.description.trim()] } : {}),
+            table: {
+              columns: ["Description", "Amount"],
+              numeric: true,
+              rows: [
+                ...lineItems.map((item) => [
+                  item.label + (item.note ? ` — ${item.note}` : ""),
+                  formatMoney(item.amountCents),
+                ]),
+                ...(discountCents > 0
+                  ? [
+                      ["Subtotal", formatMoney(subtotalCents)],
+                      ["Discount", `-${formatMoney(discountCents)}`],
+                    ]
+                  : []),
+                ["Total", formatMoney(Math.max(0, subtotalCents - discountCents))],
+              ],
+            },
+          } satisfies DocSection,
+        ]
+      : []),
     {
       heading: "Charges",
       table: {
