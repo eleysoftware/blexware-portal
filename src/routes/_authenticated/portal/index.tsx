@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getViewerRole } from "@/lib/auth.functions";
+import { formatMoney } from "@/lib/documents/types";
+
 import { listMyQuotes } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
 
