@@ -15,6 +15,14 @@ function viewerDb(supabase: unknown): SupabaseClient {
  * service role is only used to mint short-lived download URLs after the row
  * has already been proven visible to the caller.
  */
+export type QuoteBilling = {
+  billedCents: number;
+  paidCents: number;
+  outstandingCents: number;
+  payableCount: number;
+  overdueCount: number;
+};
+
 export const listMyQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: Record<string, never>) => data ?? {})
@@ -29,9 +37,60 @@ export const listMyQuotes = createServerFn({ method: "POST" })
         .limit(100);
 
       if (error) throw new Error(error.message);
-      return { quotes: (data ?? []) as unknown as Partial<QuoteRecord>[] };
+      const quotes = (data ?? []) as unknown as Partial<QuoteRecord>[];
+
+      // The rows above are already RLS-proven to belong to the caller, so the
+      // billing rollup can be aggregated with the service role over those ids.
+      const ids = quotes.map((quote) => quote.id).filter(Boolean) as string[];
+      const billing: Record<string, QuoteBilling> = {};
+      let totalPaid = 0;
+      let totalOutstanding = 0;
+
+      if (ids.length) {
+        const { adminDb } = await import("@/lib/blex.server");
+        const { data: invoices } = await adminDb()
+          .from("invoices")
+          .select("quote_id, amount_cents, amount_paid_cents, status, due_date")
+          .in("quote_id", ids)
+          .not("status", "in", "(void,cancelled,draft)");
+
+        const today = new Date().toISOString().slice(0, 10);
+        for (const row of (invoices ?? []) as {
+          quote_id: string;
+          amount_cents: number;
+          amount_paid_cents: number | null;
+          status: string;
+          due_date: string | null;
+        }[]) {
+          const bucket = (billing[row.quote_id] ??= {
+            billedCents: 0,
+            paidCents: 0,
+            outstandingCents: 0,
+            payableCount: 0,
+            overdueCount: 0,
+          });
+          const amount = Number(row.amount_cents ?? 0);
+          const paid = Number(row.amount_paid_cents ?? 0);
+          const balance = Math.max(0, amount - paid);
+          bucket.billedCents += amount;
+          bucket.paidCents += paid;
+          bucket.outstandingCents += balance;
+          if (balance > 0 && row.status !== "scheduled") {
+            bucket.payableCount += 1;
+            if (row.due_date && row.due_date < today) bucket.overdueCount += 1;
+          }
+        }
+
+        for (const bucket of Object.values(billing)) {
+          totalPaid += bucket.paidCents;
+          totalOutstanding += bucket.outstandingCents;
+        }
+      }
+
+      return { quotes, billing, totals: { paidCents: totalPaid, outstandingCents: totalOutstanding } };
     }),
   );
+
 
 export const getMyQuote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
