@@ -97,19 +97,29 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
     signed_at: string | null;
     signer_name: string | null;
   } | null;
-  const invoices = (engagement.data?.invoices ?? []) as {
-    id: string;
-    invoice_number: string;
-    sequence: number;
-    amount_cents: number;
-    status: string;
-    due_date: string | null;
-    pay_token: string;
-  }[];
+  const invoices = (engagement.data?.invoices ?? []) as PortalInvoice[];
   const documents = (engagement.data?.documents ?? []) as DocRow[];
+  const payments = (engagement.data?.payments ?? []) as PortalPayment[];
+  const project = (engagement.data?.project ?? null) as ProjectSummary | null;
+
+  // Anything needing money first, then everything else in schedule order.
+  const sortedInvoices = [...invoices].sort((a, b) => {
+    const rank = (invoice: PortalInvoice) => {
+      const state = invoiceState(invoice);
+      return state.payable ? (state.label === "Overdue" ? 0 : 1) : 2;
+    };
+    return rank(a) - rank(b) || a.sequence - b.sequence;
+  });
+
+  const visibleSequences = new Set(invoices.map((invoice) => invoice.sequence));
+  const upcoming = (project?.installments ?? []).filter(
+    (installment) => !visibleSequences.has(installment.sequence),
+  );
 
   const docsFor = (entity: string, entityId: string) =>
     documents.filter((doc) => doc.entity === entity && doc.entity_id === entityId);
+
+
 
   return (
     <div className="space-y-6">
