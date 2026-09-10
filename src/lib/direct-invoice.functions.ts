@@ -30,6 +30,7 @@ export type DirectInvoiceClient = {
 /** Clients we already have on file, for the "existing client" picker. */
 export const listInvoiceClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data)
   .handler(
     guarded("listInvoiceClients", "loading your clients", async ({ context }) => {
       const { requireAdmin, adminDb } = await import("@/lib/blex.server");
