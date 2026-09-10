@@ -48,3 +48,28 @@ test.describe("workflow guidance", () => {
     expect(getTabPurpose("nope", "client")).toBeNull();
   });
 });
+
+test.describe("completion guidance", () => {
+  test("asks the team to request sign-off once the balance is zero", () => {
+    const step = getNextStep("invoicing", "admin", { balanceCents: 0 });
+    expect(step.actionable).toBe(true);
+    expect(step.message).toContain("Paid in full");
+  });
+
+  test("tells the client there is nothing to pay before sign-off is requested", () => {
+    const step = getNextStep("invoicing", "client", { balanceCents: 0 });
+    expect(step.actionable).toBe(false);
+    expect(step.message).toContain("paid in full");
+  });
+
+  test("hands the next step to the client once completion is requested", () => {
+    const context = { balanceCents: 0, completionRequestedAt: "2026-01-01T00:00:00Z" };
+    expect(getNextStep("invoicing", "client", context).actionable).toBe(true);
+    expect(getNextStep("invoicing", "admin", context).message).toContain("Waiting on the client");
+  });
+
+  test("keeps the payment reminder while a balance is open", () => {
+    const step = getNextStep("invoicing", "client", { balanceCents: 60000 });
+    expect(step.message).toBe(getNextStep("invoicing", "client").message);
+  });
+});

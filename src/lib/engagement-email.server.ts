@@ -112,6 +112,36 @@ export async function emailPaymentUpdate(input: {
   return sendEmail({ to: input.to, toName: input.name, subject: entry.subject, ...mail });
 }
 
+/** Asks the client to confirm the delivered work so the project can be closed. */
+export async function emailCompletionRequest(input: {
+  to: string; name: string; quoteNumber: string; note?: string | null; url: string;
+}) {
+  const paragraphs = [
+    `Hi ${input.name},`,
+    `We believe the work on ${input.quoteNumber} is complete and your balance is paid in full.`,
+    ...(input.note ? [input.note] : []),
+    "Please confirm everything has been delivered, or let us know what's still outstanding.",
+  ];
+  const mail = renderEmail({
+    heading: "Please confirm your project is complete",
+    paragraphs,
+    cta: { label: "Review and confirm", url: input.url },
+  });
+  return sendEmail({ to: input.to, toName: input.name, subject: `Confirm completion — ${input.quoteNumber}`, ...mail });
+}
+
+/** Confirms to the client that the project has been closed out. */
+export async function emailProjectCompleted(input: { to: string; name: string; quoteNumber: string }) {
+  const mail = renderEmail({
+    heading: "Your project is complete",
+    paragraphs: [
+      `Hi ${input.name},`,
+      `${input.quoteNumber} is now closed out. Thank you for working with BLEXware — we'd love to help with whatever's next.`,
+    ],
+  });
+  return sendEmail({ to: input.to, toName: input.name, subject: `Project complete — ${input.quoteNumber}`, ...mail });
+}
+
 export async function notifyTeam(subject: string, paragraphs: string[], replyTo?: string) {
   const mail = renderEmail({ heading: subject, paragraphs });
   return sendEmail({ to: "hello@blexware.com", toName: "BLEXware", subject, ...mail, ...(replyTo ? { replyTo } : {}) });

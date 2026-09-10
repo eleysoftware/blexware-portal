@@ -103,7 +103,36 @@ const GUIDANCE: Record<QuoteStatus, StageGuidance> = {
   },
 };
 
-export function getStageGuidance(status: QuoteStatus): StageGuidance {
+/**
+ * Extra facts that change the next step within a status. A project stays in
+ * `invoicing` after the last payment until the work is signed off.
+ */
+export type GuidanceContext = {
+  /** Outstanding balance across the whole project, in cents. */
+  balanceCents?: number | null;
+  /** Set once an admin has asked the client to confirm the work is complete. */
+  completionRequestedAt?: string | null;
+};
+
+const PAID_AWAITING_REQUEST: StageGuidance = {
+  tab: "invoices",
+  actor: "admin",
+  clientMessage:
+    "You're paid in full — nothing to pay. We'll ask you to confirm once the work is delivered.",
+  adminMessage: "Paid in full. Confirm the work is delivered to close this project out.",
+};
+
+const COMPLETION_PENDING: StageGuidance = {
+  tab: "invoices",
+  actor: "client",
+  clientMessage: "Confirm the work is complete to close out your project, or tell us what's left.",
+  adminMessage: "Waiting on the client to confirm the project is complete.",
+};
+
+export function getStageGuidance(status: QuoteStatus, context?: GuidanceContext): StageGuidance {
+  if (status === "invoicing" && context && context.balanceCents === 0) {
+    return context.completionRequestedAt ? COMPLETION_PENDING : PAID_AWAITING_REQUEST;
+  }
   return GUIDANCE[status] ?? GUIDANCE.new;
 }
 
@@ -115,8 +144,12 @@ export type NextStep = {
   actionable: boolean;
 };
 
-export function getNextStep(status: QuoteStatus, audience: Audience): NextStep {
-  const guidance = getStageGuidance(status);
+export function getNextStep(
+  status: QuoteStatus,
+  audience: Audience,
+  context?: GuidanceContext,
+): NextStep {
+  const guidance = getStageGuidance(status, context);
   return {
     tab: guidance.tab,
     actor: guidance.actor,

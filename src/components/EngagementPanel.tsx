@@ -17,6 +17,7 @@ import {
   getMyDocumentUrl,
   getMyEngagement,
   respondToMyEstimate,
+  respondToProjectCompletion,
   signMyAgreement,
 } from "@/lib/client-engagement.functions";
 import { formatMoney, type ProjectDocument } from "@/lib/documents/types";
@@ -100,6 +101,7 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
   const [note, setNote] = useState("");
   const [signature, setSignature] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [completionNote, setCompletionNote] = useState("");
 
   const engagement = useQuery({
     queryKey: ["engagement", quoteId],
@@ -135,6 +137,22 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const respondCompletion = useServerFn(respondToProjectCompletion);
+  const completionMutation = useMutation({
+    mutationFn: (action: "confirm" | "request_changes") =>
+      respondCompletion({ data: { quoteId, action, note: completionNote } }),
+    onSuccess: (result) => {
+      toast.success(
+        result.completed
+          ? "Thank you — your project is closed out."
+          : "Thanks — we'll pick up the outstanding items and follow up.",
+      );
+      setCompletionNote("");
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const openDoc = async (documentId: string) => {
     try {
       const { url } = await docUrl({ data: { documentId } });
@@ -162,6 +180,7 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
     signer_name: string | null;
   } | null;
   const invoices = (engagement.data?.invoices ?? []) as PortalInvoice[];
+  const quoteRow = engagement.data?.quote ?? null;
   const documents = (engagement.data?.documents ?? []) as DocRow[];
   const payments = (engagement.data?.payments ?? []) as PortalPayment[];
   const project = (engagement.data?.project ?? null) as ProjectSummary | null;
@@ -433,6 +452,48 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
         ) : (
           <TabEmptyState message={getTabEmptyState("invoices", "client")} />
         )
+      ) : null}
+
+      {show("invoices") && quoteRow ? (
+        quoteRow.completed_at ? (
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-xl">Project complete</h2>
+            <p className="mt-2 text-sm text-slate">
+              Closed out on {new Date(quoteRow.completed_at).toLocaleDateString()}. Thank you for
+              working with us.
+            </p>
+          </div>
+        ) : quoteRow.completion_requested_at ? (
+          <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
+            <h2 className="text-xl">Confirm your project is complete</h2>
+            <p className="mt-2 text-sm text-slate">
+              {quoteRow.completion_note ??
+                "We believe everything has been delivered. Confirm below, or tell us what's still outstanding."}
+            </p>
+            <Textarea
+              className="mt-4"
+              rows={3}
+              placeholder="Anything still outstanding? (required if you're asking for changes)"
+              value={completionNote}
+              onChange={(event) => setCompletionNote(event.target.value)}
+            />
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button
+                disabled={completionMutation.isPending}
+                onClick={() => completionMutation.mutate("confirm")}
+              >
+                Confirm the work is complete
+              </Button>
+              <Button
+                variant="outline"
+                disabled={completionMutation.isPending}
+                onClick={() => completionMutation.mutate("request_changes")}
+              >
+                Something's still outstanding
+              </Button>
+            </div>
+          </div>
+        ) : null
       ) : null}
 
     </div>
