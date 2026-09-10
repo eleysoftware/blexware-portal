@@ -182,6 +182,9 @@ function AdminDashboard() {
           <Button variant="secondary" size="sm" asChild>
             <Link to="/admin/import">Import existing project</Link>
           </Button>
+          <Button size="sm" asChild className="shadow-cta">
+            <Link to="/admin/invoices/new">New invoice</Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
