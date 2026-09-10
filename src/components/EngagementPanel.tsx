@@ -17,6 +17,7 @@ import {
   getMyDocumentUrl,
   getMyEngagement,
   respondToMyEstimate,
+  respondToProjectCompletion,
   signMyAgreement,
 } from "@/lib/client-engagement.functions";
 import { formatMoney, type ProjectDocument } from "@/lib/documents/types";
@@ -179,6 +180,7 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
     signer_name: string | null;
   } | null;
   const invoices = (engagement.data?.invoices ?? []) as PortalInvoice[];
+  const quoteRow = engagement.data?.quote ?? null;
   const documents = (engagement.data?.documents ?? []) as DocRow[];
   const payments = (engagement.data?.payments ?? []) as PortalPayment[];
   const project = (engagement.data?.project ?? null) as ProjectSummary | null;
