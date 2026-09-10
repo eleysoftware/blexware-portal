@@ -1,6 +1,6 @@
 # Remove payment schedule from invoice page
 
-The project payment schedule now lives on the portal quotes page, so the invoice page should stop duplicating it. This keeps the invoice page focused on the current invoice and payment action.
+The project payment schedule now lives on the client portal quotes page, so the public client invoice page should stop duplicating it. This keeps the invoice page focused on the current invoice and payment action. The admin quote workspace is unaffected.
 
 ## Change
 
