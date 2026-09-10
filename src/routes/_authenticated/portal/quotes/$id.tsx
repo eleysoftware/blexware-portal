@@ -16,7 +16,7 @@ import { WorkspacePanel, WorkspaceTabs, type WorkspaceTab } from "@/components/W
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getMyDocumentUrl } from "@/lib/client-engagement.functions";
+import { getMyDocumentUrl, getMyEngagement } from "@/lib/client-engagement.functions";
 import { respondToProposal } from "@/lib/proposals.functions";
 import { getMyQuote, getMyQuoteFileUrl } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
@@ -43,6 +43,16 @@ function PortalQuoteDetail() {
     queryKey: ["my-quote", id],
     queryFn: () => fetchQuote({ data: { id } }),
   });
+
+  const fetchEngagement = useServerFn(getMyEngagement);
+  const engagement = useQuery({
+    queryKey: ["engagement", id],
+    queryFn: () => fetchEngagement({ data: { quoteId: id } }),
+  });
+  const guidanceContext = {
+    balanceCents: engagement.data?.project?.balanceCents ?? null,
+    completionRequestedAt: engagement.data?.quote?.completion_requested_at ?? null,
+  };
 
   // Land on the tab that needs the client's attention, once, on first load.
   const autoTabbed = useRef(false);
@@ -109,7 +119,7 @@ function PortalQuoteDetail() {
     );
   }
 
-  const nextStep = getNextStep(quote.status as QuoteStatus, "client");
+  const nextStep = getNextStep(quote.status as QuoteStatus, "client", guidanceContext);
   const tabs: WorkspaceTab[] = [
     { id: "overview", label: "Overview" },
     { id: "proposal", label: "Proposal" },
