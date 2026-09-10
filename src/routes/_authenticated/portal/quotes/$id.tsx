@@ -120,11 +120,18 @@ function PortalQuoteDetail() {
   }
 
   const nextStep = getNextStep(quote.status as QuoteStatus, "client", guidanceContext);
+  // Direct-billed work has no proposal, estimate or SOW — show billing only.
+  const directBilled =
+    !detail.data?.proposal && ["invoicing", "completed"].includes(String(quote.status));
   const tabs: WorkspaceTab[] = [
     { id: "overview", label: "Overview" },
-    { id: "proposal", label: "Proposal" },
-    { id: "estimate", label: "Estimate" },
-    { id: "sow", label: "SOW" },
+    ...(directBilled
+      ? []
+      : [
+          { id: "proposal", label: "Proposal" },
+          { id: "estimate", label: "Estimate" },
+          { id: "sow", label: "SOW" },
+        ]),
     { id: "invoices", label: "Invoices" },
   ].map((item) =>
     item.id === nextStep.tab
