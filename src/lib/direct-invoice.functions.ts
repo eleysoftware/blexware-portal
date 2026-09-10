@@ -60,6 +60,7 @@ export const listInvoiceClients = createServerFn({ method: "POST" })
  * builder the SOW schedule uses, so amounts always add back to the total.
  */
 export const createDirectInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator((data: DirectInvoiceInput) => {
     if (!data.contactName?.trim()) throw new Error("Enter the client contact name");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.contactEmail ?? "")) {
@@ -72,7 +73,6 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
     if (!items.length) throw new Error("Add at least one service or product line");
     return { ...data, lineItems: items };
   })
-  .middleware([requireSupabaseAuth])
   .handler(
     guarded("createDirectInvoice", "creating the invoice", async ({ data, context }) => {
       const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
