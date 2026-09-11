@@ -105,9 +105,50 @@ function ImportProjectPage() {
     lineItems.reduce((sum, item) => sum + item.amountCents, 0) - (needsEstimate ? discountCents : 0);
 
   const readFile = async (file: File) => {
-    const text = await file.text();
-    setProposalMarkdown(text);
-    toast.success(`Loaded ${file.name}`);
+    const name = file.name.toLowerCase();
+    const isPlainText =
+      name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".txt");
+
+    if (isPlainText) {
+      const text = await file.text();
+      setProposalMarkdown(text);
+      toast.success(`Loaded ${file.name}`);
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("That file is larger than 10 MB. Please upload a smaller document.");
+      return;
+    }
+
+    setReading(true);
+    try {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < buffer.length; i += 1) binary += String.fromCharCode(buffer[i]!);
+      const result = await runExtract({
+        data: {
+          fileName: file.name,
+          contentType: file.type || undefined,
+          base64: btoa(binary),
+        },
+      });
+      setProposalMarkdown(result.markdown);
+      if (result.documentTitle && !documentTitle.trim()) setDocumentTitle(result.documentTitle);
+      if (result.contactName && !contactName.trim()) setContactName(result.contactName);
+      if (result.contactEmail && !contactEmail.trim()) setContactEmail(result.contactEmail);
+      if (result.company && !company.trim()) setCompany(result.company);
+      if (result.projectType && !projectType.trim()) setProjectType(result.projectType);
+      toast.success(
+        result.aiFormatted
+          ? `Converted ${file.name} into the BLEXware proposal format — review it before importing.`
+          : `Read the text from ${file.name}. Tidy up the sections before importing.`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "That document could not be read.");
+    } finally {
+      setReading(false);
+    }
   };
 
   const mutation = useMutation({
