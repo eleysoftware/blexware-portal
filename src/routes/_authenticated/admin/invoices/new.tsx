@@ -9,7 +9,12 @@ import { Section } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { createDirectInvoice, listInvoiceClients } from "@/lib/direct-invoice.functions";
+import {
+  createDirectInvoice,
+  listClientProjects,
+  listInvoiceClients,
+} from "@/lib/direct-invoice.functions";
+
 import { SPLIT_COUNTS, evenSplitRows } from "@/lib/documents/compose";
 import { formatMoney } from "@/lib/documents/types";
 
