@@ -109,10 +109,10 @@ export const extractProposalFromFile = createServerFn({ method: "POST" })
           ...(parsed.company?.trim() ? { company: parsed.company.trim() } : {}),
           ...(parsed.projectType?.trim() ? { projectType: parsed.projectType.trim() } : {}),
           aiFormatted: true,
-        } satisfies ExtractProposalResult;
+        } as ExtractProposalResult;
       } catch (error) {
         console.warn("[extractProposalFromFile] AI formatting unavailable", error);
-        return { markdown: rawText, aiFormatted: false } satisfies ExtractProposalResult;
+        return { markdown: rawText, aiFormatted: false } as ExtractProposalResult;
       }
     }),
   );
