@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/documents/types";
 import { importTemplates } from "@/content/import-templates";
-import { importProject, type ImportStage } from "@/lib/import.functions";
+import {
+  extractProposalFromFile,
+  importProject,
+  type ImportStage,
+} from "@/lib/import.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/import")({
   head: () => ({
