@@ -300,13 +300,19 @@ function ImportProjectPage() {
             <input
               className="mt-4 block w-full text-sm text-slate"
               type="file"
-              accept=".md,.markdown,.txt,text/plain,text/markdown"
-              aria-label="Upload a markdown or text proposal"
+              disabled={reading}
+              accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+              aria-label="Upload a PDF, Word, markdown or text proposal"
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) void readFile(file);
               }}
             />
+            {reading ? (
+              <p className="mt-2 text-sm text-slate" role="status">
+                Reading the document and converting it to the BLEXware format…
+              </p>
+            ) : null}
             <Textarea
               className="mt-4 font-mono text-sm"
               rows={14}
