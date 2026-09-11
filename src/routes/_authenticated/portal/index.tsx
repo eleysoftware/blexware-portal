@@ -63,6 +63,8 @@ function PortalHome() {
 
   const totals = quotes.data?.totals;
   const billing = quotes.data?.billing ?? {};
+  const invoices = quotes.data?.invoices ?? {};
+
 
   return (
     <>
