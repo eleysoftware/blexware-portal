@@ -221,7 +221,7 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
         .select("id, sequence, invoice_number");
       if (invoiceError) throw new Error(invoiceError.message);
 
-      const first = (inserted ?? []).find((row) => Number(row.sequence) === 1);
+      const first = (inserted ?? []).find((row) => Number(row.sequence) === seqOffset + 1);
       if (data.sendNow && first) {
         const { dispatchInvoice } = await import("@/lib/invoicing.server");
         await dispatchInvoice(first.id as string);
@@ -233,7 +233,7 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
         entity: "quote",
         entityId: quoteId,
         metadata: {
-          quote_number: quote.quote_number,
+          quote_number: quoteNumber,
           invoices: rows.length,
           total_cents: totalCents,
           sent: Boolean(data.sendNow && first),
@@ -242,7 +242,8 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
 
       return {
         quoteId,
-        quoteNumber: quote.quote_number as string,
+        quoteNumber,
+
         invoiceCount: rows.length,
         totalCents,
         sent: Boolean(data.sendNow && first),
