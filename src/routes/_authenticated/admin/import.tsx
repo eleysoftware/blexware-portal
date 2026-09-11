@@ -47,6 +47,8 @@ const ESTIMATE_STAGES: ImportStage[] = ["estimate_draft", "estimate_sent", "esti
 function ImportProjectPage() {
   const navigate = useNavigate();
   const runImport = useServerFn(importProject);
+  const runExtract = useServerFn(extractProposalFromFile);
+  const [reading, setReading] = useState(false);
 
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
