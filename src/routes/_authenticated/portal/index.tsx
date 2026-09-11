@@ -63,6 +63,8 @@ function PortalHome() {
 
   const totals = quotes.data?.totals;
   const billing = quotes.data?.billing ?? {};
+  const invoices = quotes.data?.invoices ?? {};
+
 
   return (
     <>
@@ -106,17 +108,21 @@ function PortalHome() {
           <ul className="grid gap-4">
             {quotes.data?.quotes.map((quote) => {
               const money = billing[quote.id as string];
+              const rows = invoices[quote.id as string] ?? [];
               return (
-                <li key={quote.id}>
-                  <Link
-                    to="/portal/quotes/$id"
-                    params={{ id: quote.id as string }}
-                    className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-6 shadow-card transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:justify-between"
-                  >
+                <li
+                  key={quote.id}
+                  className="rounded-2xl border border-border bg-background p-6 shadow-card"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">
+                      <Link
+                        to="/portal/quotes/$id"
+                        params={{ id: quote.id as string }}
+                        className="text-sm font-semibold text-foreground hover:text-primary"
+                      >
                         {quote.quote_number} — {quote.project_type}
-                      </p>
+                      </Link>
                       <p className="mt-1 text-xs text-slate">
                         {quote.industry} · {quote.budget} · {quote.timeline}
                       </p>
@@ -145,11 +151,67 @@ function PortalHome() {
                     <Badge variant="secondary">
                       {quoteStatusLabels[quote.status as QuoteStatus] ?? quote.status}
                     </Badge>
-                  </Link>
+                  </div>
+
+                  {rows.length ? (
+                    <details className="mt-4 border-t border-border pt-3" open={rows.length <= 6}>
+                      <summary className="cursor-pointer text-xs font-medium text-slate">
+                        {rows.length} invoice{rows.length === 1 ? "" : "s"} on this project
+                      </summary>
+                      <ul className="mt-3 space-y-2" data-testid="portal-project-invoices">
+                        {rows.map((invoice) => {
+                          const balance = Math.max(
+                            0,
+                            invoice.amountCents - invoice.amountPaidCents,
+                          );
+                          return (
+                            <li
+                              key={invoice.id}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-xs"
+                            >
+                              <span className="font-medium text-foreground">
+                                {invoice.invoiceNumber}
+                              </span>
+                              <span className="text-slate">
+                                {invoice.issueDate ? `Issued ${invoice.issueDate}` : "Scheduled"}
+                                {invoice.dueDate ? ` · due ${invoice.dueDate}` : ""}
+                              </span>
+                              <span className="text-foreground">
+                                {formatMoney(invoice.amountCents)}
+                                {balance === 0 ? " · paid" : ""}
+                              </span>
+                              {invoice.payToken ? (
+                                <Button size="sm" asChild>
+                                  <Link
+                                    to="/invoice/$token"
+                                    params={{ token: invoice.payToken }}
+                                    search={{ return: "/portal" }}
+                                  >
+                                    Pay {formatMoney(balance)}
+                                  </Link>
+                                </Button>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
+                  ) : null}
+
+                  <div className="mt-4">
+                    <Link
+                      to="/portal/quotes/$id"
+                      params={{ id: quote.id as string }}
+                      className="text-xs text-primary underline"
+                    >
+                      Open project
+                    </Link>
+                  </div>
                 </li>
               );
             })}
           </ul>
+
         )}
       </Section>
     </>

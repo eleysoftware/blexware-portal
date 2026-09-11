@@ -5,6 +5,8 @@ import type { EstimateLineItem, PaymentPlanKind } from "@/lib/documents/types";
 import { guarded } from "@/lib/errors";
 
 export type DirectInvoiceInput = {
+  /** When set, the invoice is added to this existing project instead of creating one. */
+  quoteId?: string;
   contactName: string;
   contactEmail: string;
   company?: string;
@@ -26,6 +28,44 @@ export type DirectInvoiceClient = {
   name: string;
   company: string | null;
 };
+
+export type DirectInvoiceProject = {
+  id: string;
+  quoteNumber: string;
+  name: string;
+  status: string;
+};
+
+/** Projects already on file for one client, so invoices can join an existing one. */
+export const listClientProjects = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { email: string }) => {
+    if (!data?.email?.trim()) throw new Error("Choose a client first");
+    return { email: data.email.trim().toLowerCase() };
+  })
+  .handler(
+    guarded("listClientProjects", "loading that client's projects", async ({ data, context }) => {
+      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { data: rows } = await adminDb()
+        .from("quotes")
+        .select("id, quote_number, project_type, status, created_at")
+        .eq("contact_email", data.email)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      return {
+        projects: ((rows ?? []) as Record<string, unknown>[]).map((row) => ({
+          id: String(row.id),
+          quoteNumber: String(row.quote_number ?? ""),
+          name: String(row.project_type ?? "Project"),
+          status: String(row.status ?? ""),
+        })) as DirectInvoiceProject[],
+      };
+    }),
+  );
+
 
 /** Clients we already have on file, for the "existing client" picker. */
 export const listInvoiceClients = createServerFn({ method: "POST" })
@@ -101,28 +141,57 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
       const email = data.contactEmail.trim().toLowerCase();
       const projectType = data.projectType?.trim() || "Direct invoice";
 
-      const { data: quote, error: quoteError } = await db
-        .from("quotes")
-        .insert({
-          status: "invoicing",
-          project_type: projectType,
-          industry: "Not stated",
-          services: ["Direct invoice"],
-          goals: data.description.trim(),
-          budget: "Not stated",
-          timeline: "Not stated",
-          contact_name: data.contactName.trim(),
-          contact_email: email,
-          company: data.company?.trim() || null,
-          phone: data.phone?.trim() || null,
-          consent: true,
-          internal_notes: data.internalNotes?.trim() || "Direct-billed — no quote or proposal.",
-        })
-        .select("id, quote_number")
-        .single();
-      if (quoteError || !quote) throw new Error(quoteError?.message ?? "Could not create the project");
+      let quoteId: string;
+      let quoteNumber: string;
+      let seqOffset = 0;
 
-      const quoteId = quote.id as string;
+      if (data.quoteId) {
+        const { data: existing } = await db
+          .from("quotes")
+          .select("id, quote_number, contact_email")
+          .eq("id", data.quoteId)
+          .maybeSingle();
+        if (!existing) throw new Error("That project could not be found");
+        if (String(existing.contact_email ?? "").toLowerCase() !== email) {
+          throw new Error("That project belongs to a different client");
+        }
+        quoteId = existing.id as string;
+        quoteNumber = existing.quote_number as string;
+
+        const { data: last } = await db
+          .from("invoices")
+          .select("sequence")
+          .eq("quote_id", quoteId)
+          .order("sequence", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        seqOffset = Number(last?.sequence ?? 0);
+      } else {
+        const { data: quote, error: quoteError } = await db
+          .from("quotes")
+          .insert({
+            status: "invoicing",
+            project_type: projectType,
+            industry: "Not stated",
+            services: ["Direct invoice"],
+            goals: data.description.trim(),
+            budget: "Not stated",
+            timeline: "Not stated",
+            contact_name: data.contactName.trim(),
+            contact_email: email,
+            company: data.company?.trim() || null,
+            phone: data.phone?.trim() || null,
+            consent: true,
+            internal_notes: data.internalNotes?.trim() || "Direct-billed — no quote or proposal.",
+          })
+          .select("id, quote_number")
+          .single();
+        if (quoteError || !quote)
+          throw new Error(quoteError?.message ?? "Could not create the project");
+        quoteId = quote.id as string;
+        quoteNumber = quote.quote_number as string;
+      }
+
       const anchor = data.issueDate ? new Date(`${data.issueDate}T00:00:00.000Z`) : new Date();
       const entries = paymentPlanToInvoiceEntries(plan, anchor);
       const single = entries.length === 1;
@@ -130,7 +199,7 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
       const rows = entries.map((entry) => ({
         quote_id: quoteId,
         agreement_id: null,
-        sequence: entry.sequence,
+        sequence: entry.sequence + seqOffset,
         amount_cents: entry.amountCents,
         description: single
           ? data.description.trim()
@@ -145,13 +214,14 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
         discount_cents: entry.sequence === 1 ? discountCents : 0,
       }));
 
+
       const { data: inserted, error: invoiceError } = await db
         .from("invoices")
         .insert(rows as never)
         .select("id, sequence, invoice_number");
       if (invoiceError) throw new Error(invoiceError.message);
 
-      const first = (inserted ?? []).find((row) => Number(row.sequence) === 1);
+      const first = (inserted ?? []).find((row) => Number(row.sequence) === seqOffset + 1);
       if (data.sendNow && first) {
         const { dispatchInvoice } = await import("@/lib/invoicing.server");
         await dispatchInvoice(first.id as string);
@@ -163,7 +233,7 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
         entity: "quote",
         entityId: quoteId,
         metadata: {
-          quote_number: quote.quote_number,
+          quote_number: quoteNumber,
           invoices: rows.length,
           total_cents: totalCents,
           sent: Boolean(data.sendNow && first),
@@ -172,7 +242,8 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
 
       return {
         quoteId,
-        quoteNumber: quote.quote_number as string,
+        quoteNumber,
+
         invoiceCount: rows.length,
         totalCents,
         sent: Boolean(data.sendNow && first),
