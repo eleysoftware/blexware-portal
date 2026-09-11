@@ -338,16 +338,18 @@ export type Database = {
       }
       invoices: {
         Row: {
-          agreement_id: string
+          agreement_id: string | null
           amount_cents: number
           amount_paid_cents: number
           created_at: string
           currency: string
           description: string | null
+          discount_cents: number
           due_date: string | null
           id: string
           invoice_number: string
           issue_date: string | null
+          line_items: Json
           paid_at: string | null
           paused: boolean
           pay_token: string
@@ -356,20 +358,23 @@ export type Database = {
           sent_at: string | null
           sequence: number
           status: Database["public"]["Enums"]["invoice_status"]
+          subtotal_cents: number
           updated_at: string
           viewed_at: string | null
         }
         Insert: {
-          agreement_id: string
+          agreement_id?: string | null
           amount_cents: number
           amount_paid_cents?: number
           created_at?: string
           currency?: string
           description?: string | null
+          discount_cents?: number
           due_date?: string | null
           id?: string
           invoice_number?: string
           issue_date?: string | null
+          line_items?: Json
           paid_at?: string | null
           paused?: boolean
           pay_token?: string
@@ -378,20 +383,23 @@ export type Database = {
           sent_at?: string | null
           sequence: number
           status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal_cents?: number
           updated_at?: string
           viewed_at?: string | null
         }
         Update: {
-          agreement_id?: string
+          agreement_id?: string | null
           amount_cents?: number
           amount_paid_cents?: number
           created_at?: string
           currency?: string
           description?: string | null
+          discount_cents?: number
           due_date?: string | null
           id?: string
           invoice_number?: string
           issue_date?: string | null
+          line_items?: Json
           paid_at?: string | null
           paused?: boolean
           pay_token?: string
@@ -400,6 +408,7 @@ export type Database = {
           sent_at?: string | null
           sequence?: number
           status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal_cents?: number
           updated_at?: string
           viewed_at?: string | null
         }
@@ -653,6 +662,11 @@ export type Database = {
         Row: {
           budget: string
           company: string | null
+          completed_at: string | null
+          completion_change_request: string | null
+          completion_confirmed_by: string | null
+          completion_note: string | null
+          completion_requested_at: string | null
           consent: boolean
           contact_email: string
           contact_name: string
@@ -675,6 +689,11 @@ export type Database = {
         Insert: {
           budget: string
           company?: string | null
+          completed_at?: string | null
+          completion_change_request?: string | null
+          completion_confirmed_by?: string | null
+          completion_note?: string | null
+          completion_requested_at?: string | null
           consent?: boolean
           contact_email: string
           contact_name: string
@@ -697,6 +716,11 @@ export type Database = {
         Update: {
           budget?: string
           company?: string | null
+          completed_at?: string | null
+          completion_change_request?: string | null
+          completion_confirmed_by?: string | null
+          completion_note?: string | null
+          completion_requested_at?: string | null
           consent?: boolean
           contact_email?: string
           contact_name?: string
