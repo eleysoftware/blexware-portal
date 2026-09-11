@@ -107,6 +107,7 @@ function NewInvoicePage() {
   const balanced = scheduledTotal === totalCents;
 
   const applyClient = (email: string) => {
+    setExistingQuoteId("");
     const match = clients.data?.clients.find((entry) => entry.email === email);
     if (!match) return;
     setContactEmail(match.email);
@@ -118,11 +119,13 @@ function NewInvoicePage() {
     mutationFn: (sendNow: boolean) =>
       create({
         data: {
+          ...(existingQuoteId ? { quoteId: existingQuoteId } : {}),
           contactName,
           contactEmail,
           company,
           phone,
           projectType,
+
           internalNotes,
           description,
           issueDate,
