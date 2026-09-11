@@ -193,26 +193,50 @@ function NewInvoicePage() {
 
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Project</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-medium">
-                Project name
-                <Input
-                  className="mt-1"
-                  placeholder="e.g. Website maintenance — Q3"
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value)}
-                />
+            {projects.data?.projects.length ? (
+              <label className="mt-4 block text-sm font-medium">
+                Add this invoice to
+                <select
+                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                  value={existingQuoteId}
+                  onChange={(event) => setExistingQuoteId(event.target.value)}
+                >
+                  <option value="">Start a new project</option>
+                  {projects.data.projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.quoteNumber} — {project.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs font-normal text-slate">
+                  Adding to an existing project keeps all of that job's invoices together in the
+                  client's portal.
+                </span>
               </label>
-              <label className="text-sm font-medium">
-                Internal note (not shown to the client)
-                <Input
-                  className="mt-1"
-                  value={internalNotes}
-                  onChange={(e) => setInternalNotes(e.target.value)}
-                />
-              </label>
-            </div>
+            ) : null}
+            {existingQuoteId ? null : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium">
+                  Project name
+                  <Input
+                    className="mt-1"
+                    placeholder="e.g. Website maintenance — Q3"
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm font-medium">
+                  Internal note (not shown to the client)
+                  <Input
+                    className="mt-1"
+                    value={internalNotes}
+                    onChange={(e) => setInternalNotes(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
           </div>
+
 
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Invoice</h2>
