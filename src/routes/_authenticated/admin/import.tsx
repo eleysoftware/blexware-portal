@@ -284,8 +284,9 @@ function ImportProjectPage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Proposal content</h2>
             <p className="mt-1 text-sm text-slate">
-              Paste the proposal as markdown — use <code>##</code> headings for each section. For a PDF or
-              Word file, copy the text out of the document and paste it here, or upload a .md/.txt export.
+              Upload the proposal you already sent — PDF, Word (.docx), markdown or plain text, up to 10 MB
+              — and it is converted into the BLEXware proposal format below. You can also paste the text in
+              directly using <code>##</code> headings for each section.
             </p>
             <label className="mt-4 block text-sm font-medium">
               Document title (optional)
