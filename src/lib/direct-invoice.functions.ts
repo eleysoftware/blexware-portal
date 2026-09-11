@@ -5,6 +5,8 @@ import type { EstimateLineItem, PaymentPlanKind } from "@/lib/documents/types";
 import { guarded } from "@/lib/errors";
 
 export type DirectInvoiceInput = {
+  /** When set, the invoice is added to this existing project instead of creating one. */
+  quoteId?: string;
   contactName: string;
   contactEmail: string;
   company?: string;
@@ -26,6 +28,44 @@ export type DirectInvoiceClient = {
   name: string;
   company: string | null;
 };
+
+export type DirectInvoiceProject = {
+  id: string;
+  quoteNumber: string;
+  name: string;
+  status: string;
+};
+
+/** Projects already on file for one client, so invoices can join an existing one. */
+export const listClientProjects = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { email: string }) => {
+    if (!data?.email?.trim()) throw new Error("Choose a client first");
+    return { email: data.email.trim().toLowerCase() };
+  })
+  .handler(
+    guarded("listClientProjects", "loading that client's projects", async ({ data, context }) => {
+      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { data: rows } = await adminDb()
+        .from("quotes")
+        .select("id, quote_number, project_type, status, created_at")
+        .eq("contact_email", data.email)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      return {
+        projects: ((rows ?? []) as Record<string, unknown>[]).map((row) => ({
+          id: String(row.id),
+          quoteNumber: String(row.quote_number ?? ""),
+          name: String(row.project_type ?? "Project"),
+          status: String(row.status ?? ""),
+        })) as DirectInvoiceProject[],
+      };
+    }),
+  );
+
 
 /** Clients we already have on file, for the "existing client" picker. */
 export const listInvoiceClients = createServerFn({ method: "POST" })
