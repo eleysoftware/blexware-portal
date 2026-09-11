@@ -38,6 +38,85 @@ export type ImportProjectInput = {
 
 const ESTIMATE_STAGES: ImportStage[] = ["estimate_draft", "estimate_sent", "estimate_approved"];
 
+export type ExtractProposalInput = {
+  fileName: string;
+  contentType?: string;
+  base64: string;
+};
+
+export type ExtractProposalResult = {
+  markdown: string;
+  documentTitle?: string;
+  contactName?: string;
+  contactEmail?: string;
+  company?: string;
+  projectType?: string;
+  aiFormatted: boolean;
+};
+
+const EXTRACT_SYSTEM_PROMPT = [
+  "You reformat client proposals into BLEXware's proposal format.",
+  "Return JSON only, with keys: markdown, documentTitle, contactName, contactEmail, company, projectType.",
+  "markdown: the full proposal rewritten as markdown using '## ' headings for each section",
+  "(e.g. Overview, Objectives, Scope of Work, Deliverables, Timeline, Investment, Assumptions, Next Steps).",
+  "Keep the original wording, numbers, prices and dates — reorganise, never invent.",
+  "Drop page numbers, headers, footers and signature blocks. Use '- ' for lists.",
+  "Leave a field out entirely when the document does not clearly state it.",
+].join(" ");
+
+/** Reads an uploaded PDF/Word/markdown proposal and returns BLEXware-formatted markdown. */
+export const extractProposalFromFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: ExtractProposalInput) => {
+    if (!data.fileName?.trim()) throw new Error("Choose a file to upload");
+    if (!data.base64) throw new Error("That file could not be read");
+    if (data.base64.length > 14_000_000) throw new Error("That file is larger than 10 MB");
+    return data;
+  })
+  .handler(
+    guarded("extractProposalFromFile", "reading the document", async ({ data, context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { extractDocumentText } = await import("@/lib/documents/extract.server");
+
+      const binary = atob(data.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+
+      const rawText = await extractDocumentText({
+        fileName: data.fileName,
+        ...(data.contentType ? { contentType: data.contentType } : {}),
+        bytes,
+      });
+
+      try {
+        const { completeChat } = await import("@/lib/ai.server");
+        const { content } = await completeChat(
+          [
+            { role: "system", content: EXTRACT_SYSTEM_PROMPT },
+            { role: "user", content: rawText.slice(0, 60_000) },
+          ],
+          { json: true },
+        );
+        const parsed = JSON.parse(content) as Partial<ExtractProposalResult>;
+        const markdown = parsed.markdown?.trim();
+        if (!markdown) throw new Error("empty markdown from AI");
+        return {
+          markdown,
+          ...(parsed.documentTitle?.trim() ? { documentTitle: parsed.documentTitle.trim() } : {}),
+          ...(parsed.contactName?.trim() ? { contactName: parsed.contactName.trim() } : {}),
+          ...(parsed.contactEmail?.trim() ? { contactEmail: parsed.contactEmail.trim() } : {}),
+          ...(parsed.company?.trim() ? { company: parsed.company.trim() } : {}),
+          ...(parsed.projectType?.trim() ? { projectType: parsed.projectType.trim() } : {}),
+          aiFormatted: true,
+        } as ExtractProposalResult;
+      } catch (error) {
+        console.warn("[extractProposalFromFile] AI formatting unavailable", error);
+        return { markdown: rawText, aiFormatted: false } as ExtractProposalResult;
+      }
+    }),
+  );
+
 /**
  * Brings an engagement that started outside the portal (a proposal already
  * written and sometimes already approved) into the pipeline at the right stage.

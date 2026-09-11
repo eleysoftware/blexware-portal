@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/documents/types";
 import { importTemplates } from "@/content/import-templates";
-import { importProject, type ImportStage } from "@/lib/import.functions";
+import {
+  extractProposalFromFile,
+  importProject,
+  type ImportStage,
+} from "@/lib/import.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/import")({
   head: () => ({
@@ -43,6 +47,8 @@ const ESTIMATE_STAGES: ImportStage[] = ["estimate_draft", "estimate_sent", "esti
 function ImportProjectPage() {
   const navigate = useNavigate();
   const runImport = useServerFn(importProject);
+  const runExtract = useServerFn(extractProposalFromFile);
+  const [reading, setReading] = useState(false);
 
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -101,9 +107,50 @@ function ImportProjectPage() {
     lineItems.reduce((sum, item) => sum + item.amountCents, 0) - (needsEstimate ? discountCents : 0);
 
   const readFile = async (file: File) => {
-    const text = await file.text();
-    setProposalMarkdown(text);
-    toast.success(`Loaded ${file.name}`);
+    const name = file.name.toLowerCase();
+    const isPlainText =
+      name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".txt");
+
+    if (isPlainText) {
+      const text = await file.text();
+      setProposalMarkdown(text);
+      toast.success(`Loaded ${file.name}`);
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("That file is larger than 10 MB. Please upload a smaller document.");
+      return;
+    }
+
+    setReading(true);
+    try {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < buffer.length; i += 1) binary += String.fromCharCode(buffer[i]!);
+      const result = await runExtract({
+        data: {
+          fileName: file.name,
+          contentType: file.type || undefined,
+          base64: btoa(binary),
+        },
+      });
+      setProposalMarkdown(result.markdown);
+      if (result.documentTitle && !documentTitle.trim()) setDocumentTitle(result.documentTitle);
+      if (result.contactName && !contactName.trim()) setContactName(result.contactName);
+      if (result.contactEmail && !contactEmail.trim()) setContactEmail(result.contactEmail);
+      if (result.company && !company.trim()) setCompany(result.company);
+      if (result.projectType && !projectType.trim()) setProjectType(result.projectType);
+      toast.success(
+        result.aiFormatted
+          ? `Converted ${file.name} into the BLEXware proposal format — review it before importing.`
+          : `Read the text from ${file.name}. Tidy up the sections before importing.`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "That document could not be read.");
+    } finally {
+      setReading(false);
+    }
   };
 
   const mutation = useMutation({
@@ -237,8 +284,9 @@ function ImportProjectPage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Proposal content</h2>
             <p className="mt-1 text-sm text-slate">
-              Paste the proposal as markdown — use <code>##</code> headings for each section. For a PDF or
-              Word file, copy the text out of the document and paste it here, or upload a .md/.txt export.
+              Upload the proposal you already sent — PDF, Word (.docx), markdown or plain text, up to 10 MB
+              — and it is converted into the BLEXware proposal format below. You can also paste the text in
+              directly using <code>##</code> headings for each section.
             </p>
             <label className="mt-4 block text-sm font-medium">
               Document title (optional)
@@ -252,13 +300,19 @@ function ImportProjectPage() {
             <input
               className="mt-4 block w-full text-sm text-slate"
               type="file"
-              accept=".md,.markdown,.txt,text/plain,text/markdown"
-              aria-label="Upload a markdown or text proposal"
+              disabled={reading}
+              accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+              aria-label="Upload a PDF, Word, markdown or text proposal"
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) void readFile(file);
               }}
             />
+            {reading ? (
+              <p className="mt-2 text-sm text-slate" role="status">
+                Reading the document and converting it to the BLEXware format…
+              </p>
+            ) : null}
             <Textarea
               className="mt-4 font-mono text-sm"
               rows={14}
