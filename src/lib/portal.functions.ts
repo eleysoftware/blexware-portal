@@ -23,6 +23,19 @@ export type QuoteBilling = {
   overdueCount: number;
 };
 
+export type PortalInvoiceRow = {
+  id: string;
+  invoiceNumber: string;
+  sequence: number;
+  amountCents: number;
+  amountPaidCents: number;
+  status: string;
+  issueDate: string | null;
+  dueDate: string | null;
+  payToken: string | null;
+  description: string | null;
+};
+
 export const listMyQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: Record<string, never>) => data ?? {})
@@ -37,30 +50,41 @@ export const listMyQuotes = createServerFn({ method: "POST" })
         .limit(100);
 
       if (error) throw new Error(error.message);
-      const quotes = (data ?? []) as unknown as Partial<QuoteRecord>[];
+      let quotes = (data ?? []) as unknown as Partial<QuoteRecord>[];
 
       // The rows above are already RLS-proven to belong to the caller, so the
       // billing rollup can be aggregated with the service role over those ids.
       const ids = quotes.map((quote) => quote.id).filter(Boolean) as string[];
       const billing: Record<string, QuoteBilling> = {};
+      const invoicesByQuote: Record<string, PortalInvoiceRow[]> = {};
       let totalPaid = 0;
       let totalOutstanding = 0;
 
       if (ids.length) {
         const { adminDb } = await import("@/lib/blex.server");
-        const { data: invoices } = await adminDb()
+        const db = adminDb();
+        const { data: invoices } = await db
           .from("invoices")
-          .select("quote_id, amount_cents, amount_paid_cents, status, due_date")
+          .select(
+            "id, quote_id, invoice_number, sequence, description, amount_cents, amount_paid_cents, status, issue_date, due_date, pay_token",
+          )
           .in("quote_id", ids)
-          .not("status", "in", "(void,cancelled,draft)");
+          .not("status", "in", "(void,cancelled,draft)")
+          .order("sequence", { ascending: true });
 
         const today = new Date().toISOString().slice(0, 10);
         for (const row of (invoices ?? []) as {
+          id: string;
           quote_id: string;
+          invoice_number: string;
+          sequence: number;
+          description: string | null;
           amount_cents: number;
           amount_paid_cents: number | null;
           status: string;
+          issue_date: string | null;
           due_date: string | null;
+          pay_token: string | null;
         }[]) {
           const bucket = (billing[row.quote_id] ??= {
             billedCents: 0,
@@ -79,7 +103,39 @@ export const listMyQuotes = createServerFn({ method: "POST" })
             bucket.payableCount += 1;
             if (row.due_date && row.due_date < today) bucket.overdueCount += 1;
           }
+
+          (invoicesByQuote[row.quote_id] ??= []).push({
+            id: row.id,
+            invoiceNumber: row.invoice_number,
+            sequence: Number(row.sequence ?? 0),
+            amountCents: amount,
+            amountPaidCents: paid,
+            status: row.status,
+            issueDate: row.issue_date,
+            dueDate: row.due_date,
+            payToken: balance > 0 && row.status !== "scheduled" ? row.pay_token : null,
+            description: row.description,
+          });
         }
+
+        // Direct-billed placeholder projects (created for an invoice that was
+        // never sent, and with nothing else for the client to look at) would
+        // otherwise show as empty cards in the portal.
+        const { data: proposals } = await db
+          .from("proposals")
+          .select("quote_id")
+          .in("quote_id", ids)
+          .neq("status", "draft");
+        const withProposal = new Set(
+          ((proposals ?? []) as { quote_id: string }[]).map((row) => row.quote_id),
+        );
+
+        quotes = quotes.filter((quote) => {
+          const id = quote.id as string;
+          if (invoicesByQuote[id]?.length) return true;
+          if (withProposal.has(id)) return true;
+          return !["invoicing", "completed"].includes(String(quote.status));
+        });
 
         for (const bucket of Object.values(billing)) {
           totalPaid += bucket.paidCents;
@@ -87,9 +143,15 @@ export const listMyQuotes = createServerFn({ method: "POST" })
         }
       }
 
-      return { quotes, billing, totals: { paidCents: totalPaid, outstandingCents: totalOutstanding } };
+      return {
+        quotes,
+        billing,
+        invoices: invoicesByQuote,
+        totals: { paidCents: totalPaid, outstandingCents: totalOutstanding },
+      };
     }),
   );
+
 
 
 export const getMyQuote = createServerFn({ method: "POST" })
