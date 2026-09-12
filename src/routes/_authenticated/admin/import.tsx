@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHero } from "@/components/PageHero";
@@ -49,6 +49,10 @@ function ImportProjectPage() {
   const runImport = useServerFn(importProject);
   const runExtract = useServerFn(extractProposalFromFile);
   const [reading, setReading] = useState(false);
+  const [uploadedName, setUploadedName] = useState("");
+  const [pricingFromFile, setPricingFromFile] = useState(false);
+  const [phases, setPhases] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -91,6 +95,7 @@ function ImportProjectPage() {
     setDiscount(values.discount);
     setDiscountLabel(values.discountLabel);
     setRows(values.rows);
+    setPhases(values.rows.map((row) => row.label.trim()).filter(Boolean));
     toast.success(`Prefilled ${template.label} — review before importing.`);
   };
 
@@ -110,6 +115,7 @@ function ImportProjectPage() {
     const name = file.name.toLowerCase();
     const isPlainText =
       name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".txt");
+    setUploadedName(file.name);
 
     if (isPlainText) {
       const text = await file.text();
@@ -141,6 +147,25 @@ function ImportProjectPage() {
       if (result.contactEmail && !contactEmail.trim()) setContactEmail(result.contactEmail);
       if (result.company && !company.trim()) setCompany(result.company);
       if (result.projectType && !projectType.trim()) setProjectType(result.projectType);
+
+      if (result.lineItems?.length) {
+        setRows(
+          result.lineItems.map((item) => ({
+            label: item.label,
+            amount: (item.amountCents / 100).toString(),
+            duration: item.durationLabel ?? "",
+          })),
+        );
+        if (result.discountCents) setDiscount((result.discountCents / 100).toString());
+        if (result.discountLabel) setDiscountLabel(result.discountLabel);
+        if (result.durationNote) setDurationNote(result.durationNote);
+        setPricingFromFile(true);
+        setStage((current) => (ESTIMATE_STAGES.includes(current) ? current : "estimate_draft"));
+      } else {
+        setPricingFromFile(false);
+      }
+      setPhases(result.phases ?? []);
+
       toast.success(
         result.aiFormatted
           ? `Converted ${file.name} into the BLEXware proposal format — review it before importing.`
@@ -174,6 +199,7 @@ function ImportProjectPage() {
           documentTitle,
           proposalMarkdown,
           stage,
+          ...(phases.length ? { phases } : {}),
           ...(needsEstimate
             ? { lineItems, durationNote, discountCents, discountLabel }
             : {}),
@@ -195,6 +221,57 @@ function ImportProjectPage() {
       />
       <Section>
         <div className="mx-auto max-w-3xl space-y-8">
+          <div className="rounded-2xl border border-primary/30 bg-background p-6 shadow-card">
+            <h2 className="text-xl">Upload a proposal you already sent</h2>
+            <p className="mt-1 text-sm text-slate">
+              PDF, Word (.docx), markdown or plain text, up to 10 MB. We read the document and prefill
+              everything below — the proposal text, the client details, and any costs, durations and
+              phases it contains. Nothing is saved until you press “Import project”.
+            </p>
+            <input
+              ref={fileInputRef}
+              className="sr-only"
+              type="file"
+              tabIndex={-1}
+              accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readFile(file);
+                event.target.value = "";
+              }}
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                className="shadow-cta"
+                disabled={reading}
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="import-upload"
+              >
+                {reading ? "Reading the document…" : "Choose a PDF or Word file"}
+              </Button>
+              {uploadedName ? (
+                <span className="text-sm text-slate">{uploadedName}</span>
+              ) : null}
+            </div>
+            {reading ? (
+              <p className="mt-2 text-sm text-slate" role="status">
+                Reading the document and converting it to the BLEXware format…
+              </p>
+            ) : null}
+            {pricingFromFile ? (
+              <p className="mt-2 text-sm text-foreground">
+                Cost and schedule details were read from the document — check the amounts in the
+                estimate section before importing.
+              </p>
+            ) : null}
+            {phases.length ? (
+              <p className="mt-2 text-sm text-slate">
+                {phases.length} phase{phases.length === 1 ? "" : "s"} found — they'll be added to the
+                Milestones board under “Not started”.
+              </p>
+            ) : null}
+          </div>
+
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Start from a saved project</h2>
             <p className="mt-1 text-sm text-slate">
@@ -284,9 +361,8 @@ function ImportProjectPage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Proposal content</h2>
             <p className="mt-1 text-sm text-slate">
-              Upload the proposal you already sent — PDF, Word (.docx), markdown or plain text, up to 10 MB
-              — and it is converted into the BLEXware proposal format below. You can also paste the text in
-              directly using <code>##</code> headings for each section.
+              Filled in from the uploaded document. You can edit it here, or paste text in directly
+              using <code>##</code> headings for each section.
             </p>
             <label className="mt-4 block text-sm font-medium">
               Document title (optional)
@@ -297,22 +373,6 @@ function ImportProjectPage() {
                 onChange={(e) => setDocumentTitle(e.target.value)}
               />
             </label>
-            <input
-              className="mt-4 block w-full text-sm text-slate"
-              type="file"
-              disabled={reading}
-              accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
-              aria-label="Upload a PDF, Word, markdown or text proposal"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void readFile(file);
-              }}
-            />
-            {reading ? (
-              <p className="mt-2 text-sm text-slate" role="status">
-                Reading the document and converting it to the BLEXware format…
-              </p>
-            ) : null}
             <Textarea
               className="mt-4 font-mono text-sm"
               rows={14}

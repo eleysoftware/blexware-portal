@@ -4,7 +4,14 @@ export type Audience = "client" | "admin";
 export type Actor = "client" | "admin" | "none";
 
 /** Tab ids shared by the client portal and admin workspace. */
-export type GuidanceTab = "overview" | "intake" | "proposal" | "estimate" | "sow" | "invoices";
+export type GuidanceTab =
+  | "overview"
+  | "intake"
+  | "proposal"
+  | "estimate"
+  | "sow"
+  | "milestones"
+  | "invoices";
 
 export type StageGuidance = {
   /** Tab where the next step happens (or where the upcoming step will appear). */
@@ -164,6 +171,7 @@ const PURPOSE: Record<Audience, Partial<Record<GuidanceTab, string>>> = {
     proposal: "The scope and approach we recommend — review and respond to it here.",
     estimate: "Cost and schedule for each item in the approved proposal.",
     sow: "The Statement of Work to sign before work begins.",
+    milestones: "Where each phase of your project stands, from not started to done.",
     invoices: "Payments for this project, issued in instalments.",
   },
   admin: {
@@ -171,6 +179,7 @@ const PURPOSE: Record<Audience, Partial<Record<GuidanceTab, string>>> = {
     proposal: "Draft, review and send the proposal the client responds to.",
     estimate: "Price each proposal item and release the estimate for approval.",
     sow: "Generate, countersign and track the Statement of Work.",
+    milestones: "Track project phases across Not started, In progress, Testing and Done.",
     invoices: "Issue the instalment schedule and follow payments.",
   },
 };

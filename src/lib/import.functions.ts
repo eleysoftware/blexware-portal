@@ -34,6 +34,8 @@ export type ImportProjectInput = {
   durationNote?: string;
   paymentKind?: import("@/lib/documents/types").PaymentPlanKind;
   customPayments?: { label: string; amountCents: number }[];
+  /** Project phases, created as milestones in the "Not started" lane. */
+  phases?: string[];
 };
 
 const ESTIMATE_STAGES: ImportStage[] = ["estimate_draft", "estimate_sent", "estimate_approved"];
@@ -44,6 +46,12 @@ export type ExtractProposalInput = {
   base64: string;
 };
 
+export type ExtractedLineItem = {
+  label: string;
+  amountCents: number;
+  durationLabel?: string;
+};
+
 export type ExtractProposalResult = {
   markdown: string;
   documentTitle?: string;
@@ -51,18 +59,61 @@ export type ExtractProposalResult = {
   contactEmail?: string;
   company?: string;
   projectType?: string;
+  lineItems?: ExtractedLineItem[];
+  discountCents?: number;
+  discountLabel?: string;
+  durationNote?: string;
+  phases?: string[];
   aiFormatted: boolean;
 };
 
 const EXTRACT_SYSTEM_PROMPT = [
   "You reformat client proposals into BLEXware's proposal format.",
-  "Return JSON only, with keys: markdown, documentTitle, contactName, contactEmail, company, projectType.",
+  "Return JSON only, with keys: markdown, documentTitle, contactName, contactEmail, company, projectType,",
+  "lineItems, discountCents, discountLabel, durationNote, phases.",
   "markdown: the full proposal rewritten as markdown using '## ' headings for each section",
   "(e.g. Overview, Objectives, Scope of Work, Deliverables, Timeline, Investment, Assumptions, Next Steps).",
+  "lineItems: array of {label, amountCents (integer cents), durationLabel} for every priced phase or",
+  "deliverable stated in the document. discountCents: integer cents of any stated discount, with",
+  "discountLabel. durationNote: the overall project duration sentence, e.g. '24-36 business days'.",
+  "phases: the ordered list of project phase names exactly as the document names them.",
   "Keep the original wording, numbers, prices and dates — reorganise, never invent.",
   "Drop page numbers, headers, footers and signature blocks. Use '- ' for lists.",
   "Leave a field out entirely when the document does not clearly state it.",
 ].join(" ");
+
+/** Keeps only well-formed, positively priced rows from the model's JSON. */
+export function normaliseExtractedLineItems(input: unknown): ExtractedLineItem[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((row) => {
+      const entry = row as { label?: unknown; amountCents?: unknown; durationLabel?: unknown };
+      const label = typeof entry.label === "string" ? entry.label.trim() : "";
+      const amount = Number(entry.amountCents);
+      if (!label || !Number.isFinite(amount) || amount <= 0) return null;
+      const duration =
+        typeof entry.durationLabel === "string" && entry.durationLabel.trim()
+          ? entry.durationLabel.trim()
+          : undefined;
+      return {
+        label,
+        amountCents: Math.round(amount),
+        ...(duration ? { durationLabel: duration } : {}),
+      } satisfies ExtractedLineItem;
+    })
+    .filter((row): row is ExtractedLineItem => row !== null);
+}
+
+/** Phase names from the document, falling back to priced line-item labels. */
+export function normalisePhases(input: unknown, lineItems: ExtractedLineItem[]): string[] {
+  const fromDoc = Array.isArray(input)
+    ? input
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter((value) => value.length > 0 && value.length <= 200)
+    : [];
+  if (fromDoc.length) return fromDoc;
+  return lineItems.filter((item) => /phase|milestone|sprint|stage/i.test(item.label)).map((item) => item.label);
+}
 
 /** Reads an uploaded PDF/Word/markdown proposal and returns BLEXware-formatted markdown. */
 export const extractProposalFromFile = createServerFn({ method: "POST" })
@@ -101,6 +152,9 @@ export const extractProposalFromFile = createServerFn({ method: "POST" })
         const parsed = JSON.parse(content) as Partial<ExtractProposalResult>;
         const markdown = parsed.markdown?.trim();
         if (!markdown) throw new Error("empty markdown from AI");
+        const lineItems = normaliseExtractedLineItems(parsed.lineItems);
+        const phases = normalisePhases(parsed.phases, lineItems);
+        const discountCents = Number(parsed.discountCents);
         return {
           markdown,
           ...(parsed.documentTitle?.trim() ? { documentTitle: parsed.documentTitle.trim() } : {}),
@@ -108,6 +162,15 @@ export const extractProposalFromFile = createServerFn({ method: "POST" })
           ...(parsed.contactEmail?.trim() ? { contactEmail: parsed.contactEmail.trim() } : {}),
           ...(parsed.company?.trim() ? { company: parsed.company.trim() } : {}),
           ...(parsed.projectType?.trim() ? { projectType: parsed.projectType.trim() } : {}),
+          ...(lineItems.length ? { lineItems } : {}),
+          ...(Number.isFinite(discountCents) && discountCents > 0
+            ? {
+                discountCents: Math.round(discountCents),
+                discountLabel: parsed.discountLabel?.trim() || "Discount",
+              }
+            : {}),
+          ...(parsed.durationNote?.trim() ? { durationNote: parsed.durationNote.trim() } : {}),
+          ...(phases.length ? { phases } : {}),
           aiFormatted: true,
         } as ExtractProposalResult;
       } catch (error) {
@@ -246,6 +309,22 @@ export const importProject = createServerFn({ method: "POST" })
           .single();
         if (estimateError || !estimate) throw new Error(estimateError?.message ?? "Could not save the estimate");
         estimateId = estimate.id as string;
+      }
+
+      const phases = (data.phases ?? [])
+        .map((phase) => phase.trim())
+        .filter(Boolean)
+        .slice(0, 40);
+      if (phases.length) {
+        const { error: milestoneError } = await db.from("project_milestones").insert(
+          phases.map((title, index) => ({
+            quote_id: quoteId,
+            title,
+            lane: "not_started",
+            position: index,
+          })),
+        );
+        if (milestoneError) console.error("[importProject] milestones", milestoneError.message);
       }
 
       await writeAudit({
