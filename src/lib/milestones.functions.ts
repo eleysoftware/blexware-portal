@@ -49,8 +49,12 @@ export const listMilestones = createServerFn({ method: "POST" })
         .from("project_milestones")
         .select(SELECT)
         .eq("quote_id", data.quoteId);
-      if (error) throw new Error(error.message);
-      return { milestones: sortMilestones((rows ?? []) as MilestoneRecord[]) };
+      if (error) {
+        // The milestones table has not been created in this database yet.
+        if (/project_milestones/.test(error.message)) return { milestones: [], unavailable: true };
+        throw new Error(error.message);
+      }
+      return { milestones: sortMilestones((rows ?? []) as MilestoneRecord[]), unavailable: false };
     }),
   );
 
