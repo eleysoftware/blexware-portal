@@ -146,6 +146,25 @@ function ImportProjectPage() {
       if (result.contactEmail && !contactEmail.trim()) setContactEmail(result.contactEmail);
       if (result.company && !company.trim()) setCompany(result.company);
       if (result.projectType && !projectType.trim()) setProjectType(result.projectType);
+
+      if (result.lineItems?.length) {
+        setRows(
+          result.lineItems.map((item) => ({
+            label: item.label,
+            amount: (item.amountCents / 100).toString(),
+            duration: item.durationLabel ?? "",
+          })),
+        );
+        if (result.discountCents) setDiscount((result.discountCents / 100).toString());
+        if (result.discountLabel) setDiscountLabel(result.discountLabel);
+        if (result.durationNote) setDurationNote(result.durationNote);
+        setPricingFromFile(true);
+        setStage((current) => (ESTIMATE_STAGES.includes(current) ? current : "estimate_draft"));
+      } else {
+        setPricingFromFile(false);
+      }
+      setPhases(result.phases ?? []);
+
       toast.success(
         result.aiFormatted
           ? `Converted ${file.name} into the BLEXware proposal format — review it before importing.`
