@@ -308,7 +308,7 @@ function QuoteDetailPage() {
               company={quote.company}
               hasSignedSow={hasSignedSow}
               hasInvoices={hasInvoices}
-              onConfirm={() => deleteMutation.mutate()}
+              onConfirm={() => deleteMutation.mutate(quote.quote_number)}
             >
               <Button
                 variant="ghost"
