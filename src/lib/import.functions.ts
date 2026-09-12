@@ -34,6 +34,8 @@ export type ImportProjectInput = {
   durationNote?: string;
   paymentKind?: import("@/lib/documents/types").PaymentPlanKind;
   customPayments?: { label: string; amountCents: number }[];
+  /** Project phases, created as milestones in the "Not started" lane. */
+  phases?: string[];
 };
 
 const ESTIMATE_STAGES: ImportStage[] = ["estimate_draft", "estimate_sent", "estimate_approved"];
