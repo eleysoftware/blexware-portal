@@ -511,6 +511,50 @@ export type Database = {
           },
         ]
       }
+      project_milestones: {
+        Row: {
+          created_at: string
+          id: string
+          lane: Database["public"]["Enums"]["milestone_lane"]
+          note: string | null
+          position: number
+          quote_id: string
+          target_duration: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lane?: Database["public"]["Enums"]["milestone_lane"]
+          note?: string | null
+          position?: number
+          quote_id: string
+          target_duration?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lane?: Database["public"]["Enums"]["milestone_lane"]
+          note?: string | null
+          position?: number
+          quote_id?: string
+          target_duration?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_versions: {
         Row: {
           change_request: string | null
@@ -844,6 +888,7 @@ export type Database = {
         | "partially_paid"
         | "overdue"
         | "cancelled"
+      milestone_lane: "not_started" | "in_progress" | "testing" | "done"
       proposal_status:
         | "draft"
         | "sent"
@@ -1005,6 +1050,7 @@ export const Constants = {
         "overdue",
         "cancelled",
       ],
+      milestone_lane: ["not_started", "in_progress", "testing", "done"],
       proposal_status: [
         "draft",
         "sent",
