@@ -1,9 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { expect, test } from "@playwright/test";
 
 import { normaliseExtractedLineItems, normalisePhases } from "@/lib/import.functions";
 
-describe("normaliseExtractedLineItems", () => {
-  it("keeps well-formed priced rows and drops the rest", () => {
+test("keeps well-formed priced rows and drops the rest", () => {
     const rows = normaliseExtractedLineItems([
       { label: " Phase 1 – Discovery ", amountCents: 120000, durationLabel: " 5 days " },
       { label: "No price" },
@@ -18,18 +17,16 @@ describe("normaliseExtractedLineItems", () => {
     ]);
   });
 
-  it("returns an empty list when the model sends nothing usable", () => {
+test("returns an empty list when the model sends nothing usable", () => {
     expect(normaliseExtractedLineItems(undefined)).toEqual([]);
     expect(normaliseExtractedLineItems("nope")).toEqual([]);
   });
-});
 
-describe("normalisePhases", () => {
-  it("uses the document's phase list when present", () => {
+test("uses the document's phase list when present", () => {
     expect(normalisePhases([" Discovery ", "Build", ""], [])).toEqual(["Discovery", "Build"]);
   });
 
-  it("falls back to phase-like line items", () => {
+test("falls back to phase-like line items", () => {
     const items = [
       { label: "Phase 1 – Discovery", amountCents: 1 },
       { label: "Hosting", amountCents: 1 },
