@@ -220,6 +220,57 @@ function ImportProjectPage() {
       />
       <Section>
         <div className="mx-auto max-w-3xl space-y-8">
+          <div className="rounded-2xl border border-primary/30 bg-background p-6 shadow-card">
+            <h2 className="text-xl">Upload a proposal you already sent</h2>
+            <p className="mt-1 text-sm text-slate">
+              PDF, Word (.docx), markdown or plain text, up to 10 MB. We read the document and prefill
+              everything below — the proposal text, the client details, and any costs, durations and
+              phases it contains. Nothing is saved until you press “Import project”.
+            </p>
+            <input
+              ref={fileInputRef}
+              className="sr-only"
+              type="file"
+              tabIndex={-1}
+              accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void readFile(file);
+                event.target.value = "";
+              }}
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                className="shadow-cta"
+                disabled={reading}
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="import-upload"
+              >
+                {reading ? "Reading the document…" : "Choose a PDF or Word file"}
+              </Button>
+              {uploadedName ? (
+                <span className="text-sm text-slate">{uploadedName}</span>
+              ) : null}
+            </div>
+            {reading ? (
+              <p className="mt-2 text-sm text-slate" role="status">
+                Reading the document and converting it to the BLEXware format…
+              </p>
+            ) : null}
+            {pricingFromFile ? (
+              <p className="mt-2 text-sm text-foreground">
+                Cost and schedule details were read from the document — check the amounts in the
+                estimate section before importing.
+              </p>
+            ) : null}
+            {phases.length ? (
+              <p className="mt-2 text-sm text-slate">
+                {phases.length} phase{phases.length === 1 ? "" : "s"} found — they'll be added to the
+                Milestones board under “Not started”.
+              </p>
+            ) : null}
+          </div>
+
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Start from a saved project</h2>
             <p className="mt-1 text-sm text-slate">
