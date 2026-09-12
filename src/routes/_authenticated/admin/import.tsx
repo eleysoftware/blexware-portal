@@ -198,6 +198,7 @@ function ImportProjectPage() {
           documentTitle,
           proposalMarkdown,
           stage,
+          ...(phases.length ? { phases } : {}),
           ...(needsEstimate
             ? { lineItems, durationNote, discountCents, discountLabel }
             : {}),
