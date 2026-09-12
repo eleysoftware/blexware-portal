@@ -311,6 +311,22 @@ export const importProject = createServerFn({ method: "POST" })
         estimateId = estimate.id as string;
       }
 
+      const phases = (data.phases ?? [])
+        .map((phase) => phase.trim())
+        .filter(Boolean)
+        .slice(0, 40);
+      if (phases.length) {
+        const { error: milestoneError } = await db.from("project_milestones").insert(
+          phases.map((title, index) => ({
+            quote_id: quoteId,
+            title,
+            lane: "not_started",
+            position: index,
+          })),
+        );
+        if (milestoneError) console.error("[importProject] milestones", milestoneError.message);
+      }
+
       await writeAudit({
         actorId: context.userId,
         action: "project.imported",
