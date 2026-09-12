@@ -27,6 +27,7 @@ Today deleting only happens from the archived list and uses plain browser pop-up
 - Projects with a signed SOW or issued invoices still cannot be deleted; the dialog says so up front and offers Archive instead.
 - Archiving keeps its own lighter confirmation dialog (reversible, no typing).
 - After deleting from the project page, return to the project list with a confirmation message.
+- Make the Archived filter tab more discoverable: add a secondary "View archived" link in the page actions row and, when a project is archived on the project page, show an "Open Archived view" button that takes the admin back to /admin filtered to archived.
 
 ## Technical notes
 
