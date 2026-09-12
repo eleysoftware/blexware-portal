@@ -150,6 +150,9 @@ export const extractProposalFromFile = createServerFn({ method: "POST" })
         const parsed = JSON.parse(content) as Partial<ExtractProposalResult>;
         const markdown = parsed.markdown?.trim();
         if (!markdown) throw new Error("empty markdown from AI");
+        const lineItems = normaliseExtractedLineItems(parsed.lineItems);
+        const phases = normalisePhases(parsed.phases, lineItems);
+        const discountCents = Number(parsed.discountCents);
         return {
           markdown,
           ...(parsed.documentTitle?.trim() ? { documentTitle: parsed.documentTitle.trim() } : {}),
@@ -157,6 +160,15 @@ export const extractProposalFromFile = createServerFn({ method: "POST" })
           ...(parsed.contactEmail?.trim() ? { contactEmail: parsed.contactEmail.trim() } : {}),
           ...(parsed.company?.trim() ? { company: parsed.company.trim() } : {}),
           ...(parsed.projectType?.trim() ? { projectType: parsed.projectType.trim() } : {}),
+          ...(lineItems.length ? { lineItems } : {}),
+          ...(Number.isFinite(discountCents) && discountCents > 0
+            ? {
+                discountCents: Math.round(discountCents),
+                discountLabel: parsed.discountLabel?.trim() || "Discount",
+              }
+            : {}),
+          ...(parsed.durationNote?.trim() ? { durationNote: parsed.durationNote.trim() } : {}),
+          ...(phases.length ? { phases } : {}),
           aiFormatted: true,
         } as ExtractProposalResult;
       } catch (error) {
