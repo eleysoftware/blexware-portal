@@ -49,6 +49,10 @@ function ImportProjectPage() {
   const runImport = useServerFn(importProject);
   const runExtract = useServerFn(extractProposalFromFile);
   const [reading, setReading] = useState(false);
+  const [uploadedName, setUploadedName] = useState("");
+  const [pricingFromFile, setPricingFromFile] = useState(false);
+  const [phases, setPhases] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
