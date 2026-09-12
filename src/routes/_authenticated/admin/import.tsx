@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHero } from "@/components/PageHero";
+import { ProposalUploadHelp } from "@/components/ProposalUploadHelp";
 import { Section } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,12 +223,17 @@ function ImportProjectPage() {
       <Section>
         <div className="mx-auto max-w-3xl space-y-8">
           <div className="rounded-2xl border border-primary/30 bg-background p-6 shadow-card">
-            <h2 className="text-xl">Upload a proposal you already sent</h2>
-            <p className="mt-1 text-sm text-slate">
-              PDF, Word (.docx), markdown or plain text, up to 10 MB. We read the document and prefill
-              everything below — the proposal text, the client details, and any costs, durations and
-              phases it contains. Nothing is saved until you press “Import project”.
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl">Upload a proposal you already sent</h2>
+                <p className="mt-1 text-sm text-slate">
+                  PDF, Word (.docx), markdown or plain text, up to 10 MB. We read the document and
+                  prefill everything below — the proposal text, the client details, and any costs,
+                  durations and phases it contains. Nothing is saved until you press “Import project”.
+                </p>
+              </div>
+              <ProposalUploadHelp />
+            </div>
             <input
               ref={fileInputRef}
               className="sr-only"
@@ -253,6 +259,10 @@ function ImportProjectPage() {
                 <span className="text-sm text-slate">{uploadedName}</span>
               ) : null}
             </div>
+            <p className="mt-3 text-xs text-slate">
+              Tip: for cost &amp; schedule estimates to import, each line item should show a label,
+              dollar amount, and optional duration (e.g., “Discovery — $1,200 — 1 week”).
+            </p>
             {reading ? (
               <p className="mt-2 text-sm text-slate" role="status">
                 Reading the document and converting it to the BLEXware format…
