@@ -360,9 +360,8 @@ function ImportProjectPage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Proposal content</h2>
             <p className="mt-1 text-sm text-slate">
-              Upload the proposal you already sent — PDF, Word (.docx), markdown or plain text, up to 10 MB
-              — and it is converted into the BLEXware proposal format below. You can also paste the text in
-              directly using <code>##</code> headings for each section.
+              Filled in from the uploaded document. You can edit it here, or paste text in directly
+              using <code>##</code> headings for each section.
             </p>
             <label className="mt-4 block text-sm font-medium">
               Document title (optional)
@@ -373,22 +372,6 @@ function ImportProjectPage() {
                 onChange={(e) => setDocumentTitle(e.target.value)}
               />
             </label>
-            <input
-              className="mt-4 block w-full text-sm text-slate"
-              type="file"
-              disabled={reading}
-              accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
-              aria-label="Upload a PDF, Word, markdown or text proposal"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void readFile(file);
-              }}
-            />
-            {reading ? (
-              <p className="mt-2 text-sm text-slate" role="status">
-                Reading the document and converting it to the BLEXware format…
-              </p>
-            ) : null}
             <Textarea
               className="mt-4 font-mono text-sm"
               rows={14}
