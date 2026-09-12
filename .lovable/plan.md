@@ -8,6 +8,10 @@ On the Import Existing Project page, next to the upload button, add a "How this 
 
 - Which files work: PDF, Word (.docx), Markdown, plain text, up to 10 MB. Old `.doc` files and scanned/photo-only PDFs can't be read — save as PDF/Word text or paste the text instead.
 - What gets filled in automatically: client name and email, company, project title, the proposal text, the priced line items with durations, any discount, the overall duration note, and the project phases.
+- What the file should contain for cost & schedule estimates to import correctly:
+  - Each line item should include a short label, a dollar amount, and an optional duration (e.g., "Discovery — $1,200 — 1 week").
+  - A subtotal and any discount should be listed near the total.
+  - A project duration or timeline note should be stated explicitly.
 - Where each part lands: pricing goes to the Cost & schedule estimate section, phases go to the Milestones board as "Not started".
 - That everything is a draft for review — nothing is sent to the client until it is imported and sent.
 - What to do if something is missing: fix it directly in the fields below, or re-upload a cleaner file.
