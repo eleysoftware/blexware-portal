@@ -114,6 +114,7 @@ function ImportProjectPage() {
     const name = file.name.toLowerCase();
     const isPlainText =
       name.endsWith(".md") || name.endsWith(".markdown") || name.endsWith(".txt");
+    setUploadedName(file.name);
 
     if (isPlainText) {
       const text = await file.text();
