@@ -209,6 +209,17 @@ function QuoteDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (quoteNumber: string) =>
+      deleteProject({ data: { id, confirmQuoteNumber: quoteNumber } }),
+    onSuccess: (_, quoteNumber) => {
+      toast.success(`${quoteNumber} deleted`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      navigate({ to: "/admin" });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const copyReviewLink = async () => {
     if (!proposal?.review_token) return;
     const url = `${window.location.origin}/proposal/${proposal.review_token}`;
