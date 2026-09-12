@@ -259,7 +259,6 @@ function QuoteDetailPage() {
 
   const { quote, files, audit } = detail.data;
 
-  const deleteProject = useServerFn(deleteQuotePermanently);
   const hasSignedSow = engagement.data?.agreements.some((a) => a.status === "signed") ?? false;
   const hasInvoices = (engagement.data?.invoices.length ?? 0) > 0;
 
