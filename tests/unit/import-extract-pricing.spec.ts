@@ -33,4 +33,3 @@ test("falls back to phase-like line items", () => {
     ];
     expect(normalisePhases(undefined, items)).toEqual(["Phase 1 – Discovery"]);
   });
-});
