@@ -95,6 +95,7 @@ function ImportProjectPage() {
     setDiscount(values.discount);
     setDiscountLabel(values.discountLabel);
     setRows(values.rows);
+    setPhases(values.rows.map((row) => row.label.trim()).filter(Boolean));
     toast.success(`Prefilled ${template.label} — review before importing.`);
   };
 
