@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
+import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { MilestoneBoard } from "@/components/MilestoneBoard";
@@ -20,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 import {
+  archiveQuote,
+  deleteQuotePermanently,
   generateProposal,
   getAiStatus,
   getQuoteDetail,
@@ -46,6 +49,7 @@ function formatBytes(bytes: number) {
 
 function QuoteDetailPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const fetchDetail = useServerFn(getQuoteDetail);
@@ -192,6 +196,18 @@ function QuoteDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const archiveProject = useServerFn(archiveQuote);
+
+  const archiveMutation = useMutation({
+    mutationFn: (archived: boolean) => archiveProject({ data: { id, archived } }),
+    onSuccess: (_, archived) => {
+      toast.success(archived ? "Project archived" : "Project restored");
+      void invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const copyReviewLink = async () => {
     if (!proposal?.review_token) return;
     const url = `${window.location.origin}/proposal/${proposal.review_token}`;
@@ -242,6 +258,20 @@ function QuoteDetailPage() {
 
   const { quote, files, audit } = detail.data;
 
+  const deleteProject = useServerFn(deleteQuotePermanently);
+  const hasSignedSow = engagement.data?.agreements.some((a) => a.status === "signed") ?? false;
+  const hasInvoices = (engagement.data?.invoices.length ?? 0) > 0;
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteProject({ data: { id, confirmQuoteNumber: quote.quote_number } }),
+    onSuccess: () => {
+      toast.success(`${quote.quote_number} deleted`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      navigate({ to: "/admin" });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   return (
     <Section>
       <Link to="/admin" className="text-sm text-primary underline-offset-4 hover:underline">
@@ -258,6 +288,36 @@ function QuoteDetailPage() {
               {quote.contact_email}
             </a>
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={archiveMutation.isPending}
+            onClick={() => archiveMutation.mutate(!quote.deleted_at)}
+          >
+            {quote.deleted_at ? "Restore project" : "Archive project"}
+          </Button>
+          {quote.deleted_at ? (
+            <DeleteProjectDialog
+              quoteNumber={quote.quote_number}
+              contactName={quote.contact_name}
+              contactEmail={quote.contact_email}
+              company={quote.company}
+              hasSignedSow={hasSignedSow}
+              hasInvoices={hasInvoices}
+              onConfirm={() => deleteMutation.mutate()}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive"
+                disabled={deleteMutation.isPending}
+              >
+                Delete project
+              </Button>
+            </DeleteProjectDialog>
+          ) : null}
         </div>
         <StageRail
           className="w-full max-w-md"

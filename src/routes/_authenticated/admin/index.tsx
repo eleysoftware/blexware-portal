@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
+import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
@@ -43,6 +44,9 @@ function AdminDashboard() {
 
   const [converting, setConverting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<NonNullable<
+    typeof quotes.data
+  >["quotes"][number] | null>(null);
   const convertProposals = useServerFn(refreshProposalDocuments);
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
@@ -74,15 +78,14 @@ function AdminDashboard() {
     }
   };
 
-  const permanentlyDelete = async (id: string, label: string) => {
-    const typed = window.prompt(
-      `This permanently deletes ${label} and everything attached to it. Type the quote number to confirm.`,
-    );
-    if (!typed) return;
+  const handleDeleteConfirm = async (target: NonNullable<typeof quotes.data>["quotes"][number]) => {
+    const id = target.id as string;
+    const label = String(target.quote_number);
     setBusyId(id);
     try {
-      await deleteQuote({ data: { id, confirmQuoteNumber: typed } });
+      await deleteQuote({ data: { id, confirmQuoteNumber: label } });
       toast.success(`${label} deleted.`);
+      setDeleteTarget(null);
       void queryClient.invalidateQueries({ queryKey: ["quotes"] });
     } catch (error) {
       toast.error((error as Error).message);
@@ -184,6 +187,14 @@ function AdminDashboard() {
           </Button>
           <Button size="sm" asChild className="shadow-cta">
             <Link to="/admin/invoices/new">New invoice</Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilter("archived")}
+            disabled={filter === "archived"}
+          >
+            View archived
           </Button>
           <Button
             variant="ghost"
@@ -362,15 +373,24 @@ function AdminDashboard() {
                                       {archived ? "Restore" : "Archive"}
                                     </Button>
                                     {archived ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive"
-                                        disabled={busyId === id}
-                                        onClick={() => void permanentlyDelete(id, label)}
+                                      <DeleteProjectDialog
+                                        quoteNumber={label}
+                                        contactName={String(quote.contact_name ?? "")}
+                                        contactEmail={String(quote.contact_email ?? "")}
+                                        company={quote.company as string | null | undefined}
+                                        hasSignedSow={false}
+                                        hasInvoices={Boolean(billing[id]?.billedCents)}
+                                        onConfirm={() => handleDeleteConfirm(quote)}
                                       >
-                                        Delete
-                                      </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-destructive"
+                                          disabled={busyId === id}
+                                        >
+                                          Delete
+                                        </Button>
+                                      </DeleteProjectDialog>
                                     ) : null}
                                   </span>
                                 </td>
