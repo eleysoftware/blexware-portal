@@ -61,6 +61,7 @@ function QuoteDetailPage() {
   const refreshDocs = useServerFn(refreshProposalDocuments);
   const docUrl = useServerFn(getDocumentUrl);
   const aiStatusFn = useServerFn(getAiStatus);
+  const deleteProject = useServerFn(deleteQuotePermanently);
 
   const detail = useQuery({
     queryKey: ["quote", id],
