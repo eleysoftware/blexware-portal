@@ -209,6 +209,17 @@ function QuoteDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (quoteNumber: string) =>
+      deleteProject({ data: { id, confirmQuoteNumber: quoteNumber } }),
+    onSuccess: (_, quoteNumber) => {
+      toast.success(`${quoteNumber} deleted`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      navigate({ to: "/admin" });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const copyReviewLink = async () => {
     if (!proposal?.review_token) return;
     const url = `${window.location.origin}/proposal/${proposal.review_token}`;
@@ -262,15 +273,6 @@ function QuoteDetailPage() {
   const hasSignedSow = engagement.data?.agreements.some((a) => a.status === "signed") ?? false;
   const hasInvoices = (engagement.data?.invoices.length ?? 0) > 0;
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteProject({ data: { id, confirmQuoteNumber: quote.quote_number } }),
-    onSuccess: () => {
-      toast.success(`${quote.quote_number} deleted`);
-      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      navigate({ to: "/admin" });
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
 
   return (
     <Section>
@@ -306,7 +308,7 @@ function QuoteDetailPage() {
               company={quote.company}
               hasSignedSow={hasSignedSow}
               hasInvoices={hasInvoices}
-              onConfirm={() => deleteMutation.mutate()}
+              onConfirm={() => deleteMutation.mutate(quote.quote_number)}
             >
               <Button
                 variant="ghost"
