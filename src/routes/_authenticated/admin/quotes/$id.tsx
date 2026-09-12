@@ -273,15 +273,6 @@ function QuoteDetailPage() {
   const hasSignedSow = engagement.data?.agreements.some((a) => a.status === "signed") ?? false;
   const hasInvoices = (engagement.data?.invoices.length ?? 0) > 0;
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteProject({ data: { id, confirmQuoteNumber: quote.quote_number } }),
-    onSuccess: () => {
-      toast.success(`${quote.quote_number} deleted`);
-      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      navigate({ to: "/admin" });
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
 
   return (
     <Section>
