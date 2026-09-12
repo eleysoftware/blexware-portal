@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
+import { MilestoneBoard } from "@/components/MilestoneBoard";
 import { Section } from "@/components/Section";
 import { NextStepBanner } from "@/components/NextStepBanner";
 import { StageRail } from "@/components/StageRail";
@@ -100,6 +101,7 @@ function QuoteDetailPage() {
           { id: "estimate", label: "Estimate" },
           { id: "sow", label: "SOW" },
         ]),
+    { id: "milestones", label: "Milestones" },
     { id: "invoices", label: "Invoices" },
     { id: "activity", label: "Activity" },
   ].map((item) =>
@@ -495,6 +497,11 @@ function QuoteDetailPage() {
         <WorkspacePanel id="sow" active={tab === "sow"}>
           <TabIntro purpose={getTabPurpose("sow", "admin")} />
           <AdminEngagementPanel quoteId={id} proposalId={proposal?.id ?? null} tab="sow" />
+        </WorkspacePanel>
+
+        <WorkspacePanel id="milestones" active={tab === "milestones"}>
+          <TabIntro purpose={getTabPurpose("milestones", "admin")} />
+          <MilestoneBoard quoteId={id} />
         </WorkspacePanel>
 
         <WorkspacePanel id="invoices" active={tab === "invoices"}>

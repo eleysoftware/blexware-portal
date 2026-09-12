@@ -132,6 +132,7 @@ function PortalQuoteDetail() {
           { id: "estimate", label: "Estimate" },
           { id: "sow", label: "SOW" },
         ]),
+    { id: "milestones", label: "Milestones" },
     { id: "invoices", label: "Invoices" },
   ].map((item) =>
     item.id === nextStep.tab
@@ -297,6 +298,11 @@ function PortalQuoteDetail() {
         <WorkspacePanel id="sow" active={tab === "sow"}>
           <TabIntro purpose={getTabPurpose("sow", "client")} />
           <EngagementPanel quoteId={id} tab="sow" />
+        </WorkspacePanel>
+
+        <WorkspacePanel id="milestones" active={tab === "milestones"}>
+          <TabIntro purpose={getTabPurpose("milestones", "client")} />
+          <MilestoneBoard quoteId={id} readOnly />
         </WorkspacePanel>
 
         <WorkspacePanel id="invoices" active={tab === "invoices"}>
