@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { EngagementPanel } from "@/components/EngagementPanel";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
+import { MilestoneBoard } from "@/components/MilestoneBoard";
 import { Section } from "@/components/Section";
 import { NextStepBanner } from "@/components/NextStepBanner";
 import { StageRail } from "@/components/StageRail";
