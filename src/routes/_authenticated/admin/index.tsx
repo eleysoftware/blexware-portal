@@ -409,6 +409,8 @@ function AdminDashboard() {
         </div>
 
 
+        <PaymentEnvironmentCard />
+
         <PaymentMethodSettingsCard />
 
         <CreateTeamMemberCard />
