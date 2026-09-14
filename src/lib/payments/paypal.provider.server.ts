@@ -230,7 +230,6 @@ export const paypalProvider: PaymentProvider = {
             },
           },
         ],
-        payment_source: input.methods === "card" ? { card: {} } : undefined,
         application_context: {
           return_url: input.returnUrl,
           cancel_url: input.returnUrl,
@@ -240,7 +239,9 @@ export const paypalProvider: PaymentProvider = {
         },
       },
     });
-    return orderToSnapshot(order);
+    const snapshot = orderToSnapshot(order);
+    // The order id is what the PayPal JS SDK needs to render the buttons.
+    return { ...snapshot, clientToken: order.id };
   },
 
   async getPayment(providerPaymentId: string): Promise<PaymentSnapshot> {
