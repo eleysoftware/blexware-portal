@@ -207,13 +207,17 @@ function SignUpForm() {
       <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-5">
         <h2 className="text-sm font-semibold text-foreground">Check your email</h2>
         <p className="text-sm text-slate">
-          We sent a confirmation link to <span className="font-medium">{email}</span>. Confirm your
-          address, then come back and sign in. The link can only be used once and expires, so
-          request a fresh one if it stops working.
+          We sent a <span className="font-medium">Supabase Auth</span> confirmation link to{" "}
+          <span className="font-medium">{email}</span>. Look for an email from Supabase Auth (check
+          your spam folder if it isn't there), confirm your address, then come back and sign in. The
+          link can only be used once and expires, so request a fresh one if it stops working.
         </p>
         <Button variant="outline" size="sm" onClick={resend} disabled={busy}>
           {busy ? "Sending…" : "Resend confirmation email"}
         </Button>
+        <p className="text-xs text-slate">
+          A new link also arrives from Supabase Auth, and it replaces any earlier one.
+        </p>
       </div>
     );
   }
