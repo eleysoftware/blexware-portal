@@ -459,6 +459,81 @@ export const getQuoteDetail = createServerFn({ method: "POST" })
     }),
   );
 
+/**
+ * Correct a client's contact details across every project that shares their
+ * email address (archived rows included, so nothing is left behind).
+ */
+export const updateClientDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      currentEmail: string;
+      contactName: string;
+      company: string | null;
+      contactEmail: string;
+      phone: string | null;
+    }) => {
+      const currentEmail = data.currentEmail.trim().toLowerCase();
+      const contactEmail = data.contactEmail.trim().toLowerCase();
+      const contactName = data.contactName.trim();
+      if (!currentEmail) throw new Error("Missing the client to update");
+      if (contactName.length < 2 || contactName.length > 80) {
+        throw new Error("Enter the contact's name");
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) || contactEmail.length > 160) {
+        throw new Error("Enter a valid email address");
+      }
+      const company = data.company?.trim() ? data.company.trim().slice(0, 120) : null;
+      const phone = data.phone?.trim() ? data.phone.trim().slice(0, 40) : null;
+      return { currentEmail, contactEmail, contactName, company, phone };
+    },
+  )
+  .handler(
+    guarded("updateClientDetails", "saving the client details", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+
+      const db = adminDb();
+      const { data: rows, error: findError } = await db
+        .from("quotes")
+        .select("id")
+        .ilike("contact_email", data.currentEmail);
+      if (findError) throw new Error(findError.message);
+
+      const ids = (rows ?? []).map((row: { id: string }) => row.id);
+      if (!ids.length) throw new Error("No projects found for this client");
+
+      const { error } = await db
+        .from("quotes")
+        .update({
+          contact_name: data.contactName,
+          company: data.company,
+          contact_email: data.contactEmail,
+          phone: data.phone,
+        })
+        .in("id", ids);
+      if (error) throw new Error(error.message);
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims['email'] ?? context.userId),
+        action: "client.details_updated",
+        entity: "client",
+        entityId: data.contactEmail,
+        metadata: {
+          from: data.currentEmail,
+          to: data.contactEmail,
+          contactName: data.contactName,
+          company: data.company,
+          phone: data.phone,
+          quoteCount: ids.length,
+        },
+      });
+
+      return { ok: true, updated: ids.length };
+    }),
+  );
+
 export const updateQuoteStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { id: string; status: QuoteStatus }) => {
