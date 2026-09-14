@@ -943,6 +943,56 @@ export const sendInvoiceNow = createServerFn({ method: "POST" })
     }),
   );
 
+/**
+ * Sets an invoice's status by hand (no email sent). Used when delivery fails
+ * and the team shares the payment link themselves.
+ */
+export const setInvoiceStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { invoiceId: string; status: string }) => {
+    if (!data.invoiceId) throw new Error("Choose an invoice");
+    if (!data.status) throw new Error("Choose a status");
+    return data;
+  })
+  .handler(
+    guarded("setInvoiceStatus", "updating the invoice status", async ({ data, context }) => {
+      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { canSetInvoiceStatus } = await import("@/lib/invoice-status");
+
+      const db = adminDb();
+      const { data: invoice } = await db
+        .from("invoices")
+        .select("id, status, invoice_number, quote_id, sent_at")
+        .eq("id", data.invoiceId)
+        .maybeSingle();
+      if (!invoice) throw new Error("Invoice not found");
+
+      const from = String(invoice.status);
+      if (from === data.status) return { status: from, changed: false };
+      if (!canSetInvoiceStatus(from, data.status)) {
+        throw new Error(`An invoice that is ${from} can't be changed to ${data.status}.`);
+      }
+
+      const patch: Record<string, unknown> = { status: data.status };
+      if (data.status === "sent" && !invoice.sent_at) patch["sent_at"] = new Date().toISOString();
+      if (from === "scheduled") patch["scheduled_send_at"] = null;
+
+      const { error } = await db.from("invoices").update(patch).eq("id", invoice.id);
+      if (error) throw new Error(error.message);
+
+      await db.from("audit_log").insert({
+        actor_id: context.userId,
+        action: "invoice.status_changed",
+        entity: "invoice",
+        entity_id: String(invoice.id),
+        metadata: { from, to: data.status, invoice_number: invoice.invoice_number },
+      });
+
+      return { status: data.status, changed: true };
+    }),
+  );
+
 /** Issues a full or partial refund against a settled payment. */
 export const refundPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

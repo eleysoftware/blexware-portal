@@ -9,6 +9,7 @@ import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
 import { PaymentEnvironmentCard } from "@/components/admin/PaymentEnvironmentCard";
+import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -489,6 +490,11 @@ function AdminDashboard() {
                                                 {invoice.invoiceNumber}
                                               </span>
                                               <Badge variant="outline">{invoice.status}</Badge>
+                                              {invoice.status === "scheduled" ? (
+                                                <span className="text-xs text-slate">
+                                                  Client can't open this link yet — set it to Sent.
+                                                </span>
+                                              ) : null}
                                               {failure ? (
                                                 <Badge
                                                   variant="destructive"
@@ -529,6 +535,11 @@ function AdminDashboard() {
                                                       : "Send now"}
                                                 </Button>
                                               ) : null}
+                                              <InvoiceStatusControl
+                                                invoiceId={invoice.id}
+                                                invoiceNumber={invoice.invoiceNumber}
+                                                status={invoice.status}
+                                              />
                                               {invoice.payToken ? (
                                                 <>
                                                   <Button
