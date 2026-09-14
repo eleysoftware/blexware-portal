@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/documents/types";
+import { describeEmailFailure, isOutOfCredits } from "@/lib/email-failure";
 
 import {
   archiveQuote,
@@ -56,7 +57,10 @@ function AdminDashboard() {
     try {
       const result = await resendInvoice({ data: { invoiceId } });
       if (result.emailed) toast.success("Invoice emailed to the client.");
-      else toast.error(`Still not delivered: ${result.reason ?? "unknown error"}`);
+      else {
+        const failure = describeEmailFailure(result.reason);
+        toast.error(`${failure.headline}. ${failure.action}`);
+      }
       void queryClient.invalidateQueries({ queryKey: ["quotes"] });
     } catch (error) {
       toast.error((error as Error).message);
