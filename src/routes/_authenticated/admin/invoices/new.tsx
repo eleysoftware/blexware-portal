@@ -232,7 +232,10 @@ function NewInvoicePage() {
                 <select
                   className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                   value={existingQuoteId}
-                  onChange={(event) => setExistingQuoteId(event.target.value)}
+                  onChange={(event) => {
+                    touchedProject.current = true;
+                    setExistingQuoteId(event.target.value);
+                  }}
                 >
                   <option value="">Start a new project</option>
                   {projects.data.projects.map((project) => (
