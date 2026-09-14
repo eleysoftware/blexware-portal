@@ -96,7 +96,7 @@ function toSnapshot(payment: HyperswitchPayment): PaymentSnapshot {
 
 export function createHyperswitchProvider(environment: "sandbox" | "live" = "sandbox"): PaymentProvider {
   const hsEnv: "sandbox" | "production" = environment === "live" ? "production" : "sandbox";
-  const config = () => hyperswitchConfig(hsEnv);
+  const hsConfig = () => hyperswitchConfig(hsEnv);
   const request = <T,>(path: string, init: { method: "GET" | "POST"; body?: unknown } = { method: "GET" }) =>
     hyperswitchRequest<T>(path, init, hsEnv);
 
@@ -108,7 +108,7 @@ export function createHyperswitchProvider(environment: "sandbox" | "live" = "san
   },
 
   publicConfig(): PublicConfig {
-    const config = config();
+    const config = hsConfig();
     return {
       provider: "hyperswitch",
       checkout: {
@@ -121,7 +121,7 @@ export function createHyperswitchProvider(environment: "sandbox" | "live" = "san
   },
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentSnapshot> {
-    const config = config();
+    const config = hsConfig();
     const payment = await request<HyperswitchPayment>("/payments", {
       method: "POST",
       body: {
@@ -210,7 +210,7 @@ export function createHyperswitchProvider(environment: "sandbox" | "live" = "san
   },
 
   async parseWebhook(request: Request): Promise<WebhookParseResult> {
-    const secret = config().webhookSecret ?? "";
+    const secret = hsConfig().webhookSecret ?? "";
     if (!secret) return { kind: "ignore" };
 
     const body = await request.text();
