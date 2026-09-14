@@ -356,16 +356,19 @@ export async function markInvoiceViewed(invoiceId: string, status: string, viewe
 }
 
 /**
- * Creates a Hyperswitch payment for an invoice. The amount is always computed
- * server-side from the stored invoice; the browser cannot influence it. The
- * client only chooses the method family (bank/ACH or card).
+ * Creates a payment for an invoice through the active payment provider. The
+ * amount is always computed server-side from the stored invoice; the browser
+ * cannot influence it. The client only chooses the method family (bank/ACH or
+ * card), and the provider decides how that family is presented.
  */
 export async function startInvoicePayment(
   payToken: string,
   method: "bank" | "card" = "bank",
   scope: "invoice" | "project" = "invoice",
 ) {
-  const { PaymentService } = await import("@/lib/payments/service.server");
+  const { PaymentService, getActiveProviderName, getActiveEnvironment } = await import(
+    "@/lib/payments/service.server"
+  );
   const { getPaymentMethodSettings } = await import("@/lib/settings.server");
   const enabled = await getPaymentMethodSettings();
   if (!enabled[method]) {
@@ -388,6 +391,8 @@ export async function startInvoicePayment(
   const amountCents = scope === "project" ? Math.max(invoiceBalance, project.balanceCents) : invoiceBalance;
   if (amountCents <= 0) throw new Error("This invoice is already paid in full.");
 
+  const provider = await getActiveProviderName();
+  const environment = await getActiveEnvironment();
 
   const { data: attempt, error: attemptError } = await db
     .from("invoice_payments")
@@ -396,6 +401,8 @@ export async function startInvoicePayment(
       amount_cents: amountCents,
       currency: String(invoice["currency"] ?? "usd"),
       status: "created",
+      provider,
+      environment,
       metadata: { method_choice: method, scope },
     })
     .select("id, payment_reference")
@@ -417,7 +424,8 @@ export async function startInvoicePayment(
   await db
     .from("invoice_payments")
     .update({
-      hyperswitch_payment_id: snapshot.providerPaymentId,
+      provider_payment_id: snapshot.providerPaymentId,
+      hyperswitch_payment_id: provider === "hyperswitch" ? snapshot.providerPaymentId : null,
       hyperswitch_connector: snapshot.connector,
       status: snapshot.status,
     })
@@ -428,20 +436,18 @@ export async function startInvoicePayment(
     action: "payment.created",
     entity: "invoice",
     entityId: invoice["id"] as string,
-    metadata: { amount_cents: amountCents, reference: attempt.payment_reference, method },
+    metadata: { amount_cents: amountCents, reference: attempt.payment_reference, method, provider, environment },
   });
 
-  const config = PaymentService.publicConfig();
+  const config = await PaymentService.publicConfig();
   return {
-    clientSecret: snapshot.clientSecret,
-    publishableKey: config.publishableKey,
-    profileId: config.profileId,
-    environment: config.environment,
+    provider: config.provider,
+    checkout: config.checkout,
+    clientToken: snapshot.clientToken,
     amountCents,
     method,
     scope,
     reference: attempt.payment_reference as string,
-
   };
 }
 
@@ -507,14 +513,25 @@ export async function applyPaymentStatus(input: {
   failureMessage?: string | null;
 }) {
   const db = adminDb();
-  const { data: attempt } = await db
+  let matchedAttempt = await db
     .from("invoice_payments")
     .select("id, invoice_id, amount_cents, status, currency")
-    .eq("hyperswitch_payment_id", input.providerPaymentId)
-    .maybeSingle();
-  if (!attempt) return { applied: false as const };
+    .eq("provider_payment_id", input.providerPaymentId)
+    .maybeSingle()
+    .then((r) => r.data);
+  if (!matchedAttempt) {
+    // Backward compatibility: older rows may only have hyperswitch_payment_id.
+    const { data: legacy } = await db
+      .from("invoice_payments")
+      .select("id, invoice_id, amount_cents, status, currency")
+      .eq("hyperswitch_payment_id", input.providerPaymentId)
+      .maybeSingle();
+    if (!legacy) return { applied: false as const };
+    await db.from("invoice_payments").update({ provider_payment_id: input.providerPaymentId }).eq("id", legacy.id);
+    matchedAttempt = legacy;
+  }
 
-  const previous = String(attempt.status);
+  const previous = String(matchedAttempt.status);
   const alreadySucceeded = previous === "succeeded";
 
   await db
@@ -528,7 +545,7 @@ export async function applyPaymentStatus(input: {
       failure_message: input.failureMessage ?? null,
       ...(input.status === "succeeded" && !alreadySucceeded ? { paid_at: new Date().toISOString() } : {}),
     })
-    .eq("id", attempt.id);
+    .eq("id", matchedAttempt.id);
 
   const { data: invoice } = await db
     .from("invoices")

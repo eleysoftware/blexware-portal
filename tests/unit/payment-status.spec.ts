@@ -5,7 +5,7 @@ import {
   METHOD_UNAVAILABLE_MESSAGE,
   isMethodUnavailable,
   mapPaymentStatus,
-} from "../../src/lib/payments/service.server";
+} from "../../src/lib/payments/hyperswitch.provider.server";
 
 test("maps captured statuses to succeeded", () => {
   expect(mapPaymentStatus("succeeded")).toBe("succeeded");

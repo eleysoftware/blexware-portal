@@ -17,11 +17,11 @@ export function defaultPaymentMethods(): { bank: boolean; card: boolean } {
 export type PaymentEnvironment = "sandbox" | "production";
 
 export function paymentsProvider(): string {
-  return (readEnv("PAYMENTS_PROVIDER", "VITE_PAYMENTS_PROVIDER") ?? "hyperswitch").toLowerCase();
+  return (readEnv("PAYMENT_PROVIDER", "PAYMENTS_PROVIDER", "VITE_PAYMENTS_PROVIDER") ?? "hyperswitch").toLowerCase();
 }
 
 export function paymentEnvironment(): PaymentEnvironment {
-  const raw = (readEnv("HYPERSWITCH_ENVIRONMENT", "VITE_HYPERSWITCH_ENVIRONMENT") ?? "sandbox").toLowerCase();
+  const raw = (readEnv("PAYMENT_ENVIRONMENT", "HYPERSWITCH_ENVIRONMENT", "VITE_HYPERSWITCH_ENVIRONMENT") ?? "sandbox").toLowerCase();
   return raw === "production" || raw === "live" ? "production" : "sandbox";
 }
 
@@ -29,9 +29,7 @@ export function paymentEnvironment(): PaymentEnvironment {
 export function hyperswitchApiUrl(): string {
   return (
     readEnv("HYPERSWITCH_API_URL", "HYPERSWITCH_BASE_URL") ??
-    (paymentEnvironment() === "production"
-      ? "https://api.hyperswitch.io"
-      : "https://sandbox.hyperswitch.io")
+    (paymentEnvironment() === "production" ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io")
   );
 }
 
@@ -54,11 +52,35 @@ export function hyperswitchWebhookSecret(): string | undefined {
   return readEnv("HYPERSWITCH_WEBHOOK_SECRET");
 }
 
-/** True when every value needed to take a payment is present. */
+function paypalEnvPrefix(env: PaymentEnvironment): string {
+  return env === "production" ? "PAYPAL_LIVE" : "PAYPAL_SANDBOX";
+}
+
+/** True when the active provider has the credentials it needs. */
 export function isPaymentsConfigured(): boolean {
+  const provider = paymentsProvider();
+  if (provider === "paypal") {
+    const prefix = paypalEnvPrefix(paymentEnvironment());
+    return Boolean(readEnv(`${prefix}_CLIENT_ID`) && readEnv(`${prefix}_SECRET`));
+  }
   return Boolean(
     readEnv("HYPERSWITCH_API_KEY") && hyperswitchPublishableKey() && hyperswitchProfileId(),
   );
+}
+
+/** PayPal client id for the active environment (browser-safe). */
+export function paypalClientId(): string | undefined {
+  return readEnv(`${paypalEnvPrefix(paymentEnvironment())}_CLIENT_ID`);
+}
+
+/** SERVER ONLY. */
+export function paypalClientSecret(): string | undefined {
+  return readEnv(`${paypalEnvPrefix(paymentEnvironment())}_SECRET`);
+}
+
+/** SERVER ONLY. Optional: webhook verification is skipped when unset. */
+export function paypalWebhookId(): string | undefined {
+  return readEnv(`${paypalEnvPrefix(paymentEnvironment())}_WEBHOOK_ID`);
 }
 
 export const payments = {
