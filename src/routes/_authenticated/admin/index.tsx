@@ -313,95 +313,211 @@ function AdminDashboard() {
                   </button>
 
                   {open ? (
-                    <div className="overflow-x-auto border-t border-border">
-                      <table className="w-full min-w-[860px] text-left text-sm">
-                        <thead className="border-b border-border text-xs uppercase tracking-wide text-slate">
-                          <tr>
-                            <th className="px-5 py-3">Quote</th>
-                            <th className="px-5 py-3">Project</th>
-                            <th className="px-5 py-3">Budget</th>
-                            <th className="px-5 py-3">Status</th>
-                            <th className="px-5 py-3">Outstanding</th>
-                            <th className="px-5 py-3">Received</th>
-                            <th className="px-5 py-3 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {client.quotes.map((quote) => {
-                            const id = quote.id as string;
-                            const label = String(quote.quote_number);
-                            const archived = Boolean(quote.deleted_at);
-                            const owed = billing[id]?.outstandingCents ?? 0;
-                            return (
-                              <tr key={id} className="border-b border-border/60 last:border-0">
-                                <td className="px-5 py-4 font-medium">
-                                  <Link
-                                    to="/admin/quotes/$id"
-                                    params={{ id }}
-                                    className="text-primary underline-offset-4 hover:underline"
-                                  >
-                                    {label}
-                                  </Link>
-                                </td>
-                                <td className="px-5 py-4 text-slate">
-                                  {quote.project_type} · {quote.industry}
-                                </td>
-                                <td className="px-5 py-4 text-slate">{quote.budget}</td>
-                                <td className="px-5 py-4">
-                                  <span className="flex flex-wrap items-center gap-2">
-                                    <Badge variant="secondary">
-                                      {
-                                        quoteStatusLabels[
-                                          quote.status as keyof typeof quoteStatusLabels
-                                        ]
-                                      }
-                                    </Badge>
-                                    {archived ? <Badge variant="outline">Archived</Badge> : null}
-                                  </span>
-                                </td>
-                                <td className="px-5 py-4 text-slate">
-                                  {owed > 0 ? formatMoney(owed) : "—"}
-                                </td>
-                                <td className="px-5 py-4 text-slate">
-                                  {new Date(quote.created_at as string).toLocaleDateString()}
-                                </td>
-                                <td className="px-5 py-4">
-                                  <span className="flex justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      disabled={busyId === id}
-                                      onClick={() => void toggleArchive(id, !archived, label)}
-                                    >
-                                      {archived ? "Restore" : "Archive"}
-                                    </Button>
-                                    {archived ? (
-                                      <DeleteProjectDialog
-                                        quoteNumber={label}
-                                        contactName={String(quote.contact_name ?? "")}
-                                        contactEmail={String(quote.contact_email ?? "")}
-                                        company={quote.company as string | null | undefined}
-                                        hasSignedSow={false}
-                                        hasInvoices={Boolean(billing[id]?.billedCents)}
-                                        onConfirm={() => handleDeleteConfirm(quote)}
+                    <div className="divide-y divide-border border-t border-border">
+                      {(() => {
+                        const shells = client.quotes.filter(
+                          (quote) =>
+                            !(invoicesByQuote[quote.id as string] ?? []).length &&
+                            !hasProposal[quote.id as string],
+                        );
+                        const active = client.quotes.filter((quote) => !shells.includes(quote));
+                        return (
+                          <>
+                            {active.map((quote) => {
+                              const id = quote.id as string;
+                              const label = String(quote.quote_number);
+                              const archived = Boolean(quote.deleted_at);
+                              const owed = billing[id]?.outstandingCents ?? 0;
+                              const rows = invoicesByQuote[id] ?? [];
+                              return (
+                                <div key={id} className="px-5 py-4">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <Link
+                                        to="/admin/quotes/$id"
+                                        params={{ id }}
+                                        className="font-medium text-primary underline-offset-4 hover:underline"
                                       >
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-destructive"
-                                          disabled={busyId === id}
+                                        {label} — {quote.project_type}
+                                      </Link>
+                                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate">
+                                        <Badge variant="secondary">
+                                          {
+                                            quoteStatusLabels[
+                                              quote.status as keyof typeof quoteStatusLabels
+                                            ]
+                                          }
+                                        </Badge>
+                                        {archived ? <Badge variant="outline">Archived</Badge> : null}
+                                        <span>
+                                          Started{" "}
+                                          {new Date(
+                                            quote.created_at as string,
+                                          ).toLocaleDateString()}
+                                        </span>
+                                        <span>
+                                          {owed > 0
+                                            ? `${formatMoney(owed)} outstanding`
+                                            : "Nothing outstanding"}
+                                        </span>
+                                      </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={busyId === id}
+                                        onClick={() => void toggleArchive(id, !archived, label)}
+                                      >
+                                        {archived ? "Restore" : "Archive"}
+                                      </Button>
+                                      {archived ? (
+                                        <DeleteProjectDialog
+                                          quoteNumber={label}
+                                          contactName={String(quote.contact_name ?? "")}
+                                          contactEmail={String(quote.contact_email ?? "")}
+                                          company={quote.company as string | null | undefined}
+                                          hasSignedSow={false}
+                                          hasInvoices={Boolean(billing[id]?.billedCents)}
+                                          onConfirm={() => handleDeleteConfirm(quote)}
                                         >
-                                          Delete
-                                        </Button>
-                                      </DeleteProjectDialog>
-                                    ) : null}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-destructive"
+                                            disabled={busyId === id}
+                                          >
+                                            Delete
+                                          </Button>
+                                        </DeleteProjectDialog>
+                                      ) : null}
+                                    </div>
+                                  </div>
+
+                                  {rows.length ? (
+                                    <ul
+                                      className="mt-3 space-y-2 border-l-2 border-border pl-4"
+                                      data-testid="admin-project-invoices"
+                                    >
+                                      {rows.map((invoice) => {
+                                        const balance = Math.max(
+                                          0,
+                                          invoice.amountCents - invoice.amountPaidCents,
+                                        );
+                                        return (
+                                          <li
+                                            key={invoice.id}
+                                            className="flex flex-wrap items-center justify-between gap-3 text-sm"
+                                          >
+                                            <span className="flex flex-wrap items-center gap-2">
+                                              <span className="font-medium">
+                                                {invoice.invoiceNumber}
+                                              </span>
+                                              <Badge variant="outline">{invoice.status}</Badge>
+                                              <span className="text-xs text-slate">
+                                                {invoice.issueDate
+                                                  ? `Issued ${invoice.issueDate}`
+                                                  : "Not issued"}
+                                                {invoice.dueDate ? ` · due ${invoice.dueDate}` : ""}
+                                              </span>
+                                            </span>
+                                            <span className="flex items-center gap-3 text-slate">
+                                              <span className="font-medium text-foreground">
+                                                {formatMoney(invoice.amountCents)}
+                                              </span>
+                                              <span className="text-xs">
+                                                {balance > 0
+                                                  ? `${formatMoney(balance)} due`
+                                                  : "Paid"}
+                                              </span>
+                                              {invoice.payToken ? (
+                                                <Link
+                                                  to="/invoice/$token"
+                                                  params={{ token: invoice.payToken }}
+                                                  className="text-primary underline-offset-4 hover:underline"
+                                                >
+                                                  Open
+                                                </Link>
+                                              ) : null}
+                                            </span>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  ) : (
+                                    <p className="mt-3 border-l-2 border-border pl-4 text-sm text-slate">
+                                      No invoices yet
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {shells.length ? (
+                              <div className="px-5 py-4 text-sm text-slate">
+                                <p className="font-medium text-foreground">
+                                  {shells.length} unused project shell
+                                  {shells.length === 1 ? "" : "s"}
+                                </p>
+                                <p className="mt-1 text-xs">
+                                  No invoices and no proposal — safe to archive.
+                                </p>
+                                <ul className="mt-2 space-y-1">
+                                  {shells.map((quote) => {
+                                    const id = quote.id as string;
+                                    const label = String(quote.quote_number);
+                                    const archived = Boolean(quote.deleted_at);
+                                    return (
+                                      <li
+                                        key={id}
+                                        className="flex flex-wrap items-center justify-between gap-2"
+                                      >
+                                        <Link
+                                          to="/admin/quotes/$id"
+                                          params={{ id }}
+                                          className="text-primary underline-offset-4 hover:underline"
+                                        >
+                                          {label} — {quote.project_type}
+                                        </Link>
+                                        <span className="flex gap-2">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={busyId === id}
+                                            onClick={() => void toggleArchive(id, !archived, label)}
+                                          >
+                                            {archived ? "Restore" : "Archive"}
+                                          </Button>
+                                          {archived ? (
+                                            <DeleteProjectDialog
+                                              quoteNumber={label}
+                                              contactName={String(quote.contact_name ?? "")}
+                                              contactEmail={String(quote.contact_email ?? "")}
+                                              company={quote.company as string | null | undefined}
+                                              hasSignedSow={false}
+                                              hasInvoices={false}
+                                              onConfirm={() => handleDeleteConfirm(quote)}
+                                            >
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive"
+                                                disabled={busyId === id}
+                                              >
+                                                Delete
+                                              </Button>
+                                            </DeleteProjectDialog>
+                                          ) : null}
+                                        </span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : null}
                 </div>
