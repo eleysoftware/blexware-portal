@@ -661,11 +661,11 @@ export async function applyPaymentStatus(input: {
     metadata: {
       invoice: invoice.invoice_number,
       provider_payment_id: input.providerPaymentId,
-      amount_cents: input.amountCents ?? attempt.amount_cents,
+      amount_cents: input.amountCents ?? matchedAttempt.amount_cents,
     },
   });
 
-  return { applied: true as const, invoicePaymentId: attempt.id as string };
+  return { applied: true as const, invoicePaymentId: matchedAttempt.id as string };
 }
 
 /** Pulls the authoritative status from the payment service and applies it. */
