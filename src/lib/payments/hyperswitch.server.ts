@@ -34,7 +34,9 @@ export function isPaymentsConfigured(): boolean {
   return configuredInEnv();
 }
 
-export function hyperswitchConfig(): HyperswitchConfig {
+export function hyperswitchConfig(
+  environmentOverride?: "sandbox" | "production",
+): HyperswitchConfig {
   if (!isPaymentsConfigured()) {
     const missing = [
       hyperswitchPublishableKey() ? null : "HYPERSWITCH_PUBLISHABLE_KEY",
@@ -48,15 +50,17 @@ export function hyperswitchConfig(): HyperswitchConfig {
     throw new PaymentsNotConfiguredError(missing);
   }
 
+  const environment = environmentOverride ?? paymentEnvironment();
   return {
     apiKey: hyperswitchApiKey(),
     publishableKey: hyperswitchPublishableKey()!,
     profileId: hyperswitchProfileId()!,
     webhookSecret: hyperswitchWebhookSecret() ?? null,
-    environment: paymentEnvironment(),
-    baseUrl: hyperswitchApiUrl(),
+    environment,
+    baseUrl: hyperswitchApiUrlFor(environment),
   };
 }
+
 
 /**
  * A non-2xx response from Hyperswitch. `message` stays generic (it may reach a
