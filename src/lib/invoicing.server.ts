@@ -186,7 +186,22 @@ export async function ensureInvoiceScheduleForQuote(quoteId: string) {
     : { created: 0 };
 }
 
-/** Marks an invoice as sent and emails the client a pay link. */
+/**
+ * Applies delivery bookkeeping columns, tolerating a database that has not yet
+ * run migration 012 (the columns are additive and optional).
+ */
+async function patchInvoiceDelivery(invoiceId: string, patch: Record<string, unknown>) {
+  const db = adminDb();
+  const { error } = await db.from("invoices").update(patch as never).eq("id", invoiceId);
+  if (!error) return;
+  const fallback = { ...patch };
+  delete fallback["delivery_error"];
+  delete fallback["delivery_attempted_at"];
+  if (!Object.keys(fallback).length) return;
+  await db.from("invoices").update(fallback as never).eq("id", invoiceId);
+}
+
+/** Emails the client a pay link, and only then marks the invoice as sent. */
 export async function dispatchInvoice(invoiceId: string) {
   const db = adminDb();
   const { data: invoice } = await db
@@ -195,7 +210,8 @@ export async function dispatchInvoice(invoiceId: string) {
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice) throw new Error("Invoice not found");
-  if (invoice.status === "paid" || invoice.status === "void") return { emailed: false };
+  if (invoice.status === "paid" || invoice.status === "void")
+    return { emailed: false, reason: "This invoice is already settled or void." as string | null };
 
   const { data: quote } = await db
     .from("quotes")
@@ -204,15 +220,7 @@ export async function dispatchInvoice(invoiceId: string) {
     .maybeSingle();
   if (!quote) throw new Error("Quote not found");
 
-  await db
-    .from("invoices")
-    .update({
-      status: "sent",
-      sent_at: new Date().toISOString(),
-      issue_date: new Date().toISOString().slice(0, 10),
-    })
-    .eq("id", invoice.id);
-
+  const now = new Date().toISOString();
   const result = await emailInvoice({
     to: quote.contact_email as string,
     name: quote.contact_name as string,
@@ -223,17 +231,36 @@ export async function dispatchInvoice(invoiceId: string) {
     first: Number(invoice.sequence) === 1,
   });
 
+  // The invoice only becomes "sent" when the provider accepted the message, so
+  // a silent delivery failure can never look like a delivered bill.
+  await patchInvoiceDelivery(
+    invoice.id as string,
+    result.sent
+      ? {
+          status: "sent",
+          sent_at: now,
+          issue_date: now.slice(0, 10),
+          delivery_error: null,
+          delivery_attempted_at: now,
+        }
+      : { delivery_error: result.reason ?? "unknown error", delivery_attempted_at: now },
+  );
+
   await renderInvoiceDocument(invoice.id as string);
 
   await writeAudit({
     actorLabel: "system",
-    action: "invoice.sent",
+    action: result.sent ? "invoice.sent" : "invoice.delivery_failed",
     entity: "quote",
     entityId: invoice.quote_id as string,
-    metadata: { invoice: invoice.invoice_number, emailed: result.sent },
+    metadata: {
+      invoice: invoice.invoice_number,
+      emailed: result.sent,
+      reason: result.sent ? null : (result.reason ?? null),
+    },
   });
 
-  return { emailed: result.sent };
+  return { emailed: result.sent, reason: result.sent ? null : (result.reason ?? "unknown error") };
 }
 
 /**
@@ -863,10 +890,15 @@ export async function runScheduledWork() {
     .eq("status", "scheduled")
     .eq("paused", false)
     .lte("scheduled_send_at", now);
+  let invoicesSent = 0;
+  let invoicesFailed = 0;
   for (const invoice of due ?? []) {
     try {
-      await dispatchInvoice(invoice.id as string);
+      const result = await dispatchInvoice(invoice.id as string);
+      if (result.emailed) invoicesSent += 1;
+      else invoicesFailed += 1;
     } catch (error) {
+      invoicesFailed += 1;
       console.error("[cron:invoice]", error);
     }
   }
@@ -933,11 +965,26 @@ export async function runScheduledWork() {
     }
   }
 
-  return {
-    invoicesSent: due?.length ?? 0,
+  const summary = {
+    invoicesSent,
+    invoicesFailed,
     proposalsClosed: staleProposals?.length ?? 0,
     estimatesExpired: staleEstimates?.length ?? 0,
     invoicesOverdue: overdue?.length ?? 0,
     paymentsReconciled: pending?.length ?? 0,
   };
+
+  // Heartbeat so the team can see on the dashboard that the nightly job ran.
+  try {
+    await db
+      .from("app_settings")
+      .upsert(
+        { key: "cron_heartbeat", value: { ranAt: now, ...summary }, updated_at: now } as never,
+        { onConflict: "key" },
+      );
+  } catch (error) {
+    console.error("[cron:heartbeat]", error);
+  }
+
+  return summary;
 }

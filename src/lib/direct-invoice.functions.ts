@@ -277,23 +277,39 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
       const entries = paymentPlanToInvoiceEntries(plan, anchor);
       const single = entries.length === 1;
 
-      const rows = entries.map((entry) => ({
-        quote_id: quoteId,
-        agreement_id: null,
-        sequence: entry.sequence + seqOffset,
-        amount_cents: entry.amountCents,
-        description: single
-          ? data.description.trim()
-          : `${data.description.trim()} — ${entry.label}`,
-        due_date:
-          entry.sequence === 1 && data.dueDate ? data.dueDate : entry.dueDate,
-        scheduled_send_at: entry.scheduledSendAt,
-        issue_date: data.issueDate ?? null,
-        status: "draft",
-        line_items: entry.sequence === 1 ? data.lineItems : [],
-        subtotal_cents: entry.sequence === 1 ? subtotalCents : entry.amountCents,
-        discount_cents: entry.sequence === 1 ? discountCents : 0,
-      }));
+      const MONTH_MS = 30 * 86_400_000;
+      const rows = entries.map((entry) => {
+        // Custom split rows carry no send date of their own, so space them a
+        // month apart — otherwise they would sit forever without being emailed.
+        const sendAt =
+          entry.sequence === 1
+            ? null
+            : (entry.scheduledSendAt ??
+              new Date(anchor.getTime() + (entry.sequence - 1) * MONTH_MS).toISOString());
+        const dueDate =
+          entry.sequence === 1
+            ? (data.dueDate ?? entry.dueDate)
+            : (entry.dueDate ??
+              (sendAt ? new Date(new Date(sendAt).getTime() + 7 * 86_400_000).toISOString().slice(0, 10) : null));
+        return {
+          quote_id: quoteId,
+          agreement_id: null,
+          sequence: entry.sequence + seqOffset,
+          amount_cents: entry.amountCents,
+          description: single
+            ? data.description.trim()
+            : `${data.description.trim()} — ${entry.label}`,
+          due_date: dueDate,
+          scheduled_send_at: sendAt,
+          issue_date: entry.sequence === 1 ? (data.issueDate ?? null) : null,
+          // Later payments must be "scheduled" with a send date or the nightly
+          // worker never mails them; only the first is held for the manual send.
+          status: entry.sequence === 1 ? "draft" : "scheduled",
+          line_items: entry.sequence === 1 ? data.lineItems : [],
+          subtotal_cents: entry.sequence === 1 ? subtotalCents : entry.amountCents,
+          discount_cents: entry.sequence === 1 ? discountCents : 0,
+        };
+      });
 
 
       const { data: inserted, error: invoiceError } = await db
@@ -303,9 +319,13 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
       if (invoiceError) throw new Error(invoiceError.message);
 
       const first = (inserted ?? []).find((row) => Number(row.sequence) === seqOffset + 1);
+      let sent = false;
+      let deliveryError: string | null = null;
       if (data.sendNow && first) {
         const { dispatchInvoice } = await import("@/lib/invoicing.server");
-        await dispatchInvoice(first.id as string);
+        const result = await dispatchInvoice(first.id as string);
+        sent = result.emailed;
+        deliveryError = result.emailed ? null : (result.reason ?? "unknown error");
       }
 
       await writeAudit({
@@ -317,7 +337,8 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
           quote_number: quoteNumber,
           invoices: rows.length,
           total_cents: totalCents,
-          sent: Boolean(data.sendNow && first),
+          sent,
+          delivery_error: deliveryError,
         },
       });
 
@@ -327,7 +348,9 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
 
         invoiceCount: rows.length,
         totalCents,
-        sent: Boolean(data.sendNow && first),
+        sent,
+        deliveryError,
+        scheduledCount: rows.length - 1,
         firstInvoiceNumber: (first?.invoice_number as string | undefined) ?? null,
       };
     }),
