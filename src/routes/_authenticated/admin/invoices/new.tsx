@@ -503,6 +503,12 @@ function NewInvoicePage() {
             </p>
           </div>
 
+          {missing.length ? (
+            <p className="text-sm text-destructive">
+              Before sending, add {missing.join(", ")}.
+            </p>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-3">
             <Button
               className="shadow-cta"
