@@ -70,7 +70,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
               company: (quote["company"] as string | null) ?? null,
               quoteNumber: String(quote["quote_number"]),
               // Lets a signed-in admin jump back to the project workspace.
-              quoteId: String(quote["id"]),
+              quoteId: String(invoice["quote_id"]),
             }
           : null,
       };
