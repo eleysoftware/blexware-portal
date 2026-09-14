@@ -8,6 +8,7 @@ import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
+import { PaymentEnvironmentCard } from "@/components/admin/PaymentEnvironmentCard";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
