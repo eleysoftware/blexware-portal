@@ -1052,6 +1052,43 @@ export const setPaymentMethodEnabledFn = createServerFn({ method: "POST" })
     }),
   );
 
+/** Reads the active payment provider and environment. */
+export const getPaymentProviderSettingsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+    guarded("getPaymentProviderSettings", "loading the payment provider settings", async ({ context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { getPaymentProviderSettings } = await import("@/lib/settings.server");
+      return getPaymentProviderSettings();
+    }),
+  );
+
+/** Sets the active payment provider and/or environment. */
+export const setPaymentProviderSettingsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { provider?: "hyperswitch" | "paypal"; environment?: "sandbox" | "live" }) => {
+    if (data.provider && data.provider !== "hyperswitch" && data.provider !== "paypal") {
+      throw new Error("Unknown payment provider");
+    }
+    if (data.environment && data.environment !== "sandbox" && data.environment !== "live") {
+      throw new Error("Unknown payment environment");
+    }
+    return data;
+  })
+  .handler(
+    guarded("setPaymentProviderSettings", "saving the payment provider settings", async ({ data, context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { setPaymentProviderSettings } = await import("@/lib/settings.server");
+      return setPaymentProviderSettings({
+        provider: data.provider,
+        environment: data.environment,
+        actorId: context.userId,
+      });
+    }),
+  );
+
 /** Asks the client to confirm the delivered work so the project can close. */
 export const requestProjectCompletion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
