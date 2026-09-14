@@ -830,7 +830,7 @@ export async function recordOfflinePayment(input: {
   const providerPaymentId = `offline_${attempt.payment_reference as string}`;
   await db
     .from("invoice_payments")
-    .update({ hyperswitch_payment_id: providerPaymentId })
+    .update({ provider_payment_id: providerPaymentId, hyperswitch_payment_id: providerPaymentId })
     .eq("id", attempt.id);
 
   await applyPaymentStatus({
