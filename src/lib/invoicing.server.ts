@@ -3,6 +3,7 @@
 import { adminDb, writeAudit } from "@/lib/blex.server";
 import { paymentPlanToInvoiceEntries, buildPaymentPlan } from "@/lib/documents/compose";
 import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
+import { isOutOfCredits } from "@/lib/email-failure";
 import { emailInvoice, siteUrl } from "@/lib/engagement-email.server";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
@@ -892,11 +893,27 @@ export async function runScheduledWork() {
     .lte("scheduled_send_at", now);
   let invoicesSent = 0;
   let invoicesFailed = 0;
-  for (const invoice of due ?? []) {
+  // When the provider says the account is out of credits, every further send in
+  // this run will fail the same way — stop and record the reason instead.
+  let creditsExhausted: string | null = null;
+  const dueList = (due ?? []) as { id: unknown }[];
+  for (let index = 0; index < dueList.length; index += 1) {
+    const invoice = dueList[index]!;
+    if (creditsExhausted) {
+      invoicesFailed += 1;
+      await patchInvoiceDelivery(invoice.id as string, {
+        delivery_error: creditsExhausted,
+        delivery_attempted_at: now,
+      });
+      continue;
+    }
     try {
       const result = await dispatchInvoice(invoice.id as string);
       if (result.emailed) invoicesSent += 1;
-      else invoicesFailed += 1;
+      else {
+        invoicesFailed += 1;
+        if (isOutOfCredits(result.reason)) creditsExhausted = result.reason ?? null;
+      }
     } catch (error) {
       invoicesFailed += 1;
       console.error("[cron:invoice]", error);
@@ -972,6 +989,7 @@ export async function runScheduledWork() {
     estimatesExpired: staleEstimates?.length ?? 0,
     invoicesOverdue: overdue?.length ?? 0,
     paymentsReconciled: pending?.length ?? 0,
+    deliveryError: creditsExhausted,
   };
 
   // Heartbeat so the team can see on the dashboard that the nightly job ran.

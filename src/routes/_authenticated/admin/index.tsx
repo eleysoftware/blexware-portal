@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/documents/types";
+import { describeEmailFailure, isOutOfCredits } from "@/lib/email-failure";
 
 import {
   archiveQuote,
@@ -56,7 +57,10 @@ function AdminDashboard() {
     try {
       const result = await resendInvoice({ data: { invoiceId } });
       if (result.emailed) toast.success("Invoice emailed to the client.");
-      else toast.error(`Still not delivered: ${result.reason ?? "unknown error"}`);
+      else {
+        const failure = describeEmailFailure(result.reason);
+        toast.error(`${failure.headline}. ${failure.action}`);
+      }
       void queryClient.invalidateQueries({ queryKey: ["quotes"] });
     } catch (error) {
       toast.error((error as Error).message);
@@ -64,6 +68,18 @@ function AdminDashboard() {
       setResending(null);
     }
   };
+
+  /** Hand the client's own invoice link to the team, e.g. to send it manually. */
+  const copyPayLink = async (payToken: string, invoiceNumber: string) => {
+    const url = `${window.location.origin}/invoice/${payToken}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Payment link for ${invoiceNumber} copied.`);
+    } catch {
+      window.prompt(`Copy the payment link for ${invoiceNumber}`, url);
+    }
+  };
+
   const [deleteTarget, setDeleteTarget] = useState<NonNullable<
     typeof quotes.data
   >["quotes"][number] | null>(null);
@@ -156,6 +172,10 @@ function AdminDashboard() {
   const billing = quotes.data?.billing ?? {};
   const invoicesByQuote = quotes.data?.invoicesByQuote ?? {};
   const hasProposal = quotes.data?.hasProposal ?? {};
+  // One warning beats discovering the same provider problem invoice by invoice.
+  const creditsBlocked = Object.values(invoicesByQuote).some((rows) =>
+    rows.some((invoice) => isOutOfCredits(invoice.deliveryError)),
+  );
 
   // Quotes come back flat; the queue is presented grouped by client email.
   const clients = (() => {
@@ -263,6 +283,21 @@ function AdminDashboard() {
       </PageHero>
 
       <Section tone="surface">
+        {creditsBlocked ? (
+          <div
+            role="status"
+            data-testid="email-credits-warning"
+            className="mb-6 rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
+          >
+            <p className="font-medium text-destructive">
+              Invoice emails are not going out — the email account is out of sending credits.
+            </p>
+            <p className="mt-1 text-slate">
+              Top up the sending credits in ZeptoMail, then press Retry on the affected invoices.
+              In the meantime you can copy a payment link and send it yourself.
+            </p>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {["all", ...quoteStatuses, "archived"].map((value) => (
             <button
@@ -441,6 +476,9 @@ function AdminDashboard() {
                                           0,
                                           invoice.amountCents - invoice.amountPaidCents,
                                         );
+                                        const failure = invoice.deliveryError
+                                          ? describeEmailFailure(invoice.deliveryError)
+                                          : null;
                                         return (
                                           <li
                                             key={invoice.id}
@@ -451,9 +489,12 @@ function AdminDashboard() {
                                                 {invoice.invoiceNumber}
                                               </span>
                                               <Badge variant="outline">{invoice.status}</Badge>
-                                              {invoice.deliveryError ? (
-                                                <Badge variant="destructive">
-                                                  Not delivered — {invoice.deliveryError}
+                                              {failure ? (
+                                                <Badge
+                                                  variant="destructive"
+                                                  title={`${failure.action} (${invoice.deliveryError})`}
+                                                >
+                                                  {failure.headline}
                                                 </Badge>
                                               ) : null}
                                               <span className="text-xs text-slate">
@@ -489,14 +530,28 @@ function AdminDashboard() {
                                                 </Button>
                                               ) : null}
                                               {invoice.payToken ? (
-                                                <Link
-                                                  to="/invoice/$token"
-                                                  params={{ token: invoice.payToken }}
-                                                  search={{ return: "/admin" }}
-                                                  className="text-primary underline-offset-4 hover:underline"
-                                                >
-                                                  Open
-                                                </Link>
+                                                <>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      void copyPayLink(
+                                                        invoice.payToken as string,
+                                                        invoice.invoiceNumber,
+                                                      )
+                                                    }
+                                                  >
+                                                    Copy payment link
+                                                  </Button>
+                                                  <Link
+                                                    to="/invoice/$token"
+                                                    params={{ token: invoice.payToken }}
+                                                    search={{ return: "/admin" }}
+                                                    className="text-primary underline-offset-4 hover:underline"
+                                                  >
+                                                    Open
+                                                  </Link>
+                                                </>
                                               ) : null}
                                             </span>
                                           </li>

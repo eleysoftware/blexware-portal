@@ -12,6 +12,8 @@ import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { getAdminStatus } from "@/lib/admin.functions";
 import { formatMoney } from "@/lib/documents/types";
 import { beginInvoicePayment, confirmInvoicePayment, getInvoiceByToken } from "@/lib/invoice.functions";
 
@@ -60,9 +62,30 @@ function BackToProject({ returnTo, label }: { returnTo: string; label: string })
   );
 }
 
+/** Staff opening a client's pay link should see staff context, not portal nudges. */
+function useIsStaff(): boolean {
+  const checkAdmin = useServerFn(getAdminStatus);
+  const query = useQuery({
+    queryKey: ["invoice-viewer-is-staff"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return { isAdmin: false };
+      try {
+        return await checkAdmin({ data: {} });
+      } catch {
+        return { isAdmin: false };
+      }
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+  return query.data?.isAdmin === true;
+}
+
 function InvoicePage() {
   const { token } = Route.useParams();
   const { return: returnTo } = Route.useSearch();
+  const isStaff = useIsStaff();
 
   const queryClient = useQueryClient();
   const fetchInvoice = useServerFn(getInvoiceByToken);
@@ -171,7 +194,25 @@ function InvoicePage() {
       />
       <Section tone="surface">
         <div className="mx-auto mb-6 max-w-3xl">
-          {returnTo ? (
+          {isStaff ? (
+            <div
+              className="rounded-xl border border-border bg-background p-3 text-sm"
+              data-testid="invoice-staff-strip"
+            >
+              <p className="text-slate">
+                You are viewing this invoice as BLEXware staff — this is the page your client sees.
+              </p>
+              {client?.quoteId ? (
+                <Link
+                  to="/admin/quotes/$id"
+                  params={{ id: client.quoteId }}
+                  className="mt-1 inline-block text-primary underline"
+                >
+                  ← Back to project {client.quoteNumber}
+                </Link>
+              ) : null}
+            </div>
+          ) : returnTo ? (
             <BackToProject returnTo={returnTo} label="← Back to your project" />
           ) : (
             <Link to="/portal" className="text-sm text-primary underline">
