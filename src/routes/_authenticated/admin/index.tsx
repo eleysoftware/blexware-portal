@@ -530,14 +530,28 @@ function AdminDashboard() {
                                                 </Button>
                                               ) : null}
                                               {invoice.payToken ? (
-                                                <Link
-                                                  to="/invoice/$token"
-                                                  params={{ token: invoice.payToken }}
-                                                  search={{ return: "/admin" }}
-                                                  className="text-primary underline-offset-4 hover:underline"
-                                                >
-                                                  Open
-                                                </Link>
+                                                <>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      void copyPayLink(
+                                                        invoice.payToken as string,
+                                                        invoice.invoiceNumber,
+                                                      )
+                                                    }
+                                                  >
+                                                    Copy payment link
+                                                  </Button>
+                                                  <Link
+                                                    to="/invoice/$token"
+                                                    params={{ token: invoice.payToken }}
+                                                    search={{ return: "/admin" }}
+                                                    className="text-primary underline-offset-4 hover:underline"
+                                                  >
+                                                    Open
+                                                  </Link>
+                                                </>
                                               ) : null}
                                             </span>
                                           </li>
