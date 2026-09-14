@@ -919,13 +919,15 @@ export async function runScheduledWork() {
   // Reconciliation: re-check payments still reported as processing.
   const { data: pending } = await db
     .from("invoice_payments")
-    .select("hyperswitch_payment_id")
+    .select("provider_payment_id, hyperswitch_payment_id")
     .in("status", ["processing", "action_required"])
-    .not("hyperswitch_payment_id", "is", null)
+    .or("provider_payment_id.not.is.null,hyperswitch_payment_id.not.is.null")
     .limit(50);
   for (const payment of pending ?? []) {
+    const providerPaymentId = payment.provider_payment_id ?? payment.hyperswitch_payment_id;
+    if (!providerPaymentId) continue;
     try {
-      await syncPayment(payment.hyperswitch_payment_id as string);
+      await syncPayment(providerPaymentId as string);
     } catch (error) {
       console.error("[cron:reconcile]", error);
     }
