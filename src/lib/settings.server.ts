@@ -99,8 +99,13 @@ function environmentCoerce(value: unknown, fallback: PaymentEnvironment): Paymen
 }
 
 /** Which payment provider and environment are active right now. */
-export async function getPaymentProviderSettings(): Promise<PaymentProviderSettings> {
-  const fallback: PaymentProviderSettings = { provider: "hyperswitch", environment: "sandbox" };
+export async function getPaymentProviderSettings(
+  defaults?: Partial<PaymentProviderSettings>,
+): Promise<PaymentProviderSettings> {
+  const fallback: PaymentProviderSettings = {
+    provider: defaults?.provider ?? "hyperswitch",
+    environment: defaults?.environment ?? "sandbox",
+  };
   try {
     const { data, error } = await adminDb()
       .from("app_settings")
