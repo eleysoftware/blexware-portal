@@ -62,9 +62,30 @@ function BackToProject({ returnTo, label }: { returnTo: string; label: string })
   );
 }
 
+/** Staff opening a client's pay link should see staff context, not portal nudges. */
+function useIsStaff(): boolean {
+  const checkAdmin = useServerFn(getAdminStatus);
+  const query = useQuery({
+    queryKey: ["invoice-viewer-is-staff"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return { isAdmin: false };
+      try {
+        return await checkAdmin({ data: {} });
+      } catch {
+        return { isAdmin: false };
+      }
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+  return query.data?.isAdmin === true;
+}
+
 function InvoicePage() {
   const { token } = Route.useParams();
   const { return: returnTo } = Route.useSearch();
+  const isStaff = useIsStaff();
 
   const queryClient = useQueryClient();
   const fetchInvoice = useServerFn(getInvoiceByToken);
