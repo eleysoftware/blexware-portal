@@ -1179,6 +1179,11 @@ export function AdminEngagementPanel({
                           Send now
                         </Button>
                       ) : null}
+                      <InvoiceStatusControl
+                        invoiceId={invoice.id as string}
+                        invoiceNumber={String(invoice.invoice_number)}
+                        status={String(invoice.status)}
+                      />
                       {invoice.pay_token ? (
                         <Button
                           size="sm"
