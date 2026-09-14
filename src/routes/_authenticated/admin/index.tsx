@@ -385,6 +385,23 @@ function AdminDashboard() {
                     </span>
                   </button>
 
+                  <div className="flex justify-end px-5 pb-3">
+                    <EditClientDialog
+                      currentEmail={client.email}
+                      contactName={client.name}
+                      company={client.company}
+                      phone={client.phone}
+                      projectCount={client.quotes.length}
+                      otherEmails={clients
+                        .map((entry) => entry.email)
+                        .filter((value) => value !== client.email)}
+                    >
+                      <Button variant="ghost" size="sm">
+                        Edit client
+                      </Button>
+                    </EditClientDialog>
+                  </div>
+
                   {open ? (
                     <div className="divide-y divide-border border-t border-border">
                       {(() => {
