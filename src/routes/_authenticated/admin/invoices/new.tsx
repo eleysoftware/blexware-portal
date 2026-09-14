@@ -54,6 +54,16 @@ function NewInvoicePage() {
     enabled: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.trim()),
   });
 
+  const [existingQuoteId, setExistingQuoteId] = useState("");
+  const touchedProject = useRef(false);
+
+  // Default to the client's most recent project so a second bill for the same
+  // job doesn't silently create a duplicate project.
+  useEffect(() => {
+    const first = projects.data?.projects[0];
+    if (!touchedProject.current && first && !existingQuoteId) setExistingQuoteId(first.id);
+  }, [projects.data, existingQuoteId]);
+
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [projectType, setProjectType] = useState("");
