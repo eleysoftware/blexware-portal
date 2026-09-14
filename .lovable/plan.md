@@ -30,3 +30,13 @@ If you'd rather the older duplicates be merged into one project, say so and that
 - `src/routes/_authenticated/admin/index.tsx`: replace the flat `<table>` inside the expanded client block with a per-project section — project header row plus a nested invoice list, mirroring the markup conventions used in `src/routes/_authenticated/portal/index.tsx`. Keep `DeleteProjectDialog`, archive toggle, search auto-expand, and archived-filter behaviour unchanged.
 - Empty-shell grouping uses the same test the portal applies (no invoices and no proposal); `listQuotes` returns a `hasProposal` flag per quote so the UI can apply it without another round trip.
 - No schema or server-function contract changes beyond the added `invoicesByQuote` field; the portal and all payment flows are untouched.
+
+## New invoice form: say why it won't submit
+
+Submitting the new invoice form with a required field missing gave no feedback — the buttons simply did nothing. The form will now:
+
+- List exactly what is still needed above the buttons (client name, valid email, invoice description, at least one priced line, payments that add up to the total).
+- Mark the specific fields that are missing once you've tried to submit.
+- Show a clear message if the server still rejects the invoice, instead of failing silently.
+
+Technically: `src/routes/_authenticated/admin/invoices/new.tsx` computes a `missing` list used both for the summary message and per-field error text, and the submit handler surfaces server errors through a toast.
