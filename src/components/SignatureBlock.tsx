@@ -6,6 +6,8 @@ export type AgreementSignatureInfo = {
   signed_at: string | null;
   signer_name: string | null;
   document_hash?: string | null;
+  /** Set when a signature was recorded by staff or waived instead of typed in the portal. */
+  signature_note?: string | null;
 };
 
 export type Countersignature = {
@@ -95,7 +97,7 @@ export function SignatureBlock({
             agreement.signed_at
               ? `Signed ${new Date(agreement.signed_at).toLocaleString()}${
                   agreement.document_hash ? ` · document hash ${agreement.document_hash.slice(0, 16)}…` : ""
-                }`
+                }${agreement.signature_note ? ` · ${agreement.signature_note}` : ""}`
               : null
           }
         />

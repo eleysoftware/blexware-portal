@@ -11,6 +11,16 @@ import { getTabEmptyState } from "@/lib/workflow-guidance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   formatMoney,
@@ -21,6 +31,7 @@ import {
 import { buildPaymentPlan, evenSplitRows, SPLIT_COUNTS } from "@/lib/documents/compose";
 import {
   approveProjectStart,
+  recordAgreementSignature,
   generateAgreement,
   sendAgreement,
   draftSowWithAi,
@@ -81,6 +92,7 @@ export function AdminEngagementPanel({
   const approveEstimateFn = useServerFn(markEstimateApproved);
   const suggestSchedule = useServerFn(suggestInvoiceSchedule);
   const draftSow = useServerFn(draftSowWithAi);
+  const recordSignature = useServerFn(recordAgreementSignature);
 
 
   const engagement = useQuery({
@@ -120,6 +132,11 @@ export function AdminEngagementPanel({
   const [sowAddendum, setSowAddendum] = useState("");
   const [sowReviseMode, setSowReviseMode] = useState(false);
   const [scheduleNote, setScheduleNote] = useState("");
+  const [signatureOpen, setSignatureOpen] = useState(false);
+  const [signatureMode, setSignatureMode] = useState<"recorded" | "waived">("recorded");
+  const [signerName, setSignerName] = useState("");
+  const [signedOn, setSignedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [signatureChannel, setSignatureChannel] = useState("on paper");
   const [payouts, setPayouts] = useState<
     Record<
       string,
@@ -309,6 +326,32 @@ export function AdminEngagementPanel({
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const recordSignatureMutation = useMutation({
+    mutationFn: () =>
+      recordSignature({
+        data: {
+          agreementId: agreement!.id,
+          mode: signatureMode,
+          signedOn,
+          ...(signatureMode === "recorded"
+            ? { signerName: signerName.trim(), channel: signatureChannel.trim() }
+            : {}),
+        },
+      }),
+    onSuccess: (result: { mode: string }) => {
+      toast.success(
+        result.mode === "waived"
+          ? "Signature waived — set the start date to issue the invoices"
+          : "Signature recorded — set the start date to issue the invoices",
+      );
+      setSignatureOpen(false);
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+
 
 
   const regenerateMutation = useMutation({
@@ -1076,9 +1119,129 @@ export function AdminEngagementPanel({
               signed_at: agreement.signed_at ?? null,
               signer_name: agreement.signer_name ?? null,
               document_hash: (agreement as { document_hash?: string | null }).document_hash ?? null,
+              signature_note: agreement.doc?.acceptance?.signatureNote ?? null,
             }}
             countersign={countersigned ?? null}
           />
+
+          {agreement.status === "draft" || agreement.status === "sent" ? (
+            <div className="mt-5 space-y-3 border-t border-border pt-5">
+              <p className="text-sm text-slate">
+                Signed on paper, by email, or not needed at all? Record it here to move on to the
+                start date and issue the invoices. The client is not emailed.
+              </p>
+              <Dialog open={signatureOpen} onOpenChange={setSignatureOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    data-testid="sow-record-signature"
+                    onClick={() => {
+                      setSignerName(agreement.doc?.clientName ?? "");
+                      setSignatureMode("recorded");
+                    }}
+                  >
+                    Record signature received
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Record the signature for {agreement.agreement_number}</DialogTitle>
+                    <DialogDescription>
+                      This marks the Statement of Work as signed without the client signing in the
+                      portal. The document and the activity log will say the signature was recorded
+                      by BLEXware staff.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant={signatureMode === "recorded" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSignatureMode("recorded")}
+                      >
+                        Signature received
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={signatureMode === "waived" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSignatureMode("waived")}
+                      >
+                        Waive — bill without a signature
+                      </Button>
+                    </div>
+
+                    {signatureMode === "recorded" ? (
+                      <>
+                        <div>
+                          <Label htmlFor="sow-signer-name">Who signed</Label>
+                          <Input
+                            id="sow-signer-name"
+                            className="mt-1"
+                            value={signerName}
+                            onChange={(event) => setSignerName(event.target.value)}
+                            placeholder="Client contact name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="sow-signer-channel">How it was received</Label>
+                          <Input
+                            id="sow-signer-channel"
+                            className="mt-1"
+                            value={signatureChannel}
+                            onChange={(event) => setSignatureChannel(event.target.value)}
+                            placeholder="on paper, by email, verbally"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate">
+                        The Statement of Work will read “Signature waived by BLEXware”. Use this only
+                        when there is no signing step for this job.
+                      </p>
+                    )}
+
+                    <div>
+                      <Label htmlFor="sow-signed-on">Date</Label>
+                      <Input
+                        id="sow-signed-on"
+                        type="date"
+                        className="mt-1"
+                        value={signedOn}
+                        onChange={(event) => setSignedOn(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSignatureOpen(false)}
+                      disabled={recordSignatureMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="shadow-cta"
+                      data-testid="sow-record-confirm"
+                      disabled={
+                        recordSignatureMutation.isPending ||
+                        !signedOn ||
+                        (signatureMode === "recorded" && !signerName.trim())
+                      }
+                      onClick={() => recordSignatureMutation.mutate()}
+                    >
+                      {recordSignatureMutation.isPending
+                        ? "Saving…"
+                        : signatureMode === "waived"
+                          ? "Waive signature"
+                          : "Record signature"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          ) : null}
 
           {agreement.status === "signed" ? (
             countersigned ? (

@@ -211,7 +211,9 @@ export function DocumentPreview({ doc }: { doc: ProjectDocument }) {
               ""
             )}
           </p>
-          {doc.acceptance.signatureText ? (
+          {doc.acceptance.signatureNote ? (
+            <p className="text-xs text-[#666666]">{doc.acceptance.signatureNote}</p>
+          ) : doc.acceptance.signatureText ? (
             <p className="text-xs text-[#666666]">
               Signed electronically through the BLEXware client portal. This electronic signature is legally
               binding.
