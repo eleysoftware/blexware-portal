@@ -265,12 +265,9 @@ export const paypalProvider: PaymentProvider = {
   },
 
   async cancelPayment(providerPaymentId: string): Promise<PaymentSnapshot> {
-    const env = paypalEnvironment();
-    const order = await paypalRequest<Order>(env, `/v2/checkout/orders/${providerPaymentId}`, {
-      method: "POST",
-      body: { op: "replace", path: "/status", value: "VOIDED" },
-    });
-    return orderToSnapshot(order);
+    // PayPal orders cannot be voided via the Orders API; return the current
+    // status so the caller can treat the attempt as cancelled/abandoned.
+    return this.getPayment(providerPaymentId);
   },
 
   async refundPayment(input: {
