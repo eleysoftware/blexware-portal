@@ -149,31 +149,70 @@ export const listQuotes = createServerFn({ method: "POST" })
         string,
         { billedCents: number; paidCents: number; outstandingCents: number }
       > = {};
+      // Invoice rows per project, so the client list can nest them under each project.
+      const invoicesByQuote: Record<
+        string,
+        {
+          id: string;
+          invoiceNumber: string;
+          sequence: number;
+          amountCents: number;
+          amountPaidCents: number;
+          status: string;
+          issueDate: string | null;
+          dueDate: string | null;
+          payToken: string | null;
+        }[]
+      > = {};
+      const hasProposal: Record<string, boolean> = {};
+
       if (ids.length) {
         const { data: invoices } = await adminDb()
           .from("invoices")
-          .select("quote_id, amount_cents, amount_paid_cents")
+          .select(
+            "id, quote_id, invoice_number, sequence, amount_cents, amount_paid_cents, status, issue_date, due_date, pay_token",
+          )
           .in("quote_id", ids)
-          .not("status", "in", "(void,cancelled,draft)");
-        for (const row of (invoices ?? []) as {
-          quote_id: string;
-          amount_cents: number;
-          amount_paid_cents: number | null;
-        }[]) {
-          const bucket = (billing[row.quote_id] ??= {
+          .order("sequence", { ascending: true });
+        for (const row of (invoices ?? []) as Record<string, unknown>[]) {
+          const quoteId = String(row.quote_id);
+          const amount = Number(row.amount_cents ?? 0);
+          const paid = Number(row.amount_paid_cents ?? 0);
+          const status = String(row.status ?? "");
+
+          (invoicesByQuote[quoteId] ??= []).push({
+            id: String(row.id),
+            invoiceNumber: String(row.invoice_number ?? ""),
+            sequence: Number(row.sequence ?? 0),
+            amountCents: amount,
+            amountPaidCents: paid,
+            status,
+            issueDate: (row.issue_date as string | null) ?? null,
+            dueDate: (row.due_date as string | null) ?? null,
+            payToken: (row.pay_token as string | null) ?? null,
+          });
+
+          if (["void", "cancelled", "draft"].includes(status)) continue;
+          const bucket = (billing[quoteId] ??= {
             billedCents: 0,
             paidCents: 0,
             outstandingCents: 0,
           });
-          const amount = Number(row.amount_cents ?? 0);
-          const paid = Number(row.amount_paid_cents ?? 0);
           bucket.billedCents += amount;
           bucket.paidCents += paid;
           bucket.outstandingCents += Math.max(0, amount - paid);
         }
+
+        const { data: proposalRows } = await adminDb()
+          .from("proposals")
+          .select("quote_id")
+          .in("quote_id", ids);
+        for (const row of (proposalRows ?? []) as { quote_id: string }[]) {
+          hasProposal[row.quote_id] = true;
+        }
       }
 
-      return { quotes, counts, billing };
+      return { quotes, counts, billing, invoicesByQuote, hasProposal };
     }),
   );
 
