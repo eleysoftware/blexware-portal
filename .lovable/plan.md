@@ -35,3 +35,7 @@ Add a line on the admin dashboard showing when scheduled sending last ran and ho
 - Surface delivery state in `listQuotes` (`invoicesByQuote`) and in the nested invoice rows on `/admin` and the project page; Retry calls the existing `sendInvoiceNow`.
 - Cron heartbeat: record last run + counts from `runScheduledWork` into `app_settings`, read by the admin dashboard.
 - Tests: `dispatchInvoice` does not mark sent on a failed send; split creation yields one `draft`/sent first row and `scheduled` remainder summing to the total.
+
+## 5. Make the project choice explicit on the new invoice form
+
+Right now the form quietly pre-selects the client's most recent project, so a new bill can land under an existing job without the team noticing. Change it to a visible choice at the top of the Project step: "Add to an existing project" (with the project list, most recent pre-selected) or "Start a new project", with a one-line note saying where the invoice will appear. Nothing is saved until one is picked.
