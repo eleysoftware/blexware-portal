@@ -8,6 +8,7 @@ import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
+import { EditClientDialog } from "@/components/admin/EditClientDialog";
 import { PaymentEnvironmentCard } from "@/components/admin/PaymentEnvironmentCard";
 import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
@@ -186,6 +187,7 @@ function AdminDashboard() {
         email: string;
         name: string;
         company: string | null;
+        phone: string | null;
         outstandingCents: number;
         lastActivity: string;
         quotes: NonNullable<typeof quotes.data>["quotes"];
@@ -198,6 +200,7 @@ function AdminDashboard() {
         email,
         name: String(quote.contact_name ?? email),
         company: (quote.company as string | null) ?? null,
+        phone: (quote.phone as string | null) ?? null,
         outstandingCents: 0,
         lastActivity: created,
         quotes: [],
@@ -208,6 +211,7 @@ function AdminDashboard() {
         entry.lastActivity = created;
         entry.name = String(quote.contact_name ?? email);
         entry.company = (quote.company as string | null) ?? null;
+        entry.phone = (quote.phone as string | null) ?? null;
       }
       map.set(email, entry);
     }
@@ -384,6 +388,23 @@ function AdminDashboard() {
                       <span aria-hidden>{open ? "▴" : "▾"}</span>
                     </span>
                   </button>
+
+                  <div className="flex justify-end px-5 pb-3">
+                    <EditClientDialog
+                      currentEmail={client.email}
+                      contactName={client.name}
+                      company={client.company}
+                      phone={client.phone}
+                      projectCount={client.quotes.length}
+                      otherEmails={clients
+                        .map((entry) => entry.email)
+                        .filter((value) => value !== client.email)}
+                    >
+                      <Button variant="ghost" size="sm">
+                        Edit client
+                      </Button>
+                    </EditClientDialog>
+                  </div>
 
                   {open ? (
                     <div className="divide-y divide-border border-t border-border">
