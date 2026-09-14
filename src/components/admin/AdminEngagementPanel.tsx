@@ -502,6 +502,9 @@ export function AdminEngagementPanel({
     id: string;
     invoice_id: string;
     payment_reference: string;
+    provider: string | null;
+    environment: string | null;
+    provider_payment_id: string | null;
     hyperswitch_payment_id: string | null;
     hyperswitch_connector: string | null;
     amount_cents: number;
