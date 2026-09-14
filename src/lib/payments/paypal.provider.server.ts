@@ -364,11 +364,11 @@ export const paypalProvider: PaymentProvider = {
       };
     }
 
-    if (eventType === "PAYMENT.CAPTURE.DENIED" || eventType === "PAYMENT.CAPTURE.REFUNDED") {
+    if (eventType === "PAYMENT.CAPTURE.DENIED") {
       return {
         kind: "payment",
         providerPaymentId: resource.parent_payment ?? "",
-        status: eventType === "PAYMENT.CAPTURE.DENIED" ? "failed" : "refunded",
+        status: "failed",
         amountCents: parseAmount(resource.amount?.value),
         processorTransactionId: resource.id ?? null,
       };
