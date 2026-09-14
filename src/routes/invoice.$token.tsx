@@ -12,6 +12,8 @@ import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { getAdminStatus } from "@/lib/admin.functions";
 import { formatMoney } from "@/lib/documents/types";
 import { beginInvoicePayment, confirmInvoicePayment, getInvoiceByToken } from "@/lib/invoice.functions";
 
