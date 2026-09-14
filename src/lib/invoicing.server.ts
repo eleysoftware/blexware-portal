@@ -550,7 +550,7 @@ export async function applyPaymentStatus(input: {
   const { data: invoice } = await db
     .from("invoices")
     .select("id, quote_id, invoice_number, amount_cents, amount_paid_cents, status, sequence, pay_token")
-    .eq("id", attempt.invoice_id)
+    .eq("id", matchedAttempt.invoice_id)
     .maybeSingle();
   if (!invoice) return { applied: false as const };
 
