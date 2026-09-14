@@ -13,7 +13,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
   .handler(
     guarded("getInvoiceByToken", "loading the invoice", async ({ data }) => {
       const { loadInvoiceByToken, markInvoiceViewed } = await import("@/lib/invoicing.server");
-      const { isPaymentsConfigured } = await import("@/config/payments");
+      const { PaymentService } = await import("@/lib/payments/service.server");
       const { getPaymentMethodSettings } = await import("@/lib/settings.server");
 
       const loaded = await loadInvoiceByToken(data.token);
@@ -47,7 +47,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
         : null;
 
       return {
-        paymentsEnabled: isPaymentsConfigured() && availableMethods.length > 0,
+        paymentsEnabled: (await PaymentService.isConfigured()) && availableMethods.length > 0,
         availableMethods,
         doc,
         project,
