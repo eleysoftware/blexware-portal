@@ -154,8 +154,9 @@ function NewInvoicePage() {
           } will be emailed on their due dates.`
         : "";
       if (result.deliveryError) {
+        const failure = describeEmailFailure(result.deliveryError);
         toast.error(
-          `We couldn't email invoice ${result.firstInvoiceNumber ?? ""}: ${result.deliveryError}. Use Retry on the project page.`,
+          `Invoice ${result.firstInvoiceNumber ?? ""} was created but not emailed. ${failure.headline}. ${failure.action} You can also copy its payment link from the team queue.`,
         );
       } else {
         toast.success(
