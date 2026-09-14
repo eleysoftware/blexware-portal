@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+import { MoveInvoicesDialog } from "@/components/MoveInvoicesDialog";
+import { listClientProjects, moveInvoicesToProject } from "@/lib/direct-invoice.functions";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { MilestoneBoard } from "@/components/MilestoneBoard";
@@ -220,6 +222,29 @@ function QuoteDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const clientEmail = String(detail.data?.quote.contact_email ?? "").toLowerCase();
+  const fetchClientProjects = useServerFn(listClientProjects);
+  const clientProjects = useQuery({
+    queryKey: ["client-projects", clientEmail],
+    queryFn: () => fetchClientProjects({ data: { email: clientEmail } }),
+    enabled: Boolean(clientEmail),
+  });
+
+  const moveInvoices = useServerFn(moveInvoicesToProject);
+  const moveMutation = useMutation({
+    mutationFn: (toQuoteId: string) =>
+      moveInvoices({ data: { fromQuoteId: id, toQuoteId } }),
+    onSuccess: (result) => {
+      toast.success(
+        `Moved ${result.moved} invoice${result.moved === 1 ? "" : "s"} to ${result.toQuoteNumber}.`,
+      );
+      void invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      navigate({ to: "/admin/quotes/$id", params: { id: result.toQuoteId } });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const copyReviewLink = async () => {
     if (!proposal?.review_token) return;
     const url = `${window.location.origin}/proposal/${proposal.review_token}`;
@@ -300,6 +325,25 @@ function QuoteDetailPage() {
           >
             {quote.deleted_at ? "Restore project" : "Archive project"}
           </Button>
+          {hasInvoices && !hasSignedSow ? (
+            <MoveInvoicesDialog
+              quoteNumber={quote.quote_number}
+              invoiceCount={engagement.data?.invoices.length ?? 0}
+              loading={clientProjects.isLoading}
+              projects={(clientProjects.data?.projects ?? [])
+                .filter((project) => project.id !== id)
+                .map((project) => ({
+                  id: project.id,
+                  quoteNumber: project.quoteNumber,
+                  name: project.name,
+                }))}
+              onConfirm={(toQuoteId) => moveMutation.mutate(toQuoteId)}
+            >
+              <Button variant="outline" size="sm" disabled={moveMutation.isPending}>
+                Move invoices to another project
+              </Button>
+            </MoveInvoicesDialog>
+          ) : null}
           {quote.deleted_at ? (
             <DeleteProjectDialog
               quoteNumber={quote.quote_number}

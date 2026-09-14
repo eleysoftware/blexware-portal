@@ -67,6 +67,87 @@ export const listClientProjects = createServerFn({ method: "POST" })
   );
 
 
+/**
+ * Moves every invoice on one project over to another project belonging to the
+ * same client, continuing the destination's payment order. Used to consolidate
+ * duplicate one-off projects created by direct invoicing.
+ */
+export const moveInvoicesToProject = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { fromQuoteId: string; toQuoteId: string }) => {
+    if (!data?.fromQuoteId || !data?.toQuoteId) throw new Error("Choose a project to move into");
+    if (data.fromQuoteId === data.toQuoteId) throw new Error("Choose a different project");
+    return data;
+  })
+  .handler(
+    guarded("moveInvoicesToProject", "moving the invoices", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: quotes } = await db
+        .from("quotes")
+        .select("id, quote_number, contact_email")
+        .in("id", [data.fromQuoteId, data.toQuoteId]);
+      const from = (quotes ?? []).find((row) => row.id === data.fromQuoteId);
+      const to = (quotes ?? []).find((row) => row.id === data.toQuoteId);
+      if (!from || !to) throw new Error("One of those projects could not be found");
+      if (
+        String(from.contact_email ?? "").toLowerCase() !==
+        String(to.contact_email ?? "").toLowerCase()
+      ) {
+        throw new Error("Invoices can only move between projects for the same client");
+      }
+
+      const { data: moving } = await db
+        .from("invoices")
+        .select("id, sequence, agreement_id")
+        .eq("quote_id", data.fromQuoteId)
+        .order("sequence", { ascending: true });
+      const list = (moving ?? []) as Record<string, unknown>[];
+      if (!list.length) throw new Error("That project has no invoices to move");
+      if (list.some((row) => row.agreement_id)) {
+        throw new Error("Invoices tied to a signed agreement cannot be moved");
+      }
+
+      const { data: last } = await db
+        .from("invoices")
+        .select("sequence")
+        .eq("quote_id", data.toQuoteId)
+        .order("sequence", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let next = Number(last?.sequence ?? 0);
+
+      for (const row of list) {
+        next += 1;
+        const { error } = await db
+          .from("invoices")
+          .update({ quote_id: data.toQuoteId, sequence: next })
+          .eq("id", String(row.id));
+        if (error) throw new Error(error.message);
+      }
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "invoice.moved_project",
+        entity: "quote",
+        entityId: data.toQuoteId,
+        metadata: {
+          from_quote: from.quote_number,
+          to_quote: to.quote_number,
+          invoices: list.length,
+        },
+      });
+
+      return {
+        moved: list.length,
+        toQuoteId: data.toQuoteId,
+        toQuoteNumber: String(to.quote_number ?? ""),
+      };
+    }),
+  );
+
 /** Clients we already have on file, for the "existing client" picker. */
 export const listInvoiceClients = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

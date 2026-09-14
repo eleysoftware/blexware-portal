@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHero } from "@/components/PageHero";
@@ -54,10 +54,19 @@ function NewInvoicePage() {
     enabled: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.trim()),
   });
 
+  const [existingQuoteId, setExistingQuoteId] = useState("");
+  const touchedProject = useRef(false);
+
+  // Default to the client's most recent project so a second bill for the same
+  // job doesn't silently create a duplicate project.
+  useEffect(() => {
+    const first = projects.data?.projects[0];
+    if (!touchedProject.current && first && !existingQuoteId) setExistingQuoteId(first.id);
+  }, [projects.data, existingQuoteId]);
+
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [projectType, setProjectType] = useState("");
-  const [existingQuoteId, setExistingQuoteId] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [description, setDescription] = useState("");
   const [issueDate, setIssueDate] = useState(today());
@@ -107,6 +116,7 @@ function NewInvoicePage() {
   const balanced = scheduledTotal === totalCents;
 
   const applyClient = (email: string) => {
+    touchedProject.current = false;
     setExistingQuoteId("");
     const match = clients.data?.clients.find((entry) => entry.email === email);
     if (!match) return;
@@ -223,7 +233,10 @@ function NewInvoicePage() {
                 <select
                   className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                   value={existingQuoteId}
-                  onChange={(event) => setExistingQuoteId(event.target.value)}
+                  onChange={(event) => {
+                    touchedProject.current = true;
+                    setExistingQuoteId(event.target.value);
+                  }}
                 >
                   <option value="">Start a new project</option>
                   {projects.data.projects.map((project) => (
@@ -233,8 +246,9 @@ function NewInvoicePage() {
                   ))}
                 </select>
                 <span className="mt-1 block text-xs font-normal text-slate">
-                  Adding to an existing project keeps all of that job's invoices together in the
-                  client's portal.
+                  This client already has projects, so their most recent one is picked for you.
+                  Keeping a job's invoices on one project is what groups them together in the
+                  client's portal — only start a new project for genuinely new work.
                 </span>
               </label>
             ) : null}
