@@ -92,6 +92,7 @@ export function AdminEngagementPanel({
   const approveEstimateFn = useServerFn(markEstimateApproved);
   const suggestSchedule = useServerFn(suggestInvoiceSchedule);
   const draftSow = useServerFn(draftSowWithAi);
+  const recordSignature = useServerFn(recordAgreementSignature);
 
 
   const engagement = useQuery({
@@ -131,6 +132,11 @@ export function AdminEngagementPanel({
   const [sowAddendum, setSowAddendum] = useState("");
   const [sowReviseMode, setSowReviseMode] = useState(false);
   const [scheduleNote, setScheduleNote] = useState("");
+  const [signatureOpen, setSignatureOpen] = useState(false);
+  const [signatureMode, setSignatureMode] = useState<"recorded" | "waived">("recorded");
+  const [signerName, setSignerName] = useState("");
+  const [signedOn, setSignedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [signatureChannel, setSignatureChannel] = useState("on paper");
   const [payouts, setPayouts] = useState<
     Record<
       string,
