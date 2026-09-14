@@ -25,13 +25,19 @@ export function paymentEnvironment(): PaymentEnvironment {
   return raw === "production" || raw === "live" ? "production" : "sandbox";
 }
 
-/** Hyperswitch REST base URL. */
-export function hyperswitchApiUrl(): string {
+/** Hyperswitch REST base URL for a given mode. */
+export function hyperswitchApiUrlFor(environment: PaymentEnvironment): string {
   return (
     readEnv("HYPERSWITCH_API_URL", "HYPERSWITCH_BASE_URL") ??
-    (paymentEnvironment() === "production" ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io")
+    (environment === "production" ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io")
   );
 }
+
+/** Hyperswitch REST base URL. */
+export function hyperswitchApiUrl(): string {
+  return hyperswitchApiUrlFor(paymentEnvironment());
+}
+
 
 /** Publishable key — browser-safe (mounted by the checkout widget). */
 export function hyperswitchPublishableKey(): string | undefined {
