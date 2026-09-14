@@ -1,10 +1,14 @@
 // BLEXware's processor-agnostic payment service. The invoice system talks to
 // this module only. It delegates to the active PaymentProvider (Hyperswitch,
-// PayPal, etc.) selected in app_settings.
+// PayPal, etc.) selected by the admin in app_settings.
+//
+// Single source of truth: the admin setting in the database decides the
+// provider and the mode. Environment variables are only a starting default for
+// a brand-new install; they never override the saved setting.
 import { readEnv } from "@/config/env";
-import { adminDb } from "@/lib/blex.server";
-import { hyperswitchProvider } from "@/lib/payments/hyperswitch.provider.server";
-import { paypalProvider } from "@/lib/payments/paypal.provider.server";
+import { isProviderConfigured } from "@/config/payments";
+import { createHyperswitchProvider } from "@/lib/payments/hyperswitch.provider.server";
+import { createPaypalProvider } from "@/lib/payments/paypal.provider.server";
 import type {
   CreatePaymentInput,
   PaymentMethodChoice,
@@ -27,57 +31,54 @@ export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 export type PaymentEnvironment = "sandbox" | "live";
 
-/** Reads the active provider from app_settings, falling back to env or hyperswitch. */
+/** Env default used only when no admin setting has been saved yet. */
+export function envDefaultProvider(): SupportedProvider {
+  const raw = readEnv("PAYMENT_PROVIDER", "PAYMENTS_PROVIDER")?.toLowerCase();
+  return raw === "paypal" ? "paypal" : "hyperswitch";
+}
+
+/** Env default used only when no admin setting has been saved yet. */
+export function envDefaultEnvironment(): PaymentEnvironment {
+  const raw = readEnv("PAYMENT_ENVIRONMENT")?.toLowerCase();
+  return raw === "live" || raw === "production" ? "live" : "sandbox";
+}
+
+async function savedSettings(): Promise<{ provider: SupportedProvider; environment: PaymentEnvironment }> {
+  const { getPaymentProviderSettings } = await import("@/lib/settings.server");
+  return getPaymentProviderSettings({
+    provider: envDefaultProvider(),
+    environment: envDefaultEnvironment(),
+  });
+}
+
+/** The provider the admin has selected. */
 export async function getActiveProviderName(): Promise<SupportedProvider> {
-  const env = readEnv("PAYMENT_PROVIDER")?.toLowerCase();
-  if (env === "paypal" || env === "hyperswitch") return env;
-  try {
-    const { data } = await adminDb()
-      .from("app_settings")
-      .select("value")
-      .eq("key", "payment_provider")
-      .maybeSingle();
-    const value = String((data?.value as string | null) ?? "").replace(/^"|"$/g, "");
-    if (value === "paypal" || value === "hyperswitch") return value;
-  } catch {
-    /* fall back to default */
-  }
-  return "hyperswitch";
+  return (await savedSettings()).provider;
 }
 
-/** Reads the active environment from app_settings, falling back to env or sandbox. */
+/** The mode (sandbox or live) the admin has selected. */
 export async function getActiveEnvironment(): Promise<PaymentEnvironment> {
-  const env = readEnv("PAYMENT_ENVIRONMENT")?.toLowerCase();
-  if (env === "live" || env === "production") return "live";
-  try {
-    const { data } = await adminDb()
-      .from("app_settings")
-      .select("value")
-      .eq("key", "payment_environment")
-      .maybeSingle();
-    const value = String((data?.value as string | null) ?? "").replace(/^"|"$/g, "");
-    if (value === "live") return "live";
-  } catch {
-    /* fall back to default */
-  }
-  return "sandbox";
+  return (await savedSettings()).environment;
 }
 
-function providerByName(name: SupportedProvider): PaymentProvider {
-  switch (name) {
-    case "paypal":
-      return paypalProvider;
-    case "hyperswitch":
-    default:
-      return hyperswitchProvider;
-  }
+export function providerFor(name: SupportedProvider, environment: PaymentEnvironment): PaymentProvider {
+  return name === "paypal" ? createPaypalProvider(environment) : createHyperswitchProvider(environment);
+}
+
+/** True when the given provider has credentials for the given mode. */
+export function providerHasCredentials(
+  name: SupportedProvider,
+  environment: PaymentEnvironment,
+): boolean {
+  return isProviderConfigured(name, environment === "live" ? "production" : "sandbox");
 }
 
 /** Resolves the currently configured payment provider. */
 export async function activeProvider(): Promise<PaymentProvider> {
-  const name = await getActiveProviderName();
-  return providerByName(name);
+  const { provider, environment } = await savedSettings();
+  return providerFor(provider, environment);
 }
+
 
 export const PaymentService = {
   async isConfigured(): Promise<boolean> {
