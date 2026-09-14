@@ -434,6 +434,7 @@ function AdminDashboard() {
                                                 <Link
                                                   to="/invoice/$token"
                                                   params={{ token: invoice.payToken }}
+                                                  search={{ return: undefined }}
                                                   className="text-primary underline-offset-4 hover:underline"
                                                 >
                                                   Open
