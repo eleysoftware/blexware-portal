@@ -94,7 +94,13 @@ function toSnapshot(payment: HyperswitchPayment): PaymentSnapshot {
   };
 }
 
-export const hyperswitchProvider: PaymentProvider = {
+export function createHyperswitchProvider(environment: "sandbox" | "live" = "sandbox"): PaymentProvider {
+  const hsEnv: "sandbox" | "production" = environment === "live" ? "production" : "sandbox";
+  const hsConfig = () => hyperswitchConfig(hsEnv);
+  const request = <T,>(path: string, init: { method: "GET" | "POST"; body?: unknown } = { method: "GET" }) =>
+    hyperswitchRequest<T>(path, init, hsEnv);
+
+  return {
   name: "hyperswitch",
 
   isConfigured(): boolean {
@@ -102,7 +108,7 @@ export const hyperswitchProvider: PaymentProvider = {
   },
 
   publicConfig(): PublicConfig {
-    const config = hyperswitchConfig();
+    const config = hsConfig();
     return {
       provider: "hyperswitch",
       checkout: {
@@ -115,8 +121,8 @@ export const hyperswitchProvider: PaymentProvider = {
   },
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentSnapshot> {
-    const config = hyperswitchConfig();
-    const payment = await hyperswitchRequest<HyperswitchPayment>("/payments", {
+    const config = hsConfig();
+    const payment = await request<HyperswitchPayment>("/payments", {
       method: "POST",
       body: {
         amount: input.amountCents,
@@ -145,7 +151,7 @@ export const hyperswitchProvider: PaymentProvider = {
   },
 
   async getPayment(providerPaymentId: string): Promise<PaymentSnapshot> {
-    const payment = await hyperswitchRequest<HyperswitchPayment>(
+    const payment = await request<HyperswitchPayment>(
       `/payments/${providerPaymentId}?force_sync=true`,
       { method: "GET" },
     );
@@ -153,7 +159,7 @@ export const hyperswitchProvider: PaymentProvider = {
   },
 
   async getSettlement(providerPaymentId: string): Promise<SettlementView> {
-    const payment = await hyperswitchRequest<HyperswitchPayment>(
+    const payment = await request<HyperswitchPayment>(
       `/payments/${providerPaymentId}?force_sync=true`,
       { method: "GET" },
     );
@@ -176,7 +182,7 @@ export const hyperswitchProvider: PaymentProvider = {
   },
 
   async cancelPayment(providerPaymentId: string, reason = "Cancelled by BLEXware"): Promise<PaymentSnapshot> {
-    const payment = await hyperswitchRequest<HyperswitchPayment>(
+    const payment = await request<HyperswitchPayment>(
       `/payments/${providerPaymentId}/cancel`,
       { method: "POST", body: { cancellation_reason: reason } },
     );
@@ -188,7 +194,7 @@ export const hyperswitchProvider: PaymentProvider = {
     amountCents: number;
     reason?: string | null;
   }): Promise<RefundResult> {
-    const refund = await hyperswitchRequest<{ refund_id: string; status: string; amount: number }>("/refunds", {
+    const refund = await request<{ refund_id: string; status: string; amount: number }>("/refunds", {
       method: "POST",
       body: {
         payment_id: input.providerPaymentId,
@@ -204,7 +210,7 @@ export const hyperswitchProvider: PaymentProvider = {
   },
 
   async parseWebhook(request: Request): Promise<WebhookParseResult> {
-    const secret = hyperswitchConfig().webhookSecret ?? "";
+    const secret = hsConfig().webhookSecret ?? "";
     if (!secret) return { kind: "ignore" };
 
     const body = await request.text();
@@ -275,3 +281,6 @@ export const hyperswitchProvider: PaymentProvider = {
     return { kind: "ignore" };
   },
 };
+}
+
+export const hyperswitchProvider: PaymentProvider = createHyperswitchProvider();

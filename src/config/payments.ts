@@ -25,13 +25,19 @@ export function paymentEnvironment(): PaymentEnvironment {
   return raw === "production" || raw === "live" ? "production" : "sandbox";
 }
 
-/** Hyperswitch REST base URL. */
-export function hyperswitchApiUrl(): string {
+/** Hyperswitch REST base URL for a given mode. */
+export function hyperswitchApiUrlFor(environment: PaymentEnvironment): string {
   return (
     readEnv("HYPERSWITCH_API_URL", "HYPERSWITCH_BASE_URL") ??
-    (paymentEnvironment() === "production" ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io")
+    (environment === "production" ? "https://api.hyperswitch.io" : "https://sandbox.hyperswitch.io")
   );
 }
+
+/** Hyperswitch REST base URL. */
+export function hyperswitchApiUrl(): string {
+  return hyperswitchApiUrlFor(paymentEnvironment());
+}
+
 
 /** Publishable key — browser-safe (mounted by the checkout widget). */
 export function hyperswitchPublishableKey(): string | undefined {
@@ -56,17 +62,26 @@ function paypalEnvPrefix(env: PaymentEnvironment): string {
   return env === "production" ? "PAYPAL_LIVE" : "PAYPAL_SANDBOX";
 }
 
-/** True when the active provider has the credentials it needs. */
-export function isPaymentsConfigured(): boolean {
-  const provider = paymentsProvider();
+/**
+ * True when the named provider has the credentials it needs for that mode.
+ * The active provider/mode come from the admin settings, not from env, so this
+ * takes both explicitly.
+ */
+export function isProviderConfigured(provider: string, environment: PaymentEnvironment): boolean {
   if (provider === "paypal") {
-    const prefix = paypalEnvPrefix(paymentEnvironment());
+    const prefix = paypalEnvPrefix(environment);
     return Boolean(readEnv(`${prefix}_CLIENT_ID`) && readEnv(`${prefix}_SECRET`));
   }
   return Boolean(
     readEnv("HYPERSWITCH_API_KEY") && hyperswitchPublishableKey() && hyperswitchProfileId(),
   );
 }
+
+/** True when the env-default provider has the credentials it needs. */
+export function isPaymentsConfigured(): boolean {
+  return isProviderConfigured(paymentsProvider(), paymentEnvironment());
+}
+
 
 /** PayPal client id for the active environment (browser-safe). */
 export function paypalClientId(): string | undefined {

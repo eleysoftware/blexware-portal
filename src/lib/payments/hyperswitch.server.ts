@@ -4,13 +4,14 @@
 
 import {
   hyperswitchApiKey,
-  hyperswitchApiUrl,
+  hyperswitchApiUrlFor,
   hyperswitchProfileId,
   hyperswitchPublishableKey,
   hyperswitchWebhookSecret,
   isPaymentsConfigured as configuredInEnv,
   paymentEnvironment,
 } from "@/config/payments";
+
 
 export type HyperswitchConfig = {
   apiKey: string;
@@ -34,7 +35,9 @@ export function isPaymentsConfigured(): boolean {
   return configuredInEnv();
 }
 
-export function hyperswitchConfig(): HyperswitchConfig {
+export function hyperswitchConfig(
+  environmentOverride?: "sandbox" | "production",
+): HyperswitchConfig {
   if (!isPaymentsConfigured()) {
     const missing = [
       hyperswitchPublishableKey() ? null : "HYPERSWITCH_PUBLISHABLE_KEY",
@@ -48,15 +51,17 @@ export function hyperswitchConfig(): HyperswitchConfig {
     throw new PaymentsNotConfiguredError(missing);
   }
 
+  const environment = environmentOverride ?? paymentEnvironment();
   return {
     apiKey: hyperswitchApiKey(),
     publishableKey: hyperswitchPublishableKey()!,
     profileId: hyperswitchProfileId()!,
     webhookSecret: hyperswitchWebhookSecret() ?? null,
-    environment: paymentEnvironment(),
-    baseUrl: hyperswitchApiUrl(),
+    environment,
+    baseUrl: hyperswitchApiUrlFor(environment),
   };
 }
+
 
 /**
  * A non-2xx response from Hyperswitch. `message` stays generic (it may reach a
@@ -78,8 +83,9 @@ export class HyperswitchApiError extends Error {
 export async function hyperswitchRequest<T>(
   path: string,
   init: { method: "GET" | "POST"; body?: unknown } = { method: "GET" },
+  environmentOverride?: "sandbox" | "production",
 ): Promise<T> {
-  const config = hyperswitchConfig();
+  const config = hyperswitchConfig(environmentOverride);
   const response = await fetch(`${config.baseUrl}${path}`, {
     method: init.method,
     headers: {

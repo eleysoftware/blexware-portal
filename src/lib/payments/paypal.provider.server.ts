@@ -192,15 +192,17 @@ function orderToSnapshot(order: Order): PaymentSnapshot {
   };
 }
 
-export const paypalProvider: PaymentProvider = {
+export function createPaypalProvider(environment: PayPalEnvironment = "sandbox"): PaymentProvider {
+  const env = environment;
+
+  return {
   name: "paypal",
 
   isConfigured(): boolean {
-    return isPayPalConfigured();
+    return isPayPalConfigured(env);
   },
 
   publicConfig(): PublicConfig {
-    const env = paypalEnvironment();
     const { clientId } = credentials(env);
     return {
       provider: "paypal",
@@ -213,7 +215,6 @@ export const paypalProvider: PaymentProvider = {
   },
 
   async createPayment(input: CreatePaymentInput): Promise<PaymentSnapshot> {
-    const env = paypalEnvironment();
     const currency = (input.currency ?? "usd").toUpperCase();
     const amountDollars = (input.amountCents / 100).toFixed(2);
     const order = await paypalRequest<Order>(env, "/v2/checkout/orders", {
@@ -245,7 +246,6 @@ export const paypalProvider: PaymentProvider = {
   },
 
   async getPayment(providerPaymentId: string): Promise<PaymentSnapshot> {
-    const env = paypalEnvironment();
     const order = await paypalRequest<Order>(env, `/v2/checkout/orders/${providerPaymentId}`);
     return orderToSnapshot(order);
   },
@@ -275,7 +275,6 @@ export const paypalProvider: PaymentProvider = {
     amountCents: number;
     reason?: string | null;
   }): Promise<RefundResult> {
-    const env = paypalEnvironment();
     // Find the capture id from the order.
     const order = await paypalRequest<Order>(env, `/v2/checkout/orders/${input.providerPaymentId}`);
     const captureId = order.purchase_units?.[0]?.payments?.captures?.[0]?.id;
@@ -297,7 +296,6 @@ export const paypalProvider: PaymentProvider = {
   },
 
   async parseWebhook(request: Request): Promise<WebhookParseResult> {
-    const env = paypalEnvironment();
     const { webhookId } = credentials(env);
     if (!webhookId) {
       console.warn("[paypal] webhook id not configured; skipping verification");
@@ -385,3 +383,7 @@ export const paypalProvider: PaymentProvider = {
     return { kind: "ignore" };
   },
 };
+}
+
+/** Env-default instance. Prefer createPaypalProvider(activeEnvironment). */
+export const paypalProvider: PaymentProvider = createPaypalProvider(paypalEnvironment());
