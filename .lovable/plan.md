@@ -19,6 +19,10 @@ Sign in to the ZeptoMail console and top up / renew the sending credits for the 
 
 3. **Don't keep hammering the provider.** The nightly scheduled-send job will stop attempting further sends in that run after it sees an out-of-credits refusal, record the reason on the remaining invoices, and report it in the heartbeat line, rather than burning through every scheduled invoice with the same failure.
 
+4. **Copy the invoice link from the admin side.** Every invoice row in the team queue and on the project page gets a "Copy payment link" action that puts the client's invoice URL on the clipboard. You can paste it into your own email or a text message whenever the mail provider is refusing sends — no send attempt required, and the link is the same one the client would have received.
+
+5. **Admins don't get the client experience on that link.** When a signed-in admin opens an invoice link, the page drops the "Sign in to your portal to see all your invoices" prompt and instead shows a short admin strip: a note that you are viewing as staff, the invoice's project number, and a link back to that project in the admin workspace. Payment controls stay visible so you can still check what the client sees, but the client-portal nudges are gone.
+
 ## Technical notes
 
 - Add a `describeEmailFailure(reason)` mapper next to `parseZeptoMailError` in `src/lib/email.server.ts`, keyed on the ZeptoMail code prefix (`TM_5001`, `SM_101`/`SM_111` domain, `SM_113` recipient) plus the internal `not_configured` / `network_error` sentinels. Returns `{ headline, action }`.
