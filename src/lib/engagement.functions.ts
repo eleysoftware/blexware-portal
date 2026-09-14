@@ -829,6 +829,112 @@ export const sendAgreement = createServerFn({ method: "POST" })
   );
 
 /**
+ * Lets an admin record a signature that happened outside the portal (paper,
+ * email, verbal) or waive it entirely, so the project start and invoice
+ * schedule are no longer blocked on the client signing in the portal.
+ */
+export const recordAgreementSignature = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      agreementId: string;
+      mode: "recorded" | "waived";
+      signerName?: string;
+      signedOn?: string;
+      channel?: string;
+    }) => {
+      if (!["recorded", "waived"].includes(data.mode)) throw new Error("Unknown option");
+      if (data.signedOn && !/^\d{4}-\d{2}-\d{2}$/.test(data.signedOn)) {
+        throw new Error("Choose the date the signature was given");
+      }
+      if (data.mode === "recorded" && !data.signerName?.trim()) {
+        throw new Error("Enter the name of the person who signed");
+      }
+      return {
+        ...data,
+        signerName: data.signerName?.trim().slice(0, 120),
+        channel: data.channel?.trim().slice(0, 60),
+      };
+    },
+  )
+  .handler(
+    guarded("recordAgreementSignature", "recording the signature", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: agreement } = await db
+        .from("agreements")
+        .select("id, quote_id, agreement_number, status, doc")
+        .eq("id", data.agreementId)
+        .maybeSingle();
+      if (!agreement) throw new Error("Agreement not found");
+      if (agreement.status === "signed") {
+        throw new Error("This Statement of Work is already signed.");
+      }
+      if (agreement.status === "void") {
+        throw new Error("This Statement of Work has been voided. Generate a new one first.");
+      }
+
+      const signedAt = data.signedOn ? new Date(`${data.signedOn}T12:00:00Z`) : new Date();
+      const signedLabel = signedAt.toLocaleDateString("en-US", {
+        timeZone: "UTC",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      const channelLabel = data.channel && data.channel.length ? data.channel : "outside the portal";
+      const waived = data.mode === "waived";
+      const signerName = waived ? "Signature waived by BLEXware" : (data.signerName as string);
+      const note = waived
+        ? `Signature waived by BLEXware on ${signedLabel}. Work and billing proceed under the terms above.`
+        : `Signature recorded by BLEXware staff — received ${channelLabel} on ${signedLabel}.`;
+
+      const existingDoc = (agreement.doc ?? {}) as Record<string, unknown>;
+      const acceptance = (existingDoc["acceptance"] ?? {}) as Record<string, unknown>;
+      const nextDoc = {
+        ...existingDoc,
+        acceptance: {
+          ...acceptance,
+          signerName,
+          ...(waived ? {} : { signatureText: signerName }),
+          signedAt: signedLabel,
+          signatureNote: note,
+        },
+      };
+
+      await db
+        .from("agreements")
+        .update({
+          status: "signed",
+          signed_at: signedAt.toISOString(),
+          signer_name: signerName,
+          signer_user_agent: waived ? "signature-waived-by-staff" : "signature-recorded-by-staff",
+          doc: nextDoc,
+        })
+        .eq("id", agreement.id);
+      await db.from("quotes").update({ status: "signed" }).eq("id", agreement.quote_id);
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "agreement.signature_recorded",
+        entity: "quote",
+        entityId: agreement.quote_id as string,
+        metadata: {
+          agreement: agreement.agreement_number,
+          mode: data.mode,
+          channel: channelLabel,
+          signerName,
+          signedOn: signedAt.toISOString(),
+        },
+      });
+
+      return { agreementId: agreement.id as string, mode: data.mode, note };
+    }),
+  );
+
+
+/**
  * Admin approval of a signed SOW: countersigns for BLEXware, records the
  * project start date and issues the first invoice ahead of that date.
  */
