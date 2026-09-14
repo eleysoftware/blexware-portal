@@ -289,6 +289,7 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
               signed_at: agreement.signed_at ?? null,
               signer_name: agreement.signer_name ?? null,
               document_hash: (agreement as { document_hash?: string | null }).document_hash ?? null,
+              signature_note: agreement.doc?.acceptance?.signatureNote ?? null,
             }}
             countersign={agreement.doc?.acceptance?.countersign ?? null}
           />
