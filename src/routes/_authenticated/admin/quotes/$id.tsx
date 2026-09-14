@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+import { MoveInvoicesDialog } from "@/components/MoveInvoicesDialog";
+import { listClientProjects, moveInvoicesToProject } from "@/lib/direct-invoice.functions";
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { MilestoneBoard } from "@/components/MilestoneBoard";
