@@ -1060,7 +1060,17 @@ export const getPaymentProviderSettingsFn = createServerFn({ method: "POST" })
       const { requireAdmin } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const { getPaymentProviderSettings } = await import("@/lib/settings.server");
-      return getPaymentProviderSettings();
+      const { envDefaultProvider, envDefaultEnvironment, providerHasCredentials } = await import(
+        "@/lib/payments/service.server"
+      );
+      const settings = await getPaymentProviderSettings({
+        provider: envDefaultProvider(),
+        environment: envDefaultEnvironment(),
+      });
+      return {
+        ...settings,
+        credentialsPresent: providerHasCredentials(settings.provider, settings.environment),
+      };
     }),
   );
 
@@ -1081,11 +1091,16 @@ export const setPaymentProviderSettingsFn = createServerFn({ method: "POST" })
       const { requireAdmin } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const { setPaymentProviderSettings } = await import("@/lib/settings.server");
-      return setPaymentProviderSettings({
+      const { providerHasCredentials } = await import("@/lib/payments/service.server");
+      const settings = await setPaymentProviderSettings({
         provider: data.provider,
         environment: data.environment,
         actorId: context.userId,
       });
+      return {
+        ...settings,
+        credentialsPresent: providerHasCredentials(settings.provider, settings.environment),
+      };
     }),
   );
 

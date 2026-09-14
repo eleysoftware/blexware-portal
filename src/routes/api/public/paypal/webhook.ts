@@ -5,9 +5,11 @@ export const Route = createFileRoute("/api/public/paypal/webhook")({
     handlers: {
       POST: async ({ request }) => {
         const { adminDb } = await import("@/lib/blex.server");
-        const { paypalProvider } = await import("@/lib/payments/paypal.provider.server");
+        const { createPaypalProvider } = await import("@/lib/payments/paypal.provider.server");
+        const { getActiveEnvironment } = await import("@/lib/payments/service.server");
 
-        const parsed = await paypalProvider.parseWebhook(request);
+        const provider = createPaypalProvider(await getActiveEnvironment());
+        const parsed = await provider.parseWebhook(request);
         if (parsed.kind === "ignore") {
           return new Response("ok");
         }

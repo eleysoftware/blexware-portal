@@ -127,9 +127,23 @@ export function PaymentEnvironmentCard() {
         </div>
       </div>
 
-      <p className="mt-4 text-xs text-slate">
+      <p className="mt-4 text-sm" data-testid="payment-provider-active">
+        Active:{" "}
+        <strong>{currentProvider === "paypal" ? "PayPal Business" : "Hyperswitch (fallback)"}</strong>{" "}
+        in <strong>{isLive ? "live / production" : "sandbox / test"}</strong> mode.{" "}
+        {settings.data?.credentialsPresent === false ? (
+          <span className="text-destructive">
+            Its keys for this mode are missing, so clients can&apos;t pay yet.
+          </span>
+        ) : settings.data ? (
+          <span className="text-emerald">Its keys for this mode are in place.</span>
+        ) : null}
+      </p>
+
+      <p className="mt-2 text-xs text-slate">
         Switching to live makes real charges. Only admins can change this; every change is logged.
       </p>
+
 
       <AlertDialog open={!!confirmLive} onOpenChange={() => setConfirmLive(null)}>
         <AlertDialogContent>

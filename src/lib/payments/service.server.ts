@@ -114,9 +114,8 @@ export const PaymentService = {
   },
 };
 
-/** Convenience for legacy call sites that expect synchronous config. */
+/** Env default only. Use getActiveProviderName() for the real answer. */
 export function currentProviderName(): SupportedProvider {
-  const env = readEnv("PAYMENT_PROVIDER")?.toLowerCase();
-  if (env === "paypal" || env === "hyperswitch") return env;
-  return "hyperswitch";
+  return envDefaultProvider();
 }
+
