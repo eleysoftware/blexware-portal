@@ -148,11 +148,22 @@ function NewInvoicePage() {
         },
       }),
     onSuccess: (result) => {
-      toast.success(
-        result.sent
-          ? `Invoice ${result.firstInvoiceNumber ?? ""} sent to the client.`
-          : `Created ${result.invoiceCount} invoice${result.invoiceCount === 1 ? "" : "s"} as drafts.`,
-      );
+      const later = result.scheduledCount
+        ? ` The remaining ${result.scheduledCount} payment${
+            result.scheduledCount === 1 ? "" : "s"
+          } will be emailed on their due dates.`
+        : "";
+      if (result.deliveryError) {
+        toast.error(
+          `We couldn't email invoice ${result.firstInvoiceNumber ?? ""}: ${result.deliveryError}. Use Retry on the project page.`,
+        );
+      } else {
+        toast.success(
+          result.sent
+            ? `Invoice ${result.firstInvoiceNumber ?? ""} sent to the client.${later}`
+            : `Created ${result.invoiceCount} invoice${result.invoiceCount === 1 ? "" : "s"}.${later}`,
+        );
+      }
       navigate({ to: "/admin/quotes/$id", params: { id: result.quoteId } });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -228,29 +239,69 @@ function NewInvoicePage() {
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
             <h2 className="text-xl">Project</h2>
             {projects.data?.projects.length ? (
-              <label className="mt-4 block text-sm font-medium">
-                Add this invoice to
-                <select
-                  className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-                  value={existingQuoteId}
-                  onChange={(event) => {
-                    touchedProject.current = true;
-                    setExistingQuoteId(event.target.value);
-                  }}
-                >
-                  <option value="">Start a new project</option>
-                  {projects.data.projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.quoteNumber} — {project.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="mt-1 block text-xs font-normal text-slate">
-                  This client already has projects, so their most recent one is picked for you.
-                  Keeping a job's invoices on one project is what groups them together in the
-                  client's portal — only start a new project for genuinely new work.
-                </span>
-              </label>
+              <div className="mt-4 space-y-3">
+                <p className="text-sm font-medium">Where should this invoice go?</p>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    name="project-choice"
+                    checked={Boolean(existingQuoteId)}
+                    onChange={() => {
+                      touchedProject.current = true;
+                      setExistingQuoteId(projects.data?.projects[0]?.id ?? "");
+                    }}
+                  />
+                  <span>
+                    Add to an existing project
+                    <span className="block text-xs text-slate">
+                      Keeps this bill alongside the client's other invoices in their portal.
+                    </span>
+                  </span>
+                </label>
+                {existingQuoteId ? (
+                  <select
+                    className="ml-6 h-10 w-[calc(100%-1.5rem)] rounded-md border border-border bg-background px-3 text-sm"
+                    value={existingQuoteId}
+                    onChange={(event) => {
+                      touchedProject.current = true;
+                      setExistingQuoteId(event.target.value);
+                    }}
+                  >
+                    {projects.data.projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.quoteNumber} — {project.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    name="project-choice"
+                    checked={!existingQuoteId}
+                    onChange={() => {
+                      touchedProject.current = true;
+                      setExistingQuoteId("");
+                    }}
+                  />
+                  <span>
+                    Start a new project
+                    <span className="block text-xs text-slate">
+                      Only for genuinely new work — it appears as a separate card in the portal.
+                    </span>
+                  </span>
+                </label>
+                <p className="text-xs text-slate">
+                  {existingQuoteId
+                    ? `This invoice will appear under ${
+                        projects.data.projects.find((p) => p.id === existingQuoteId)?.quoteNumber ??
+                        "the selected project"
+                      }.`
+                    : "This invoice will create a new project for this client."}
+                </p>
+              </div>
             ) : null}
             {existingQuoteId ? null : (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">

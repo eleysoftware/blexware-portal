@@ -20,9 +20,11 @@ import {
   archiveQuote,
   deleteQuotePermanently,
   getAdminStatus,
+  getCronHeartbeat,
   listQuotes,
   refreshProposalDocuments,
 } from "@/lib/admin.functions";
+import { sendInvoiceNow } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
@@ -45,6 +47,23 @@ function AdminDashboard() {
 
   const [converting, setConverting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+  const resendInvoice = useServerFn(sendInvoiceNow);
+  const fetchHeartbeat = useServerFn(getCronHeartbeat);
+
+  const handleResend = async (invoiceId: string) => {
+    setResending(invoiceId);
+    try {
+      const result = await resendInvoice({ data: { invoiceId } });
+      if (result.emailed) toast.success("Invoice emailed to the client.");
+      else toast.error(`Still not delivered: ${result.reason ?? "unknown error"}`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setResending(null);
+    }
+  };
   const [deleteTarget, setDeleteTarget] = useState<NonNullable<
     typeof quotes.data
   >["quotes"][number] | null>(null);
@@ -56,6 +75,13 @@ function AdminDashboard() {
     queryFn: () => fetchQuotes({ data: { status: filter, search } }),
     enabled: access.data?.isAdmin === true,
   });
+  const heartbeat = useQuery({
+    queryKey: ["cron-heartbeat"],
+    queryFn: () => fetchHeartbeat(),
+    enabled: access.data?.isAdmin === true,
+  });
+
+
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -182,6 +208,17 @@ function AdminDashboard() {
       >
         <div className="flex flex-wrap items-center gap-3 text-sm text-slate">
           <span>Signed in as {access.data.email}</span>
+          <span data-testid="cron-heartbeat">
+            {heartbeat.data?.heartbeat
+              ? `Scheduled invoice mail last ran ${new Date(
+                  heartbeat.data.heartbeat.ranAt ?? "",
+                ).toLocaleString()} — ${heartbeat.data.heartbeat.invoicesSent} sent${
+                  heartbeat.data.heartbeat.invoicesFailed
+                    ? `, ${heartbeat.data.heartbeat.invoicesFailed} failed`
+                    : ""
+                }`
+              : "Scheduled invoice mail: no run recorded yet"}
+          </span>
           <Button variant="outline" size="sm" onClick={signOut}>
             Sign out
           </Button>
@@ -414,6 +451,11 @@ function AdminDashboard() {
                                                 {invoice.invoiceNumber}
                                               </span>
                                               <Badge variant="outline">{invoice.status}</Badge>
+                                              {invoice.deliveryError ? (
+                                                <Badge variant="destructive">
+                                                  Not delivered — {invoice.deliveryError}
+                                                </Badge>
+                                              ) : null}
                                               <span className="text-xs text-slate">
                                                 {invoice.issueDate
                                                   ? `Issued ${invoice.issueDate}`
@@ -430,6 +472,22 @@ function AdminDashboard() {
                                                   ? `${formatMoney(balance)} due`
                                                   : "Paid"}
                                               </span>
+                                              {invoice.deliveryError ||
+                                              invoice.status === "draft" ||
+                                              invoice.status === "scheduled" ? (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  disabled={resending === invoice.id}
+                                                  onClick={() => void handleResend(invoice.id)}
+                                                >
+                                                  {resending === invoice.id
+                                                    ? "Sending…"
+                                                    : invoice.deliveryError
+                                                      ? "Retry"
+                                                      : "Send now"}
+                                                </Button>
+                                              ) : null}
                                               {invoice.payToken ? (
                                                 <Link
                                                   to="/invoice/$token"

@@ -162,6 +162,7 @@ export const listQuotes = createServerFn({ method: "POST" })
           issueDate: string | null;
           dueDate: string | null;
           payToken: string | null;
+          deliveryError: string | null;
         }[]
       > = {};
       const hasProposal: Record<string, boolean> = {};
@@ -174,6 +175,18 @@ export const listQuotes = createServerFn({ method: "POST" })
           )
           .in("quote_id", ids)
           .order("sequence", { ascending: true });
+
+        // Delivery columns are additive (migration 012); read them separately so
+        // a database that has not run it yet still loads the queue.
+        const deliveryErrors: Record<string, string | null> = {};
+        const { data: deliveryRows } = await adminDb()
+          .from("invoices")
+          .select("id, delivery_error")
+          .in("quote_id", ids);
+        for (const row of (deliveryRows ?? []) as Record<string, unknown>[]) {
+          deliveryErrors[String(row.id)] = (row.delivery_error as string | null) ?? null;
+        }
+
         for (const row of (invoices ?? []) as Record<string, unknown>[]) {
           const quoteId = String(row.quote_id);
           const amount = Number(row.amount_cents ?? 0);
@@ -190,6 +203,7 @@ export const listQuotes = createServerFn({ method: "POST" })
             issueDate: (row.issue_date as string | null) ?? null,
             dueDate: (row.due_date as string | null) ?? null,
             payToken: (row.pay_token as string | null) ?? null,
+            deliveryError: deliveryErrors[String(row.id)] ?? null,
           });
 
           if (["void", "cancelled", "draft"].includes(status)) continue;
@@ -213,6 +227,30 @@ export const listQuotes = createServerFn({ method: "POST" })
       }
 
       return { quotes, counts, billing, invoicesByQuote, hasProposal };
+    }),
+  );
+
+/** Last run of the nightly worker, so the team can see scheduled mail is going out. */
+export const getCronHeartbeat = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+    guarded("getCronHeartbeat", "checking the nightly job", async ({ context }) => {
+      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const { data } = await adminDb()
+        .from("app_settings")
+        .select("value, updated_at")
+        .eq("key", "cron_heartbeat")
+        .maybeSingle();
+      if (!data) return { heartbeat: null };
+      const value = (data.value ?? {}) as Record<string, unknown>;
+      return {
+        heartbeat: {
+          ranAt: (value["ranAt"] as string | undefined) ?? (data.updated_at as string) ?? null,
+          invoicesSent: Number(value["invoicesSent"] ?? 0),
+          invoicesFailed: Number(value["invoicesFailed"] ?? 0),
+        },
+      };
     }),
   );
 
