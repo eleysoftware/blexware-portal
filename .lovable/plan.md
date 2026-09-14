@@ -29,6 +29,8 @@ Sign in to the ZeptoMail console and top up / renew the sending credits for the 
 - Store the raw reason in `invoices.delivery_error` as today; format only at display time in the admin queue rows, the project page invoice rows, and the create-invoice confirmation.
 - Banner: derive from the existing `invoicesByQuote` delivery fields in `listQuotes` — no new query, no schema change.
 - `runScheduledWork` in `src/lib/invoicing.server.ts`: treat an out-of-credits reason as a run-level abort; mark remaining due invoices with the same `delivery_error` and include the count in the heartbeat written to `app_settings`.
+- Copy link: `listQuotes` already returns `payToken` per invoice, so the admin row builds `${origin}/invoice/${payToken}` and copies it with a toast — no new server call. Rows with no `payToken` hide the action.
+- Admin view of `/invoice/$token`: the route is public and SSR, so detect staff client-side only — a small `useIsAdmin()` check via the existing auth session/role query, rendered after hydration so the public page is unchanged for clients. When true, hide the `/portal` sign-in link and render the admin strip linking to `/admin/quotes/$id`; the quote id comes from the existing `project` field already returned by `getInvoiceByToken`.
 - Tests: mapper returns the credits message for `TM_5001: ...`; scheduled run aborts after the first out-of-credits refusal.
 
 ## Still outstanding from before
