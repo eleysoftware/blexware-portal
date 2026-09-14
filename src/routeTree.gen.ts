@@ -36,6 +36,7 @@ import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authe
 import { Route as ApiPublicAuthHooksPasswordCheckRouteImport } from './routes/api/public/auth-hooks/password-check'
 import { Route as ApiPublicCronEngagementRouteImport } from './routes/api/public/cron/engagement'
 import { Route as ApiPublicHyperswitchWebhookRouteImport } from './routes/api/public/hyperswitch/webhook'
+import { Route as ApiPublicPaypalWebhookRouteImport } from './routes/api/public/paypal/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -178,6 +179,11 @@ const ApiPublicHyperswitchWebhookRoute =
     path: '/api/public/hyperswitch/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaypalWebhookRoute = ApiPublicPaypalWebhookRouteImport.update({
+  id: '/api/public/paypal/webhook',
+  path: '/api/public/paypal/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
   '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
   '/api/public/hyperswitch/webhook': typeof ApiPublicHyperswitchWebhookRoute
+  '/api/public/paypal/webhook': typeof ApiPublicPaypalWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
   '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
   '/api/public/hyperswitch/webhook': typeof ApiPublicHyperswitchWebhookRoute
+  '/api/public/paypal/webhook': typeof ApiPublicPaypalWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/api/public/auth-hooks/password-check': typeof ApiPublicAuthHooksPasswordCheckRoute
   '/api/public/cron/engagement': typeof ApiPublicCronEngagementRoute
   '/api/public/hyperswitch/webhook': typeof ApiPublicHyperswitchWebhookRoute
+  '/api/public/paypal/webhook': typeof ApiPublicPaypalWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -294,6 +303,7 @@ export interface FileRouteTypes {
     | '/api/public/auth-hooks/password-check'
     | '/api/public/cron/engagement'
     | '/api/public/hyperswitch/webhook'
+    | '/api/public/paypal/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/api/public/auth-hooks/password-check'
     | '/api/public/cron/engagement'
     | '/api/public/hyperswitch/webhook'
+    | '/api/public/paypal/webhook'
   id:
     | '__root__'
     | '/'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/api/public/auth-hooks/password-check'
     | '/api/public/cron/engagement'
     | '/api/public/hyperswitch/webhook'
+    | '/api/public/paypal/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -375,6 +387,7 @@ export interface RootRouteChildren {
   ApiPublicAuthHooksPasswordCheckRoute: typeof ApiPublicAuthHooksPasswordCheckRoute
   ApiPublicCronEngagementRoute: typeof ApiPublicCronEngagementRoute
   ApiPublicHyperswitchWebhookRoute: typeof ApiPublicHyperswitchWebhookRoute
+  ApiPublicPaypalWebhookRoute: typeof ApiPublicPaypalWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -568,6 +581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHyperswitchWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/paypal/webhook': {
+      id: '/api/public/paypal/webhook'
+      path: '/api/public/paypal/webhook'
+      fullPath: '/api/public/paypal/webhook'
+      preLoaderRoute: typeof ApiPublicPaypalWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -614,6 +634,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAuthHooksPasswordCheckRoute: ApiPublicAuthHooksPasswordCheckRoute,
   ApiPublicCronEngagementRoute: ApiPublicCronEngagementRoute,
   ApiPublicHyperswitchWebhookRoute: ApiPublicHyperswitchWebhookRoute,
+  ApiPublicPaypalWebhookRoute: ApiPublicPaypalWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

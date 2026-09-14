@@ -13,7 +13,7 @@ export const getInvoiceByToken = createServerFn({ method: "POST" })
   .handler(
     guarded("getInvoiceByToken", "loading the invoice", async ({ data }) => {
       const { loadInvoiceByToken, markInvoiceViewed } = await import("@/lib/invoicing.server");
-      const { isPaymentsConfigured } = await import("@/lib/payments/hyperswitch.server");
+      const { isPaymentsConfigured } = await import("@/config/payments");
       const { getPaymentMethodSettings } = await import("@/lib/settings.server");
 
       const loaded = await loadInvoiceByToken(data.token);
@@ -107,12 +107,12 @@ export const confirmInvoicePayment = createServerFn({ method: "POST" })
 
       const { data: attempt } = await adminDb()
         .from("invoice_payments")
-        .select("hyperswitch_payment_id, status")
+        .select("provider_payment_id, status")
         .eq("payment_reference", data.reference)
         .maybeSingle();
-      if (!attempt?.hyperswitch_payment_id) return { status: "unknown" as const };
+      if (!attempt?.provider_payment_id) return { status: "unknown" as const };
 
-      await syncPayment(attempt.hyperswitch_payment_id as string);
+      await syncPayment(attempt.provider_payment_id as string);
 
       const { data: refreshed } = await adminDb()
         .from("invoice_payments")

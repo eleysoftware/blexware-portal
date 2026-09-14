@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DocumentPreview } from "@/components/DocumentPreview";
-import { HyperswitchCheckout, type CheckoutSession } from "@/components/HyperswitchCheckout";
 import { Logo } from "@/components/Logo";
+import { PaymentCheckout, type CheckoutSession } from "@/components/PaymentCheckout";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
 import { Badge } from "@/components/ui/badge";
@@ -309,13 +309,13 @@ function InvoicePage() {
                     : "Enter your card details securely below."}
                 </p>
               </div>
-              <HyperswitchCheckout
+              <PaymentCheckout
                 session={session}
                 processing={confirm.isPending}
                 returnUrl={`${window.location.origin}/invoice/${token}`}
                 payLabel={`Pay ${formatMoney(session.amountCents)}`}
                 onChangeMethod={() => setSession(null)}
-                onDone={(status) => {
+                onDone={(status: "succeeded" | "processing" | "failed") => {
                   if (status === "failed") {
                     toast.error("We were unable to process your payment. You can try again.");
                     return;

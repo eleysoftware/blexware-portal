@@ -82,7 +82,7 @@ export const Route = createFileRoute("/api/public/hyperswitch/webhook")({
         if (PAYMENT_EVENTS.has(eventType) || eventType === "dispute_opened") {
           const paymentId = String(object["payment_id"] ?? "");
           if (paymentId) {
-            const { mapPaymentStatus } = await import("@/lib/payments/service.server");
+            const { mapPaymentStatus } = await import("@/lib/payments/hyperswitch.provider.server");
             const status =
               eventType === "dispute_opened"
                 ? ("disputed" as const)
