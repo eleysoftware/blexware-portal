@@ -76,3 +76,86 @@ export async function setPaymentMethodEnabled(input: {
 
   return next;
 }
+
+export type PaymentProviderName = "hyperswitch" | "paypal";
+export type PaymentEnvironment = "sandbox" | "live";
+
+export type PaymentProviderSettings = {
+  provider: PaymentProviderName;
+  environment: PaymentEnvironment;
+};
+
+const PROVIDER_KEY = "payment_provider";
+const ENVIRONMENT_KEY = "payment_environment";
+
+function providerCoerce(value: unknown, fallback: PaymentProviderName): PaymentProviderName {
+  if (value === "hyperswitch" || value === "paypal") return value;
+  return fallback;
+}
+
+function environmentCoerce(value: unknown, fallback: PaymentEnvironment): PaymentEnvironment {
+  if (value === "sandbox" || value === "live") return value;
+  return fallback;
+}
+
+/** Which payment provider and environment are active right now. */
+export async function getPaymentProviderSettings(): Promise<PaymentProviderSettings> {
+  const fallback: PaymentProviderSettings = { provider: "hyperswitch", environment: "sandbox" };
+  try {
+    const { data, error } = await adminDb()
+      .from("app_settings")
+      .select("key, value")
+      .in("key", [PROVIDER_KEY, ENVIRONMENT_KEY]);
+    if (error) {
+      console.error("[settings] payment_provider read failed:", error.message);
+      return fallback;
+    }
+    const map = new Map((data ?? []).map((row) => [row.key, row.value]));
+    return {
+      provider: providerCoerce(map.get(PROVIDER_KEY), fallback.provider),
+      environment: environmentCoerce(map.get(ENVIRONMENT_KEY), fallback.environment),
+    };
+  } catch (error) {
+    console.error("[settings] payment_provider unavailable:", error);
+    return fallback;
+  }
+}
+
+/** Sets the active payment provider and/or environment. Admin-gated by the caller. */
+export async function setPaymentProviderSettings(input: {
+  provider?: PaymentProviderName;
+  environment?: PaymentEnvironment;
+  actorId?: string | null;
+}): Promise<PaymentProviderSettings> {
+  const current = await getPaymentProviderSettings();
+  const next: PaymentProviderSettings = {
+    provider: input.provider ?? current.provider,
+    environment: input.environment ?? current.environment,
+  };
+
+  const now = new Date().toISOString();
+  const { error } = await adminDb()
+    .from("app_settings")
+    .upsert(
+      [
+        { key: PROVIDER_KEY, value: next.provider, updated_at: now, updated_by: input.actorId ?? null },
+        { key: ENVIRONMENT_KEY, value: next.environment, updated_at: now, updated_by: input.actorId ?? null },
+      ],
+      { onConflict: "key" },
+    );
+  if (error) {
+    console.error("[settings] payment_provider write failed:", error.message);
+    throw new Error("Could not save the payment provider settings. Please try again.");
+  }
+
+  await writeAudit({
+    actorId: input.actorId ?? null,
+    actorLabel: "admin",
+    action: "settings.payment_provider.updated",
+    entity: "settings",
+    entityId: PROVIDER_KEY,
+    metadata: { from: current, to: next },
+  });
+
+  return next;
+}
