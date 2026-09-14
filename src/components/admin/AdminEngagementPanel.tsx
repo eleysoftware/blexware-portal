@@ -327,6 +327,32 @@ export function AdminEngagementPanel({
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const recordSignatureMutation = useMutation({
+    mutationFn: () =>
+      recordSignature({
+        data: {
+          agreementId: agreement!.id,
+          mode: signatureMode,
+          signedOn,
+          ...(signatureMode === "recorded"
+            ? { signerName: signerName.trim(), channel: signatureChannel.trim() }
+            : {}),
+        },
+      }),
+    onSuccess: (result: { mode: string }) => {
+      toast.success(
+        result.mode === "waived"
+          ? "Signature waived — set the start date to issue the invoices"
+          : "Signature recorded — set the start date to issue the invoices",
+      );
+      setSignatureOpen(false);
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+
+
 
   const regenerateMutation = useMutation({
     mutationFn: () =>
