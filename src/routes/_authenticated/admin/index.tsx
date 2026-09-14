@@ -8,6 +8,7 @@ import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
+import { EditClientDialog } from "@/components/admin/EditClientDialog";
 import { PaymentEnvironmentCard } from "@/components/admin/PaymentEnvironmentCard";
 import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
