@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { TabEmptyState } from "@/components/TabIntro";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { SignatureBlock } from "@/components/SignatureBlock";
+import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
 import { getTabEmptyState } from "@/lib/workflow-guidance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
