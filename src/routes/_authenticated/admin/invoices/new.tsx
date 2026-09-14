@@ -233,8 +233,9 @@ function NewInvoicePage() {
                   ))}
                 </select>
                 <span className="mt-1 block text-xs font-normal text-slate">
-                  Adding to an existing project keeps all of that job's invoices together in the
-                  client's portal.
+                  This client already has projects, so their most recent one is picked for you.
+                  Keeping a job's invoices on one project is what groups them together in the
+                  client's portal — only start a new project for genuinely new work.
                 </span>
               </label>
             ) : null}
