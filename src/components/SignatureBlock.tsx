@@ -6,6 +6,8 @@ export type AgreementSignatureInfo = {
   signed_at: string | null;
   signer_name: string | null;
   document_hash?: string | null;
+  /** Set when a signature was recorded by staff or waived instead of typed in the portal. */
+  signature_note?: string | null;
 };
 
 export type Countersignature = {
