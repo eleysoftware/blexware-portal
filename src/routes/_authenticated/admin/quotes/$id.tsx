@@ -325,6 +325,25 @@ function QuoteDetailPage() {
           >
             {quote.deleted_at ? "Restore project" : "Archive project"}
           </Button>
+          {hasInvoices && !hasSignedSow ? (
+            <MoveInvoicesDialog
+              quoteNumber={quote.quote_number}
+              invoiceCount={engagement.data?.invoices.length ?? 0}
+              loading={clientProjects.isLoading}
+              projects={(clientProjects.data?.projects ?? [])
+                .filter((project) => project.id !== id)
+                .map((project) => ({
+                  id: project.id,
+                  quoteNumber: project.quoteNumber,
+                  name: project.name,
+                }))}
+              onConfirm={(toQuoteId) => moveMutation.mutate(toQuoteId)}
+            >
+              <Button variant="outline" size="sm" disabled={moveMutation.isPending}>
+                Move invoices to another project
+              </Button>
+            </MoveInvoicesDialog>
+          ) : null}
           {quote.deleted_at ? (
             <DeleteProjectDialog
               quoteNumber={quote.quote_number}
