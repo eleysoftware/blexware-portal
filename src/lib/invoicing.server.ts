@@ -3,6 +3,7 @@
 import { adminDb, writeAudit } from "@/lib/blex.server";
 import { paymentPlanToInvoiceEntries, buildPaymentPlan } from "@/lib/documents/compose";
 import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
+import { isOutOfCredits } from "@/lib/email-failure";
 import { emailInvoice, siteUrl } from "@/lib/engagement-email.server";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
@@ -988,6 +989,7 @@ export async function runScheduledWork() {
     estimatesExpired: staleEstimates?.length ?? 0,
     invoicesOverdue: overdue?.length ?? 0,
     paymentsReconciled: pending?.length ?? 0,
+    deliveryError: creditsExhausted,
   };
 
   // Heartbeat so the team can see on the dashboard that the nightly job ran.
