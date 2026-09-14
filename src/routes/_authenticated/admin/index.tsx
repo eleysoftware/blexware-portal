@@ -476,6 +476,9 @@ function AdminDashboard() {
                                           0,
                                           invoice.amountCents - invoice.amountPaidCents,
                                         );
+                                        const failure = invoice.deliveryError
+                                          ? describeEmailFailure(invoice.deliveryError)
+                                          : null;
                                         return (
                                           <li
                                             key={invoice.id}
