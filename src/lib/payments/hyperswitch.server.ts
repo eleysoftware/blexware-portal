@@ -4,13 +4,14 @@
 
 import {
   hyperswitchApiKey,
-  hyperswitchApiUrl,
+  hyperswitchApiUrlFor,
   hyperswitchProfileId,
   hyperswitchPublishableKey,
   hyperswitchWebhookSecret,
   isPaymentsConfigured as configuredInEnv,
   paymentEnvironment,
 } from "@/config/payments";
+
 
 export type HyperswitchConfig = {
   apiKey: string;
