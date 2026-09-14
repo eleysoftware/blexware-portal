@@ -97,7 +97,7 @@ export function SignatureBlock({
             agreement.signed_at
               ? `Signed ${new Date(agreement.signed_at).toLocaleString()}${
                   agreement.document_hash ? ` · document hash ${agreement.document_hash.slice(0, 16)}…` : ""
-                }`
+                }${agreement.signature_note ? ` · ${agreement.signature_note}` : ""}`
               : null
           }
         />
