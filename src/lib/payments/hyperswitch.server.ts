@@ -83,8 +83,9 @@ export class HyperswitchApiError extends Error {
 export async function hyperswitchRequest<T>(
   path: string,
   init: { method: "GET" | "POST"; body?: unknown } = { method: "GET" },
+  environmentOverride?: "sandbox" | "production",
 ): Promise<T> {
-  const config = hyperswitchConfig();
+  const config = hyperswitchConfig(environmentOverride);
   const response = await fetch(`${config.baseUrl}${path}`, {
     method: init.method,
     headers: {
