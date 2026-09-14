@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
+import { EditClientDialog } from "@/components/admin/EditClientDialog";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { MoveInvoicesDialog } from "@/components/MoveInvoicesDialog";
 import { listClientProjects, moveInvoicesToProject } from "@/lib/direct-invoice.functions";
@@ -317,6 +318,17 @@ function QuoteDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <EditClientDialog
+            currentEmail={quote.contact_email}
+            contactName={quote.contact_name}
+            company={quote.company}
+            phone={quote.phone}
+            projectCount={clientProjects.data?.projects?.length ?? 1}
+          >
+            <Button variant="outline" size="sm">
+              Edit client details
+            </Button>
+          </EditClientDialog>
           <Button
             variant="outline"
             size="sm"
