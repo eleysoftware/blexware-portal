@@ -187,6 +187,7 @@ function AdminDashboard() {
         email: string;
         name: string;
         company: string | null;
+        phone: string | null;
         outstandingCents: number;
         lastActivity: string;
         quotes: NonNullable<typeof quotes.data>["quotes"];
@@ -199,6 +200,7 @@ function AdminDashboard() {
         email,
         name: String(quote.contact_name ?? email),
         company: (quote.company as string | null) ?? null,
+        phone: (quote.phone as string | null) ?? null,
         outstandingCents: 0,
         lastActivity: created,
         quotes: [],
@@ -209,6 +211,7 @@ function AdminDashboard() {
         entry.lastActivity = created;
         entry.name = String(quote.contact_name ?? email);
         entry.company = (quote.company as string | null) ?? null;
+        entry.phone = (quote.phone as string | null) ?? null;
       }
       map.set(email, entry);
     }
