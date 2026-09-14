@@ -172,6 +172,10 @@ function AdminDashboard() {
   const billing = quotes.data?.billing ?? {};
   const invoicesByQuote = quotes.data?.invoicesByQuote ?? {};
   const hasProposal = quotes.data?.hasProposal ?? {};
+  // One warning beats discovering the same provider problem invoice by invoice.
+  const creditsBlocked = Object.values(invoicesByQuote).some((rows) =>
+    rows.some((invoice) => isOutOfCredits(invoice.deliveryError)),
+  );
 
   // Quotes come back flat; the queue is presented grouped by client email.
   const clients = (() => {
@@ -279,6 +283,21 @@ function AdminDashboard() {
       </PageHero>
 
       <Section tone="surface">
+        {creditsBlocked ? (
+          <div
+            role="status"
+            data-testid="email-credits-warning"
+            className="mb-6 rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
+          >
+            <p className="font-medium text-destructive">
+              Invoice emails are not going out — the email account is out of sending credits.
+            </p>
+            <p className="mt-1 text-slate">
+              Top up the sending credits in ZeptoMail, then press Retry on the affected invoices.
+              In the meantime you can copy a payment link and send it yourself.
+            </p>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {["all", ...quoteStatuses, "archived"].map((value) => (
             <button
