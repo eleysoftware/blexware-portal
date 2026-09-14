@@ -745,8 +745,8 @@ export async function applyRefundStatus(input: {
   const db = adminDb();
   const { data: refund } = await db
     .from("refunds")
-    .select("id, invoice_payment_id, status")
-    .eq("hyperswitch_refund_id", input.refundId)
+    .select("id, invoice_payment_id, status, provider_refund_id, hyperswitch_refund_id")
+    .or(`provider_refund_id.eq.${input.refundId},hyperswitch_refund_id.eq.${input.refundId}`)
     .maybeSingle();
   if (!refund) return;
   if (refund.status === input.status) return;
