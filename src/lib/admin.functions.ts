@@ -108,7 +108,7 @@ export const listQuotes = createServerFn({ method: "POST" })
       let query = adminDb()
         .from("quotes")
         .select(
-          "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, created_at, deleted_at",
+          "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at",
         )
         .order("created_at", { ascending: false })
         .limit(200);
