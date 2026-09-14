@@ -68,6 +68,18 @@ function AdminDashboard() {
       setResending(null);
     }
   };
+
+  /** Hand the client's own invoice link to the team, e.g. to send it manually. */
+  const copyPayLink = async (payToken: string, invoiceNumber: string) => {
+    const url = `${window.location.origin}/invoice/${payToken}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Payment link for ${invoiceNumber} copied.`);
+    } catch {
+      window.prompt(`Copy the payment link for ${invoiceNumber}`, url);
+    }
+  };
+
   const [deleteTarget, setDeleteTarget] = useState<NonNullable<
     typeof quotes.data
   >["quotes"][number] | null>(null);
