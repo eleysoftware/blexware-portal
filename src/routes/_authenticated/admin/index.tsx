@@ -490,6 +490,11 @@ function AdminDashboard() {
                                                 {invoice.invoiceNumber}
                                               </span>
                                               <Badge variant="outline">{invoice.status}</Badge>
+                                              {invoice.status === "scheduled" ? (
+                                                <span className="text-xs text-slate">
+                                                  Client can't open this link yet — set it to Sent.
+                                                </span>
+                                              ) : null}
                                               {failure ? (
                                                 <Badge
                                                   variant="destructive"
