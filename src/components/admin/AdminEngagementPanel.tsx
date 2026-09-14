@@ -1219,6 +1219,8 @@ export function AdminEngagementPanel({
                           <span className="text-slate">
                             {formatMoney(Number(payment.amount_cents))}
                             {payment.payment_method ? ` · ${payment.payment_method}` : ""}
+                            {payment.provider ? ` · ${payment.provider}` : ""}
+                            {payment.environment ? ` · ${payment.environment}` : ""}
                             {payment.hyperswitch_connector ? ` · ${payment.hyperswitch_connector}` : ""}
                             {payment.processor_transaction_id
                               ? ` · ${payment.processor_transaction_id}`
@@ -1233,12 +1235,12 @@ export function AdminEngagementPanel({
                               {String(payment.status).replace(/_/g, " ")}
                             </Badge>
 
-                            {payment.hyperswitch_payment_id ? (
+                            {payment.provider_payment_id ? (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() =>
-                                  reconcileMutation.mutate(payment.hyperswitch_payment_id as string)
+                                  reconcileMutation.mutate(payment.provider_payment_id as string)
                                 }
                               >
                                 Reconcile
@@ -1275,33 +1277,33 @@ export function AdminEngagementPanel({
                                 </Button>
                               </>
                             ) : null}
-                            {payment.status === "succeeded" && payment.hyperswitch_payment_id ? (
+                            {payment.status === "succeeded" && payment.provider_payment_id ? (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() =>
-                                  payoutMutation.mutate(payment.hyperswitch_payment_id as string)
+                                  payoutMutation.mutate(payment.provider_payment_id as string)
                                 }
                               >
                                 Payout status
                               </Button>
                             ) : null}
                           </span>
-                          {payment.hyperswitch_payment_id &&
-                          payouts[payment.hyperswitch_payment_id] ? (
+                          {payment.provider_payment_id &&
+                          payouts[payment.provider_payment_id] ? (
                             <p className="basis-full text-xs text-slate">
-                              Payout: {payouts[payment.hyperswitch_payment_id]!.status}
-                              {payouts[payment.hyperswitch_payment_id]!.netAmountCents !== null
-                                ? ` · net ${formatMoney(payouts[payment.hyperswitch_payment_id]!.netAmountCents!)}`
+                              Payout: {payouts[payment.provider_payment_id]!.status}
+                              {payouts[payment.provider_payment_id]!.netAmountCents !== null
+                                ? ` · net ${formatMoney(payouts[payment.provider_payment_id]!.netAmountCents!)}`
                                 : ""}
-                              {payouts[payment.hyperswitch_payment_id]!.feeCents !== null
-                                ? ` · fees ${formatMoney(payouts[payment.hyperswitch_payment_id]!.feeCents!)}`
+                              {payouts[payment.provider_payment_id]!.feeCents !== null
+                                ? ` · fees ${formatMoney(payouts[payment.provider_payment_id]!.feeCents!)}`
                                 : ""}
-                              {payouts[payment.hyperswitch_payment_id]!.connector
-                                ? ` · ${payouts[payment.hyperswitch_payment_id]!.connector}`
+                              {payouts[payment.provider_payment_id]!.connector
+                                ? ` · ${payouts[payment.provider_payment_id]!.connector}`
                                 : ""}
-                              {payouts[payment.hyperswitch_payment_id]!.settledAt
-                                ? ` · ${new Date(payouts[payment.hyperswitch_payment_id]!.settledAt!).toLocaleString()}`
+                              {payouts[payment.provider_payment_id]!.settledAt
+                                ? ` · ${new Date(payouts[payment.provider_payment_id]!.settledAt!).toLocaleString()}`
                                 : ""}
                               . Bank account details stay in the payment gateway dashboard.
                             </p>
