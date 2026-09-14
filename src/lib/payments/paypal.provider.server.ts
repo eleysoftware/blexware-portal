@@ -2,6 +2,8 @@
 // with OAuth2 client-credentials tokens. No Node-only SDK is used so this runs
 // on the Worker runtime.
 import { readEnv } from "@/config/env";
+import { paypalSecretFor } from "@/config/payments";
+
 import { UserFacingError } from "@/lib/errors";
 import type {
   CreatePaymentInput,
