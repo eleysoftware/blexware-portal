@@ -636,7 +636,7 @@ export async function applyPaymentStatus(input: {
       to: quote.contact_email as string,
       name: quote.contact_name as string,
       invoiceNumber: invoice.invoice_number as string,
-      amountCents: Number(attempt.amount_cents),
+      amountCents: Number(matchedAttempt.amount_cents),
       kind: "processing",
       url,
     });
