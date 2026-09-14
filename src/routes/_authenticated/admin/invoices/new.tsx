@@ -16,6 +16,7 @@ import {
 } from "@/lib/direct-invoice.functions";
 
 import { SPLIT_COUNTS, evenSplitRows } from "@/lib/documents/compose";
+import { describeEmailFailure } from "@/lib/email-failure";
 import { formatMoney } from "@/lib/documents/types";
 
 export const Route = createFileRoute("/_authenticated/admin/invoices/new")({
