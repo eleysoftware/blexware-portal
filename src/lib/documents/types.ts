@@ -75,6 +75,11 @@ export type ProjectDocument = {
     signerName?: string;
     signatureText?: string;
     signedAt?: string;
+    /**
+     * Replaces the "signed electronically" line when the signature was
+     * recorded by BLEXware staff or waived rather than typed in the portal.
+     */
+    signatureNote?: string;
     /** BLEXware countersignature applied when the project is approved to start. */
     countersign?: {
       name: string;

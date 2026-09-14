@@ -310,7 +310,9 @@ export async function renderPdf(doc: ProjectDocument): Promise<Uint8Array> {
     } else {
       drawText("Signature:", { size: 10, font: regular });
     }
-    if (doc.acceptance.signatureText) {
+    if (doc.acceptance.signatureNote) {
+      drawText(doc.acceptance.signatureNote, { size: 9, color: MUTED });
+    } else if (doc.acceptance.signatureText) {
       drawText(
         "Signed electronically through the BLEXware client portal. This electronic signature is legally binding.",
         { size: 9, color: MUTED },
@@ -610,6 +612,9 @@ export async function renderDocx(doc: ProjectDocument): Promise<Uint8Array> {
           })
         : docxParagraph("Signature:"),
     );
+    if (doc.acceptance.signatureNote) {
+      children.push(docxParagraph(doc.acceptance.signatureNote, { color: MUTED_HEX, spacing: 40 }));
+    }
     const countersign = doc.acceptance.countersign;
     if (countersign) {
       children.push(docxParagraph("Accepted for BLEXware:", { bold: true, before: 200 }));
