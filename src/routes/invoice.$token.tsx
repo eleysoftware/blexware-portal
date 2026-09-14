@@ -194,7 +194,25 @@ function InvoicePage() {
       />
       <Section tone="surface">
         <div className="mx-auto mb-6 max-w-3xl">
-          {returnTo ? (
+          {isStaff ? (
+            <div
+              className="rounded-xl border border-border bg-background p-3 text-sm"
+              data-testid="invoice-staff-strip"
+            >
+              <p className="text-slate">
+                You are viewing this invoice as BLEXware staff — this is the page your client sees.
+              </p>
+              {client?.quoteId ? (
+                <Link
+                  to="/admin/quotes/$id"
+                  params={{ id: client.quoteId }}
+                  className="mt-1 inline-block text-primary underline"
+                >
+                  ← Back to project {client.quoteNumber}
+                </Link>
+              ) : null}
+            </div>
+          ) : returnTo ? (
             <BackToProject returnTo={returnTo} label="← Back to your project" />
           ) : (
             <Link to="/portal" className="text-sm text-primary underline">
