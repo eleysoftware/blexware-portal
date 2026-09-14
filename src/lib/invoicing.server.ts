@@ -695,10 +695,11 @@ export async function refundInvoicePayment(input: {
   const db = adminDb();
   const { data: attempt } = await db
     .from("invoice_payments")
-    .select("id, invoice_id, amount_cents, status, hyperswitch_payment_id")
+    .select("id, invoice_id, amount_cents, status, provider_payment_id, hyperswitch_payment_id")
     .eq("id", input.invoicePaymentId)
     .maybeSingle();
-  if (!attempt || attempt.status !== "succeeded" || !attempt.hyperswitch_payment_id) {
+  const providerPaymentId = attempt?.provider_payment_id ?? attempt?.hyperswitch_payment_id;
+  if (!attempt || attempt.status !== "succeeded" || !providerPaymentId) {
     throw new Error("Only settled payments can be refunded.");
   }
   if (input.amountCents <= 0 || input.amountCents > Number(attempt.amount_cents)) {
@@ -706,7 +707,7 @@ export async function refundInvoicePayment(input: {
   }
 
   const refund = await PaymentService.refundPayment({
-    providerPaymentId: attempt.hyperswitch_payment_id as string,
+    providerPaymentId: providerPaymentId as string,
     amountCents: input.amountCents,
     reason: input.reason ?? null,
   });
@@ -717,6 +718,7 @@ export async function refundInvoicePayment(input: {
     reason: input.reason ?? null,
     initiated_by: input.actorId ?? null,
     initiated_label: "admin",
+    provider_refund_id: refund.refundId,
     hyperswitch_refund_id: refund.refundId,
     status: refund.status,
   });
