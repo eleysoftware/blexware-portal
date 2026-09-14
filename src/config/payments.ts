@@ -63,6 +63,14 @@ function paypalEnvPrefix(env: PaymentEnvironment): string {
 }
 
 /**
+ * PayPal's dashboard calls it the "client secret", so that's the name people
+ * save. The shorter `_SECRET` form is accepted too for older setups.
+ */
+export function paypalSecretFor(prefix: string): string | undefined {
+  return readEnv(`${prefix}_CLIENT_SECRET`, `${prefix}_SECRET`);
+}
+
+/**
  * True when the named provider has the credentials it needs for that mode.
  * The active provider/mode come from the admin settings, not from env, so this
  * takes both explicitly.
@@ -70,7 +78,7 @@ function paypalEnvPrefix(env: PaymentEnvironment): string {
 export function isProviderConfigured(provider: string, environment: PaymentEnvironment): boolean {
   if (provider === "paypal") {
     const prefix = paypalEnvPrefix(environment);
-    return Boolean(readEnv(`${prefix}_CLIENT_ID`) && readEnv(`${prefix}_SECRET`));
+    return Boolean(readEnv(`${prefix}_CLIENT_ID`) && paypalSecretFor(prefix));
   }
   return Boolean(
     readEnv("HYPERSWITCH_API_KEY") && hyperswitchPublishableKey() && hyperswitchProfileId(),
@@ -90,8 +98,9 @@ export function paypalClientId(): string | undefined {
 
 /** SERVER ONLY. */
 export function paypalClientSecret(): string | undefined {
-  return readEnv(`${paypalEnvPrefix(paymentEnvironment())}_SECRET`);
+  return paypalSecretFor(paypalEnvPrefix(paymentEnvironment()));
 }
+
 
 /** SERVER ONLY. Optional: webhook verification is skipped when unset. */
 export function paypalWebhookId(): string | undefined {

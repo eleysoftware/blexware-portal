@@ -34,15 +34,16 @@ export type PayPalCredentials = {
 function credentials(environment: PayPalEnvironment): PayPalCredentials {
   const prefix = environment === "live" ? "PAYPAL_LIVE" : "PAYPAL_SANDBOX";
   const clientId = readEnv(`${prefix}_CLIENT_ID`);
-  const clientSecret = readEnv(`${prefix}_SECRET`);
+  const clientSecret = paypalSecretFor(prefix);
   const webhookId = readEnv(`${prefix}_WEBHOOK_ID`);
   if (!clientId || !clientSecret) {
     throw new Error(
-      `PayPal ${environment} credentials are not configured. Set ${prefix}_CLIENT_ID and ${prefix}_SECRET.`,
+      `PayPal ${environment} credentials are not configured. Set ${prefix}_CLIENT_ID and ${prefix}_CLIENT_SECRET.`,
     );
   }
   return { clientId, clientSecret: clientSecret, webhookId: webhookId ?? "" };
 }
+
 
 export function isPayPalConfigured(environment?: PayPalEnvironment): boolean {
   try {
