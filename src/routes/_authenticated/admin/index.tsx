@@ -128,6 +128,8 @@ function AdminDashboard() {
   const counts = quotes.data?.counts ?? {};
   const viewingArchived = filter === "archived";
   const billing = quotes.data?.billing ?? {};
+  const invoicesByQuote = quotes.data?.invoicesByQuote ?? {};
+  const hasProposal = quotes.data?.hasProposal ?? {};
 
   // Quotes come back flat; the queue is presented grouped by client email.
   const clients = (() => {
