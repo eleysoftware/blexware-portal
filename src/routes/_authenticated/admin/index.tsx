@@ -489,9 +489,12 @@ function AdminDashboard() {
                                                 {invoice.invoiceNumber}
                                               </span>
                                               <Badge variant="outline">{invoice.status}</Badge>
-                                              {invoice.deliveryError ? (
-                                                <Badge variant="destructive">
-                                                  Not delivered — {invoice.deliveryError}
+                                              {failure ? (
+                                                <Badge
+                                                  variant="destructive"
+                                                  title={`${failure.action} (${invoice.deliveryError})`}
+                                                >
+                                                  {failure.headline}
                                                 </Badge>
                                               ) : null}
                                               <span className="text-xs text-slate">
