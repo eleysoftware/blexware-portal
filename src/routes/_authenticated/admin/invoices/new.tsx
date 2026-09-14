@@ -148,7 +148,14 @@ function NewInvoicePage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const canSubmit = lineItems.length > 0 && totalCents > 0 && balanced && !mutation.isPending;
+  const missing: string[] = [];
+  if (!contactName.trim()) missing.push("the client's name");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.trim())) missing.push("a valid client email");
+  if (!description.trim()) missing.push("a description for the invoice");
+  if (!lineItems.length || totalCents <= 0) missing.push("at least one priced line");
+  if (!balanced) missing.push("payments that add up to the total");
+
+  const canSubmit = missing.length === 0 && !mutation.isPending;
 
   return (
     <>
@@ -495,6 +502,12 @@ function NewInvoicePage() {
               project's invoices tab.
             </p>
           </div>
+
+          {missing.length ? (
+            <p className="text-sm text-destructive">
+              Before sending, add {missing.join(", ")}.
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-3">
             <Button

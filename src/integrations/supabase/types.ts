@@ -273,6 +273,7 @@ export type Database = {
           amount_cents: number
           created_at: string
           currency: string
+          environment: string
           failure_code: string | null
           failure_message: string | null
           fees: Json
@@ -285,6 +286,8 @@ export type Database = {
           payment_method: string | null
           payment_reference: string
           processor_transaction_id: string | null
+          provider: string
+          provider_payment_id: string | null
           status: string
           updated_at: string
         }
@@ -292,6 +295,7 @@ export type Database = {
           amount_cents: number
           created_at?: string
           currency?: string
+          environment?: string
           failure_code?: string | null
           failure_message?: string | null
           fees?: Json
@@ -304,6 +308,8 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string
           processor_transaction_id?: string | null
+          provider?: string
+          provider_payment_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -311,6 +317,7 @@ export type Database = {
           amount_cents?: number
           created_at?: string
           currency?: string
+          environment?: string
           failure_code?: string | null
           failure_message?: string | null
           fees?: Json
@@ -323,6 +330,8 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string
           processor_transaction_id?: string | null
+          provider?: string
+          provider_payment_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -790,12 +799,15 @@ export type Database = {
         Row: {
           amount_cents: number
           created_at: string
+          environment: string
           hyperswitch_refund_id: string | null
           id: string
           initiated_by: string | null
           initiated_label: string | null
           invoice_payment_id: string
           processor_refund_id: string | null
+          provider: string
+          provider_refund_id: string | null
           reason: string | null
           status: string
           updated_at: string
@@ -803,12 +815,15 @@ export type Database = {
         Insert: {
           amount_cents: number
           created_at?: string
+          environment?: string
           hyperswitch_refund_id?: string | null
           id?: string
           initiated_by?: string | null
           initiated_label?: string | null
           invoice_payment_id: string
           processor_refund_id?: string | null
+          provider?: string
+          provider_refund_id?: string | null
           reason?: string | null
           status?: string
           updated_at?: string
@@ -816,12 +831,15 @@ export type Database = {
         Update: {
           amount_cents?: number
           created_at?: string
+          environment?: string
           hyperswitch_refund_id?: string | null
           id?: string
           initiated_by?: string | null
           initiated_label?: string | null
           invoice_payment_id?: string
           processor_refund_id?: string | null
+          provider?: string
+          provider_refund_id?: string | null
           reason?: string | null
           status?: string
           updated_at?: string
