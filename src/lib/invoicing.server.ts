@@ -563,7 +563,7 @@ export async function applyPaymentStatus(input: {
    const { emailPaymentUpdate, emailReceipt, notifyTeam } = await import("@/lib/engagement-email.server");
 
   if (input.status === "succeeded" && !alreadySucceeded) {
-    const credited = Number(input.amountCents ?? attempt.amount_cents);
+    const credited = Number(input.amountCents ?? matchedAttempt.amount_cents);
     const invoiceBalance = Math.max(
       0,
       Number(invoice.amount_cents) - Number(invoice.amount_paid_cents ?? 0),
