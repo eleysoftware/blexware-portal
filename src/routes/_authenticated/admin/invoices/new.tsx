@@ -67,7 +67,6 @@ function NewInvoicePage() {
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [projectType, setProjectType] = useState("");
-  const [existingQuoteId, setExistingQuoteId] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [description, setDescription] = useState("");
   const [issueDate, setIssueDate] = useState(today());
