@@ -116,6 +116,7 @@ function NewInvoicePage() {
   const balanced = scheduledTotal === totalCents;
 
   const applyClient = (email: string) => {
+    touchedProject.current = false;
     setExistingQuoteId("");
     const match = clients.data?.clients.find((entry) => entry.email === email);
     if (!match) return;
