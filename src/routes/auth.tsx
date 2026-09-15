@@ -20,6 +20,10 @@ const description =
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: "signin" | "signup" } =>
+    search["tab"] === "signup" ? { tab: "signup" } : {},
   head: () => ({
     meta: [
       { title },
@@ -36,6 +40,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { tab } = Route.useSearch();
   const viewer = useServerFn(getViewerRole);
 
   const routeAfterSignIn = async () => {
@@ -67,7 +72,7 @@ function AuthPage() {
       />
       <Section tone="surface">
         <div className="mx-auto max-w-md rounded-2xl border border-border bg-background p-8 shadow-card">
-          <Tabs defaultValue="signin">
+          <Tabs defaultValue={tab === "signup" ? "signup" : "signin"}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
               <TabsTrigger value="signup">Create account</TabsTrigger>

@@ -24,7 +24,7 @@ export const getProposalByToken = createServerFn({ method: "POST" })
       const [{ data: quote }, { data: documents }] = await Promise.all([
         db
           .from("quotes")
-          .select("quote_number, contact_name, project_type")
+          .select("id, quote_number, contact_name, project_type")
           .eq("id", proposal.quote_id)
           .maybeSingle(),
         db
@@ -46,6 +46,7 @@ export const getProposalByToken = createServerFn({ method: "POST" })
         },
         quote: quote
           ? {
+              id: quote.id as string,
               number: quote.quote_number as string,
               name: quote.contact_name as string,
               projectType: quote.project_type as string,
