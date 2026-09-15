@@ -257,7 +257,135 @@ export const listQuotes = createServerFn({ method: "POST" })
         }
       }
 
-      return { quotes, counts, billing, invoicesByQuote, hasProposal };
+      return { quotes, counts, billing, invoicesByQuote, hasProposal, testAware, testCount };
+    }),
+  );
+
+/** Moves a project in or out of the test-data region (admin only). */
+export const setQuoteTestFlag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; isTest: boolean }) => data)
+  .handler(
+    guarded("setQuoteTestFlag", "updating the test marker", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+
+      const { error } = await adminDb()
+        .from("quotes")
+        .update({ is_test: data.isTest })
+        .eq("id", data.quoteId);
+      if (error) {
+        throw new Error(
+          /is_test/.test(error.message)
+            ? "Run the 013 test-data migration in Supabase before using this."
+            : error.message,
+        );
+      }
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? context.userId),
+        action: "quote.test_flag_changed",
+        entity: "quote",
+        entityId: data.quoteId,
+        metadata: { isTest: data.isTest },
+      });
+      return { ok: true, isTest: data.isTest };
+    }),
+  );
+
+type TestClient = { email: string; name: string; userId: string | null; projectCount: number };
+
+/** Sign-in accounts whose only projects are test projects, and who hold no staff role. */
+async function collectTestOnlyClients(): Promise<TestClient[]> {
+  const { adminDb } = await import("@/lib/blex.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = adminDb();
+
+  const { data: rows, error } = await db
+    .from("quotes")
+    .select("contact_email, contact_name, is_test");
+  if (error) {
+    throw new Error(
+      /is_test/.test(error.message)
+        ? "Run the 013 test-data migration in Supabase before using this."
+        : error.message,
+    );
+  }
+
+  const byEmail = new Map<string, { name: string; test: number; real: number }>();
+  for (const row of (rows ?? []) as {
+    contact_email: string;
+    contact_name: string | null;
+    is_test: boolean | null;
+  }[]) {
+    const email = String(row.contact_email ?? "").trim().toLowerCase();
+    if (!email) continue;
+    const entry = byEmail.get(email) ?? { name: row.contact_name ?? email, test: 0, real: 0 };
+    if (row.is_test) entry.test += 1;
+    else entry.real += 1;
+    byEmail.set(email, entry);
+  }
+
+  // Anyone holding an admin/staff role is never a candidate.
+  const { data: roleRows } = await db.from("user_roles").select("user_id");
+  const roleHolders = new Set((roleRows ?? []).map((row: { user_id: string }) => row.user_id));
+
+  const { data: userList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const usersByEmail = new Map<string, string>();
+  for (const user of userList?.users ?? []) {
+    if (user.email) usersByEmail.set(user.email.toLowerCase(), user.id);
+  }
+
+  const candidates: TestClient[] = [];
+  for (const [email, entry] of byEmail) {
+    if (entry.real > 0 || entry.test === 0) continue;
+    const userId = usersByEmail.get(email) ?? null;
+    if (userId && roleHolders.has(userId)) continue;
+    candidates.push({ email, name: entry.name, userId, projectCount: entry.test });
+  }
+  return candidates.sort((a, b) => a.email.localeCompare(b.email));
+}
+
+export const listTestOnlyClients = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data ?? {})
+  .handler(
+    guarded("listTestOnlyClients", "listing test clients", async ({ context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      return { clients: await collectTestOnlyClients() };
+    }),
+  );
+
+export const deleteTestClients = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { emails: string[] }) => data)
+  .handler(
+    guarded("deleteTestClients", "removing test client accounts", async ({ data, context }) => {
+      const { requireAdmin, writeAudit } = await import("@/lib/blex.server");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await requireAdmin(context.supabase, context.userId);
+
+      const allowed = await collectTestOnlyClients();
+      const wanted = new Set(data.emails.map((email) => email.trim().toLowerCase()));
+      const targets = allowed.filter((entry) => wanted.has(entry.email) && entry.userId);
+
+      let removed = 0;
+      for (const target of targets) {
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(target.userId as string);
+        if (error) continue;
+        removed += 1;
+        await writeAudit({
+          actorId: context.userId,
+          actorLabel: String(context.claims["email"] ?? context.userId),
+          action: "client.test_account_deleted",
+          entity: "client",
+          entityId: target.email,
+          metadata: { projectCount: target.projectCount },
+        });
+      }
+      return { removed, skipped: targets.length - removed };
     }),
   );
 
