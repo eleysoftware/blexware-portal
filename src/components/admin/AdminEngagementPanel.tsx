@@ -117,7 +117,8 @@ export function AdminEngagementPanel({
   const aiReady = aiStatus.data?.configured !== false;
   const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
-  const [rows, setRows] = useState<Draft[]>([emptyRow]);
+  const [rows, setRows] = useState<Draft[]>([newRow()]);
+  const [draggingRow, setDraggingRow] = useState<number | null>(null);
   const [discount, setDiscount] = useState("0");
   const [discountLabel, setDiscountLabel] = useState("Discount");
   const [durationNote, setDurationNote] = useState("");
@@ -181,12 +182,14 @@ export function AdminEngagementPanel({
   useEffect(() => {
     if (!estimate?.line_items?.length) return;
     setRows(
-      estimate.line_items.map((item) => ({
-        label: item.label,
-        amount: (item.amountCents / 100).toString(),
-        duration: item.durationLabel ?? "",
-        note: item.note ?? "",
-      })),
+      estimate.line_items.map((item) =>
+        newRow({
+          label: item.label,
+          amount: (item.amountCents / 100).toString(),
+          duration: item.durationLabel ?? "",
+          note: item.note ?? "",
+        }),
+      ),
     );
     setDiscount((Number(estimate.discount_cents) / 100).toString());
     setDurationNote(estimate.duration_note ?? "");
@@ -384,12 +387,14 @@ export function AdminEngagementPanel({
       draftEstimate({ data: { quoteId, provider: aiChoice.provider, model: aiChoice.model } }),
     onSuccess: (result) => {
       setRows(
-        result.lineItems.map((item) => ({
-          label: item.label,
-          amount: (item.amountCents / 100).toString(),
-          duration: item.durationLabel ?? "",
-          note: item.note ?? "",
-        })),
+        result.lineItems.map((item) =>
+          newRow({
+            label: item.label,
+            amount: (item.amountCents / 100).toString(),
+            duration: item.durationLabel ?? "",
+            note: item.note ?? "",
+          }),
+        ),
       );
       if (result.durationNote) setDurationNote(result.durationNote);
       setEstimateNote(
