@@ -20,9 +20,10 @@ const description =
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  validateSearch: (search: Record<string, unknown>) => ({
-    tab: search["tab"] === "signup" ? ("signup" as const) : ("signin" as const),
-  }),
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: "signin" | "signup" } =>
+    search["tab"] === "signup" ? { tab: "signup" } : {},
   head: () => ({
     meta: [
       { title },
