@@ -502,6 +502,24 @@ function AdminDashboard() {
                                       >
                                         {archived ? "Restore" : "Archive"}
                                       </Button>
+                                      {quotes.data?.testAware ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          disabled={busyId === id}
+                                          onClick={() =>
+                                            void toggleTest(
+                                              id,
+                                              !(quote as { is_test?: boolean }).is_test,
+                                              label,
+                                            )
+                                          }
+                                        >
+                                          {(quote as { is_test?: boolean }).is_test
+                                            ? "Mark as real"
+                                            : "Mark as test"}
+                                        </Button>
+                                      ) : null}
                                       {archived ? (
                                         <DeleteProjectDialog
                                           quoteNumber={label}
