@@ -88,6 +88,16 @@ export const saveMilestone = createServerFn({ method: "POST" })
       };
 
       if (data.id) {
+        const { data: current } = await db
+          .from("project_milestones")
+          .select("lane")
+          .eq("id", data.id)
+          .maybeSingle();
+        if ((current?.lane as MilestoneLane | undefined) === "done") {
+          throw new Error(
+            "This phase is marked Done. Move it out of Done before changing its details.",
+          );
+        }
         const { error } = await db.from("project_milestones").update(values).eq("id", data.id);
         if (error) throw new Error(error.message);
         return { id: data.id };

@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { MilestoneEditDialog } from "@/components/MilestoneEditDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -24,8 +25,8 @@ export function milestoneProgress(rows: MilestoneRecord[]): string | null {
 }
 
 /**
- * Kanban board of project phases. Admins can add, edit and drag milestones
- * between lanes; clients see the same board read-only.
+ * Kanban board of project phases. Admins can add, edit, reorder and drag
+ * milestones between lanes; clients see the same board read-only.
  */
 export function MilestoneBoard({
   quoteId,
@@ -42,6 +43,7 @@ export function MilestoneBoard({
 
   const [title, setTitle] = useState("");
   const [dragging, setDragging] = useState<string | null>(null);
+  const [editing, setEditing] = useState<MilestoneRecord | null>(null);
 
   const key = ["milestones", quoteId];
   const milestones = useQuery({
@@ -61,16 +63,39 @@ export function MilestoneBoard({
   });
 
   const moveMutation = useMutation({
-    mutationFn: (input: { id: string; lane: MilestoneLane }) =>
-      move({ data: { id: input.id, quoteId, lane: input.lane } }),
+    mutationFn: (input: { id: string; lane: MilestoneLane; index?: number }) =>
+      move({
+        data: {
+          id: input.id,
+          quoteId,
+          lane: input.lane,
+          ...(input.index === undefined ? {} : { index: input.index }),
+        },
+      }),
     onSuccess: () => void invalidate(),
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const renameMutation = useMutation({
-    mutationFn: (input: { id: string; title: string }) =>
-      save({ data: { quoteId, id: input.id, title: input.title } }),
-    onSuccess: () => void invalidate(),
+  const editMutation = useMutation({
+    mutationFn: (input: {
+      id: string;
+      title: string;
+      note: string;
+      targetDuration: string;
+    }) =>
+      save({
+        data: {
+          quoteId,
+          id: input.id,
+          title: input.title,
+          note: input.note,
+          targetDuration: input.targetDuration,
+        },
+      }),
+    onSuccess: () => {
+      setEditing(null);
+      void invalidate();
+    },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -102,6 +127,13 @@ export function MilestoneBoard({
       <div className="mt-5 grid gap-4 lg:grid-cols-4">
         {MILESTONE_LANES.map((lane) => {
           const laneRows = rows.filter((row) => row.lane === lane);
+          const dropAt = (index: number) => (event: React.DragEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const id = event.dataTransfer.getData("text/plain") || dragging;
+            setDragging(null);
+            if (id) moveMutation.mutate({ id, lane, index });
+          };
           return (
             <div
               key={lane}
@@ -110,23 +142,14 @@ export function MilestoneBoard({
                 !readOnly && dragging ? "border-dashed border-primary/50" : "",
               )}
               onDragOver={readOnly ? undefined : (event) => event.preventDefault()}
-              onDrop={
-                readOnly
-                  ? undefined
-                  : (event) => {
-                      event.preventDefault();
-                      const id = event.dataTransfer.getData("text/plain") || dragging;
-                      setDragging(null);
-                      if (id) moveMutation.mutate({ id, lane });
-                    }
-              }
+              onDrop={readOnly ? undefined : dropAt(laneRows.length)}
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-slate">
                 {MILESTONE_LANE_LABELS[lane]}
                 <span className="ml-2 font-normal">{laneRows.length}</span>
               </p>
               <ul className="mt-3 space-y-2">
-                {laneRows.map((row) => (
+                {laneRows.map((row, index) => (
                   <li
                     key={row.id}
                     draggable={!readOnly}
@@ -139,7 +162,12 @@ export function MilestoneBoard({
                           }
                     }
                     onDragEnd={() => setDragging(null)}
-                    className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm"
+                    onDragOver={readOnly ? undefined : (event) => event.preventDefault()}
+                    onDrop={readOnly ? undefined : dropAt(index)}
+                    className={cn(
+                      "rounded-lg border border-border bg-background p-3 text-sm shadow-sm",
+                      !readOnly && dragging && dragging !== row.id ? "border-t-2 border-t-primary/40" : "",
+                    )}
                   >
                     <p className="font-medium text-foreground">{row.title}</p>
                     {row.note ? <p className="mt-1 text-xs text-slate">{row.note}</p> : null}
@@ -170,16 +198,39 @@ export function MilestoneBoard({
                         </select>
                         <button
                           type="button"
-                          className="text-xs text-primary underline-offset-4 hover:underline"
-                          onClick={() => {
-                            const next = window.prompt("Rename milestone", row.title);
-                            if (next?.trim() && next.trim() !== row.title) {
-                              renameMutation.mutate({ id: row.id, title: next.trim() });
-                            }
-                          }}
+                          aria-label={`Move ${row.title} up`}
+                          disabled={index === 0}
+                          className="rounded border border-border px-1 text-xs disabled:opacity-40"
+                          onClick={() =>
+                            moveMutation.mutate({ id: row.id, lane, index: index - 1 })
+                          }
                         >
-                          Rename
+                          ↑
                         </button>
+                        <button
+                          type="button"
+                          aria-label={`Move ${row.title} down`}
+                          disabled={index === laneRows.length - 1}
+                          className="rounded border border-border px-1 text-xs disabled:opacity-40"
+                          onClick={() =>
+                            moveMutation.mutate({ id: row.id, lane, index: index + 1 })
+                          }
+                        >
+                          ↓
+                        </button>
+                        {row.lane === "done" ? (
+                          <span className="text-xs text-slate">
+                            Complete — move out of Done to edit
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="text-xs text-primary underline-offset-4 hover:underline"
+                            onClick={() => setEditing(row)}
+                          >
+                            Edit
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="text-xs text-slate underline-offset-4 hover:underline"
@@ -196,6 +247,19 @@ export function MilestoneBoard({
           );
         })}
       </div>
+
+      {editing ? (
+        <MilestoneEditDialog
+          key={editing.id}
+          milestone={editing}
+          open
+          saving={editMutation.isPending}
+          onOpenChange={(next) => {
+            if (!next) setEditing(null);
+          }}
+          onSave={(values) => editMutation.mutate({ id: editing.id, ...values })}
+        />
+      ) : null}
 
       {readOnly ? null : (
         <div className="mt-5 flex flex-wrap items-center gap-2">

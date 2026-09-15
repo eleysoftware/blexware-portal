@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHero } from "@/components/PageHero";
+import { PhaseOrderList } from "@/components/PhaseOrderList";
 import { ProposalUploadHelp } from "@/components/ProposalUploadHelp";
 import { Section } from "@/components/Section";
 import { Button } from "@/components/ui/button";
@@ -274,12 +275,7 @@ function ImportProjectPage() {
                 estimate section before importing.
               </p>
             ) : null}
-            {phases.length ? (
-              <p className="mt-2 text-sm text-slate">
-                {phases.length} phase{phases.length === 1 ? "" : "s"} found — they'll be added to the
-                Milestones board under “Not started”.
-              </p>
-            ) : null}
+            <PhaseOrderList phases={phases} onChange={setPhases} />
           </div>
 
           <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
