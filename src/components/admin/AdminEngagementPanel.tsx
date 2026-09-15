@@ -58,9 +58,15 @@ import {
 import { getAiStatus } from "@/lib/admin.functions";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 
-type Draft = { label: string; amount: string; duration: string; note: string };
+type Draft = { key: string; label: string; amount: string; duration: string; note: string };
 
-const emptyRow: Draft = { label: "", amount: "", duration: "", note: "" };
+let draftKeySeed = 0;
+/** Stable key so reordering rows does not shuffle the inputs React reuses. */
+const nextDraftKey = () => `row-${(draftKeySeed += 1)}`;
+const newRow = (values: Omit<Draft, "key"> = { label: "", amount: "", duration: "", note: "" }): Draft => ({
+  key: nextDraftKey(),
+  ...values,
+});
 
 export type EngagementTab = "proposal" | "estimate" | "sow" | "invoices";
 
