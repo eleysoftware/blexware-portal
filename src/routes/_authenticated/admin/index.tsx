@@ -110,8 +110,8 @@ function AdminDashboard() {
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
   const quotes = useQuery({
-    queryKey: ["quotes", filter, search],
-    queryFn: () => fetchQuotes({ data: { status: filter, search } }),
+    queryKey: ["quotes", filter, search, showTest],
+    queryFn: () => fetchQuotes({ data: { status: filter, search, includeTest: showTest } }),
     enabled: access.data?.isAdmin === true,
   });
   const heartbeat = useQuery({
