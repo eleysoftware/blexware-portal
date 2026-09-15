@@ -40,6 +40,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { tab } = Route.useSearch();
   const viewer = useServerFn(getViewerRole);
 
   const routeAfterSignIn = async () => {
