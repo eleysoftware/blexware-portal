@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
+import { CleanupTestClientsDialog } from "@/components/admin/CleanupTestClientsDialog";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
