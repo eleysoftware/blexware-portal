@@ -49,6 +49,25 @@ function AdminDashboard() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [showTest, setShowTest] = useState(false);
+  const markTest = useServerFn(setQuoteTestFlag);
+
+  const toggleTest = async (id: string, isTest: boolean, label: string) => {
+    const message = isTest
+      ? `Move ${label} into the test data area? It disappears from the normal views and from the client portal.`
+      : `Mark ${label} as real business data? It becomes visible to the client again.`;
+    if (!window.confirm(message)) return;
+    setBusyId(id);
+    try {
+      await markTest({ data: { quoteId: id, isTest } });
+      toast.success(isTest ? `${label} marked as test data.` : `${label} marked as real.`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const [converting, setConverting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
