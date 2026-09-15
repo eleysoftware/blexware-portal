@@ -417,7 +417,20 @@ function ImportProjectPage() {
               <h2 className="text-xl">Estimate line items</h2>
               <div className="mt-4 space-y-2">
                 {rows.map((row, index) => (
-                  <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+                  <div
+                    key={index}
+                    draggable
+                    onDragStart={() => setDraggingRow(index)}
+                    onDragEnd={() => setDraggingRow(null)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggingRow === null) return;
+                      setRows(moveItem(rows, draggingRow, index));
+                      setDraggingRow(null);
+                    }}
+                    className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto_auto]"
+                  >
                     <Input
                       aria-label="Line item"
                       placeholder="Phase or deliverable"
