@@ -352,6 +352,8 @@ export type Database = {
           amount_paid_cents: number
           created_at: string
           currency: string
+          delivery_attempted_at: string | null
+          delivery_error: string | null
           description: string | null
           discount_cents: number
           due_date: string | null
@@ -377,6 +379,8 @@ export type Database = {
           amount_paid_cents?: number
           created_at?: string
           currency?: string
+          delivery_attempted_at?: string | null
+          delivery_error?: string | null
           description?: string | null
           discount_cents?: number
           due_date?: string | null
@@ -402,6 +406,8 @@ export type Database = {
           amount_paid_cents?: number
           created_at?: string
           currency?: string
+          delivery_attempted_at?: string | null
+          delivery_error?: string | null
           description?: string | null
           discount_cents?: number
           due_date?: string | null
@@ -730,6 +736,7 @@ export type Database = {
           id: string
           industry: string
           internal_notes: string | null
+          is_test: boolean
           phone: string | null
           project_type: string
           quote_number: string
@@ -757,6 +764,7 @@ export type Database = {
           id?: string
           industry: string
           internal_notes?: string | null
+          is_test?: boolean
           phone?: string | null
           project_type: string
           quote_number?: string
@@ -784,6 +792,7 @@ export type Database = {
           id?: string
           industry?: string
           internal_notes?: string | null
+          is_test?: boolean
           phone?: string | null
           project_type?: string
           quote_number?: string
