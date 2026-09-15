@@ -477,6 +477,9 @@ function AdminDashboard() {
                                           }
                                         </Badge>
                                         {archived ? <Badge variant="outline">Archived</Badge> : null}
+                                        {(quote as { is_test?: boolean }).is_test ? (
+                                          <Badge variant="outline">TEST</Badge>
+                                        ) : null}
                                         <span>
                                           Started{" "}
                                           {new Date(
