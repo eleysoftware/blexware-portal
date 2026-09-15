@@ -283,6 +283,19 @@ function AdminDashboard() {
             View archived
           </Button>
           <Button
+            variant={showTest ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowTest((current) => !current)}
+          >
+            {showTest ? "Hide test data" : "Show test data"}
+            {quotes.data?.testCount ? ` (${quotes.data.testCount})` : ""}
+          </Button>
+          <CleanupTestClientsDialog>
+            <Button variant="ghost" size="sm">
+              Clean up test clients
+            </Button>
+          </CleanupTestClientsDialog>
+          <Button
             variant="ghost"
             size="sm"
             disabled={converting}
