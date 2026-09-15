@@ -45,12 +45,18 @@ export const listMyQuotes = createServerFn({ method: "POST" })
         "id, quote_number, status, project_type, industry, budget, timeline, created_at";
       // Test projects never reach the client portal. The marker column arrives
       // with migration 013, so fall back cleanly when it isn't there yet.
-      let response = await context.supabase
-        .from("quotes")
-        .select(columns)
+      const loose = context.supabase.from("quotes").select(columns) as unknown as {
+        eq: (column: string, value: unknown) => {
+          order: (
+            column: string,
+            options: { ascending: boolean },
+          ) => { limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }> };
+        };
+      };
+      let response = (await loose
         .eq("is_test", false)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(100)) as { data: unknown; error: { message: string } | null };
       if (response.error && /is_test/.test(response.error.message)) {
         response = await context.supabase
           .from("quotes")
