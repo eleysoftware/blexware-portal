@@ -294,7 +294,7 @@ export const setQuoteTestFlag = createServerFn({ method: "POST" })
     }),
   );
 
-type TestClient = { email: string; name: string; userId: string | null; projectCount: number };
+import { pickTestOnlyClients, type QuoteOwnerRow, type TestClient } from "@/lib/test-data";
 
 /** Sign-in accounts whose only projects are test projects, and who hold no staff role. */
 async function collectTestOnlyClients(): Promise<TestClient[]> {
