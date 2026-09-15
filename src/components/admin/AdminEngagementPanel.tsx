@@ -677,7 +677,20 @@ export function AdminEngagementPanel({
         <fieldset disabled={estimateLocked} className="contents">
         <div className="mt-4 space-y-3">
           {rows.map((row, index) => (
-            <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+            <div
+              key={row.key}
+              draggable={!estimateLocked}
+              onDragStart={() => setDraggingRow(index)}
+              onDragEnd={() => setDraggingRow(null)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (draggingRow === null) return;
+                setRows(moveItem(rows, draggingRow, index));
+                setDraggingRow(null);
+              }}
+              className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto_auto]"
+            >
               <Input
                 aria-label="Line item"
                 data-testid="estimate-line-label"
@@ -714,6 +727,24 @@ export function AdminEngagementPanel({
               <Button
                 variant="ghost"
                 size="sm"
+                aria-label={`Move line item ${index + 1} up`}
+                disabled={index === 0}
+                onClick={() => setRows(nudgeItem(rows, index, -1))}
+              >
+                ↑
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Move line item ${index + 1} down`}
+                disabled={index === rows.length - 1}
+                onClick={() => setRows(nudgeItem(rows, index, 1))}
+              >
+                ↓
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setRows(rows.filter((_, i) => i !== index))}
                 aria-label="Remove line item"
               >
@@ -721,7 +752,7 @@ export function AdminEngagementPanel({
               </Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => setRows([...rows, emptyRow])}>
+          <Button variant="outline" size="sm" onClick={() => setRows([...rows, newRow()])}>
             Add line item
           </Button>
         </div>
