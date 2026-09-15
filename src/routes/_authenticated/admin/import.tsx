@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/documents/types";
+import { moveItem, nudgeItem } from "@/lib/reorder";
 import { importTemplates } from "@/content/import-templates";
 import {
   extractProposalFromFile,
@@ -72,6 +73,7 @@ function ImportProjectPage() {
   const [stage, setStage] = useState<ImportStage>("approved");
   const [durationNote, setDurationNote] = useState("");
   const [rows, setRows] = useState<LineRow[]>([{ label: "", amount: "", duration: "" }]);
+  const [draggingRow, setDraggingRow] = useState<number | null>(null);
   const [discount, setDiscount] = useState("");
   const [discountLabel, setDiscountLabel] = useState("Discount");
 
@@ -417,7 +419,20 @@ function ImportProjectPage() {
               <h2 className="text-xl">Estimate line items</h2>
               <div className="mt-4 space-y-2">
                 {rows.map((row, index) => (
-                  <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+                  <div
+                    key={index}
+                    draggable
+                    onDragStart={() => setDraggingRow(index)}
+                    onDragEnd={() => setDraggingRow(null)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggingRow === null) return;
+                      setRows(moveItem(rows, draggingRow, index));
+                      setDraggingRow(null);
+                    }}
+                    className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto_auto]"
+                  >
                     <Input
                       aria-label="Line item"
                       placeholder="Phase or deliverable"
@@ -443,6 +458,24 @@ function ImportProjectPage() {
                         setRows(rows.map((r, i) => (i === index ? { ...r, duration: e.target.value } : r)))
                       }
                     />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Move line item ${index + 1} up`}
+                      disabled={index === 0}
+                      onClick={() => setRows(nudgeItem(rows, index, -1))}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Move line item ${index + 1} down`}
+                      disabled={index === rows.length - 1}
+                      onClick={() => setRows(nudgeItem(rows, index, 1))}
+                    >
+                      ↓
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

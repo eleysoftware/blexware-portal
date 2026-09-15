@@ -56,11 +56,18 @@ import {
 
 
 import { getAiStatus } from "@/lib/admin.functions";
+import { moveItem, nudgeItem } from "@/lib/reorder";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 
-type Draft = { label: string; amount: string; duration: string; note: string };
+type Draft = { key: string; label: string; amount: string; duration: string; note: string };
 
-const emptyRow: Draft = { label: "", amount: "", duration: "", note: "" };
+let draftKeySeed = 0;
+/** Stable key so reordering rows does not shuffle the inputs React reuses. */
+const nextDraftKey = () => `row-${(draftKeySeed += 1)}`;
+const newRow = (values: Omit<Draft, "key"> = { label: "", amount: "", duration: "", note: "" }): Draft => ({
+  key: nextDraftKey(),
+  ...values,
+});
 
 export type EngagementTab = "proposal" | "estimate" | "sow" | "invoices";
 
@@ -111,7 +118,8 @@ export function AdminEngagementPanel({
   const aiReady = aiStatus.data?.configured !== false;
   const [aiChoice, setAiChoice] = useAiChoice(aiStatus.data?.providers);
 
-  const [rows, setRows] = useState<Draft[]>([emptyRow]);
+  const [rows, setRows] = useState<Draft[]>([newRow()]);
+  const [draggingRow, setDraggingRow] = useState<number | null>(null);
   const [discount, setDiscount] = useState("0");
   const [discountLabel, setDiscountLabel] = useState("Discount");
   const [durationNote, setDurationNote] = useState("");
@@ -175,12 +183,14 @@ export function AdminEngagementPanel({
   useEffect(() => {
     if (!estimate?.line_items?.length) return;
     setRows(
-      estimate.line_items.map((item) => ({
-        label: item.label,
-        amount: (item.amountCents / 100).toString(),
-        duration: item.durationLabel ?? "",
-        note: item.note ?? "",
-      })),
+      estimate.line_items.map((item) =>
+        newRow({
+          label: item.label,
+          amount: (item.amountCents / 100).toString(),
+          duration: item.durationLabel ?? "",
+          note: item.note ?? "",
+        }),
+      ),
     );
     setDiscount((Number(estimate.discount_cents) / 100).toString());
     setDurationNote(estimate.duration_note ?? "");
@@ -378,12 +388,14 @@ export function AdminEngagementPanel({
       draftEstimate({ data: { quoteId, provider: aiChoice.provider, model: aiChoice.model } }),
     onSuccess: (result) => {
       setRows(
-        result.lineItems.map((item) => ({
-          label: item.label,
-          amount: (item.amountCents / 100).toString(),
-          duration: item.durationLabel ?? "",
-          note: item.note ?? "",
-        })),
+        result.lineItems.map((item) =>
+          newRow({
+            label: item.label,
+            amount: (item.amountCents / 100).toString(),
+            duration: item.durationLabel ?? "",
+            note: item.note ?? "",
+          }),
+        ),
       );
       if (result.durationNote) setDurationNote(result.durationNote);
       setEstimateNote(
@@ -666,7 +678,20 @@ export function AdminEngagementPanel({
         <fieldset disabled={estimateLocked} className="contents">
         <div className="mt-4 space-y-3">
           {rows.map((row, index) => (
-            <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+            <div
+              key={row.key}
+              draggable={!estimateLocked}
+              onDragStart={() => setDraggingRow(index)}
+              onDragEnd={() => setDraggingRow(null)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (draggingRow === null) return;
+                setRows(moveItem(rows, draggingRow, index));
+                setDraggingRow(null);
+              }}
+              className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto_auto]"
+            >
               <Input
                 aria-label="Line item"
                 data-testid="estimate-line-label"
@@ -703,6 +728,24 @@ export function AdminEngagementPanel({
               <Button
                 variant="ghost"
                 size="sm"
+                aria-label={`Move line item ${index + 1} up`}
+                disabled={index === 0}
+                onClick={() => setRows(nudgeItem(rows, index, -1))}
+              >
+                ↑
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Move line item ${index + 1} down`}
+                disabled={index === rows.length - 1}
+                onClick={() => setRows(nudgeItem(rows, index, 1))}
+              >
+                ↓
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setRows(rows.filter((_, i) => i !== index))}
                 aria-label="Remove line item"
               >
@@ -710,7 +753,7 @@ export function AdminEngagementPanel({
               </Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => setRows([...rows, emptyRow])}>
+          <Button variant="outline" size="sm" onClick={() => setRows([...rows, newRow()])}>
             Add line item
           </Button>
         </div>
