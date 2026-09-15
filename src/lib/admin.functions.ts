@@ -96,24 +96,45 @@ async function persistProposalDocument(
   return doc;
 }
 
+/**
+ * The test-data marker arrives with migration 013. Until that has been applied
+ * the column simply isn't there, so every read probes once and skips the filter
+ * rather than failing the whole queue.
+ */
+export async function hasTestColumn(db: {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: unknown) => { limit: (n: number) => Promise<{ error: unknown }> };
+    };
+  };
+}): Promise<boolean> {
+  const { error } = await db.from("quotes").select("id").eq("is_test", false).limit(1);
+  return !error;
+}
+
 export const listQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { status?: string; search?: string }) => data ?? {})
+  .validator((data: { status?: string; search?: string; includeTest?: boolean }) => data ?? {})
   .handler(
     guarded("listQuotes", "loading quotes", async ({ data, context }) => {
       const { requireAdmin, adminDb } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const archived = data.status === "archived";
+      const testAware = await hasTestColumn(adminDb() as never);
+      const hideTest = testAware && !data.includeTest;
 
       let query = adminDb()
         .from("quotes")
         .select(
-          "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at",
+          testAware
+            ? "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at, is_test"
+            : "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at",
         )
         .order("created_at", { ascending: false })
         .limit(200);
 
       query = archived ? query.not("deleted_at", "is", null) : query.is("deleted_at", null);
+      if (hideTest) query = query.eq("is_test", false);
 
       if (data.status && data.status !== "all" && !archived) query = query.eq("status", data.status);
       if (data.search?.trim()) {
@@ -128,19 +149,29 @@ export const listQuotes = createServerFn({ method: "POST" })
 
       const counts: Record<string, number> = {};
       for (const status of quoteStatuses) counts[status] = 0;
-      const { data: all } = await adminDb()
-        .from("quotes")
-        .select("status")
-        .is("deleted_at", null);
+      let countQuery = adminDb().from("quotes").select("status").is("deleted_at", null);
+      if (hideTest) countQuery = countQuery.eq("is_test", false);
+      const { data: all } = await countQuery;
       for (const row of (all ?? []) as { status: string }[]) {
         counts[row.status] = (counts[row.status] ?? 0) + 1;
       }
 
-      const { count: archivedCount } = await adminDb()
+      let archivedQuery = adminDb()
         .from("quotes")
         .select("id", { count: "exact", head: true })
         .not("deleted_at", "is", null);
+      if (hideTest) archivedQuery = archivedQuery.eq("is_test", false);
+      const { count: archivedCount } = await archivedQuery;
       counts["archived"] = archivedCount ?? 0;
+
+      let testCount = 0;
+      if (testAware) {
+        const { count } = await adminDb()
+          .from("quotes")
+          .select("id", { count: "exact", head: true })
+          .eq("is_test", true);
+        testCount = count ?? 0;
+      }
 
       // Billing rollup per quote so the client list can show what is owed.
       const quotes = (rows ?? []) as Partial<QuoteRecord>[];
