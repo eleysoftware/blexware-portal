@@ -149,8 +149,65 @@ function ProposalReviewPage() {
               </div>
             </>
           )}
+
+          <PortalAccessCard quoteId={quote?.id ?? null} />
         </div>
       </Section>
     </>
+  );
+}
+
+/** Offers portal sign-in / sign-up to clients reading a proposal link. */
+function PortalAccessCard({ quoteId }: { quoteId: string | null }) {
+  const session = useQuery({
+    queryKey: ["proposal-viewer-session"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      return { signedIn: Boolean(data.session) };
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const signedIn = session.data?.signedIn === true;
+
+  return (
+    <div className="mt-8 rounded-xl border border-border bg-surface p-6">
+      <h2 className="text-base font-semibold text-headline">
+        Track this project in your BLEXware portal
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-slate">
+        The portal keeps your project in one place — the proposal, the schedule of work, and any
+        invoices you can pay online.
+      </p>
+
+      {signedIn && quoteId ? (
+        <Button asChild className="mt-4 shadow-cta">
+          <Link to="/portal/quotes/$id" params={{ id: quoteId }}>
+            Open this project in your portal
+          </Link>
+        </Button>
+      ) : signedIn ? (
+        <Button asChild className="mt-4 shadow-cta">
+          <Link to="/portal">Go to your portal</Link>
+        </Button>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button asChild className="shadow-cta">
+              <Link to="/auth" search={{ tab: "signup" }}>
+                Create account
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/auth">Sign in</Link>
+            </Button>
+          </div>
+          <p className="mt-3 text-xs text-slate">
+            Use the same email address this proposal was sent to, so your project shows up.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
