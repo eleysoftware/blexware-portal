@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { CreateTeamMemberCard } from "@/components/CreateTeamMemberCard";
+import { CleanupTestClientsDialog } from "@/components/admin/CleanupTestClientsDialog";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { PageHero } from "@/components/PageHero";
 import { Section } from "@/components/Section";
@@ -26,6 +27,7 @@ import {
   getCronHeartbeat,
   listQuotes,
   refreshProposalDocuments,
+  setQuoteTestFlag,
 } from "@/lib/admin.functions";
 import { sendInvoiceNow } from "@/lib/engagement.functions";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
@@ -47,6 +49,25 @@ function AdminDashboard() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [showTest, setShowTest] = useState(false);
+  const markTest = useServerFn(setQuoteTestFlag);
+
+  const toggleTest = async (id: string, isTest: boolean, label: string) => {
+    const message = isTest
+      ? `Move ${label} into the test data area? It disappears from the normal views and from the client portal.`
+      : `Mark ${label} as real business data? It becomes visible to the client again.`;
+    if (!window.confirm(message)) return;
+    setBusyId(id);
+    try {
+      await markTest({ data: { quoteId: id, isTest } });
+      toast.success(isTest ? `${label} marked as test data.` : `${label} marked as real.`);
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const [converting, setConverting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -89,8 +110,8 @@ function AdminDashboard() {
 
   const access = useQuery({ queryKey: ["admin-status"], queryFn: () => status({ data: {} }) });
   const quotes = useQuery({
-    queryKey: ["quotes", filter, search],
-    queryFn: () => fetchQuotes({ data: { status: filter, search } }),
+    queryKey: ["quotes", filter, search, showTest],
+    queryFn: () => fetchQuotes({ data: { status: filter, search, includeTest: showTest } }),
     enabled: access.data?.isAdmin === true,
   });
   const heartbeat = useQuery({
@@ -261,6 +282,19 @@ function AdminDashboard() {
           >
             View archived
           </Button>
+          <Button
+            variant={showTest ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowTest((current) => !current)}
+          >
+            {showTest ? "Hide test data" : "Show test data"}
+            {quotes.data?.testCount ? ` (${quotes.data.testCount})` : ""}
+          </Button>
+          <CleanupTestClientsDialog>
+            <Button variant="ghost" size="sm">
+              Clean up test clients
+            </Button>
+          </CleanupTestClientsDialog>
           <Button
             variant="ghost"
             size="sm"
@@ -443,6 +477,9 @@ function AdminDashboard() {
                                           }
                                         </Badge>
                                         {archived ? <Badge variant="outline">Archived</Badge> : null}
+                                        {(quote as { is_test?: boolean }).is_test ? (
+                                          <Badge variant="outline">TEST</Badge>
+                                        ) : null}
                                         <span>
                                           Started{" "}
                                           {new Date(
@@ -465,6 +502,24 @@ function AdminDashboard() {
                                       >
                                         {archived ? "Restore" : "Archive"}
                                       </Button>
+                                      {quotes.data?.testAware ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          disabled={busyId === id}
+                                          onClick={() =>
+                                            void toggleTest(
+                                              id,
+                                              !(quote as { is_test?: boolean }).is_test,
+                                              label,
+                                            )
+                                          }
+                                        >
+                                          {(quote as { is_test?: boolean }).is_test
+                                            ? "Mark as real"
+                                            : "Mark as test"}
+                                        </Button>
+                                      ) : null}
                                       {archived ? (
                                         <DeleteProjectDialog
                                           quoteNumber={label}

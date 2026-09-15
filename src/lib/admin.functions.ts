@@ -96,24 +96,45 @@ async function persistProposalDocument(
   return doc;
 }
 
+/**
+ * The test-data marker arrives with migration 013. Until that has been applied
+ * the column simply isn't there, so every read probes once and skips the filter
+ * rather than failing the whole queue.
+ */
+export async function hasTestColumn(db: {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: unknown) => { limit: (n: number) => Promise<{ error: unknown }> };
+    };
+  };
+}): Promise<boolean> {
+  const { error } = await db.from("quotes").select("id").eq("is_test", false).limit(1);
+  return !error;
+}
+
 export const listQuotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { status?: string; search?: string }) => data ?? {})
+  .validator((data: { status?: string; search?: string; includeTest?: boolean }) => data ?? {})
   .handler(
     guarded("listQuotes", "loading quotes", async ({ data, context }) => {
       const { requireAdmin, adminDb } = await import("@/lib/blex.server");
       await requireAdmin(context.supabase, context.userId);
       const archived = data.status === "archived";
+      const testAware = await hasTestColumn(adminDb() as never);
+      const hideTest = testAware && !data.includeTest;
 
       let query = adminDb()
         .from("quotes")
         .select(
-          "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at",
+          testAware
+            ? "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at, is_test"
+            : "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at",
         )
         .order("created_at", { ascending: false })
         .limit(200);
 
       query = archived ? query.not("deleted_at", "is", null) : query.is("deleted_at", null);
+      if (hideTest) query = query.eq("is_test", false);
 
       if (data.status && data.status !== "all" && !archived) query = query.eq("status", data.status);
       if (data.search?.trim()) {
@@ -128,19 +149,29 @@ export const listQuotes = createServerFn({ method: "POST" })
 
       const counts: Record<string, number> = {};
       for (const status of quoteStatuses) counts[status] = 0;
-      const { data: all } = await adminDb()
-        .from("quotes")
-        .select("status")
-        .is("deleted_at", null);
+      let countQuery = adminDb().from("quotes").select("status").is("deleted_at", null);
+      if (hideTest) countQuery = countQuery.eq("is_test", false);
+      const { data: all } = await countQuery;
       for (const row of (all ?? []) as { status: string }[]) {
         counts[row.status] = (counts[row.status] ?? 0) + 1;
       }
 
-      const { count: archivedCount } = await adminDb()
+      let archivedQuery = adminDb()
         .from("quotes")
         .select("id", { count: "exact", head: true })
         .not("deleted_at", "is", null);
+      if (hideTest) archivedQuery = archivedQuery.eq("is_test", false);
+      const { count: archivedCount } = await archivedQuery;
       counts["archived"] = archivedCount ?? 0;
+
+      let testCount = 0;
+      if (testAware) {
+        const { count } = await adminDb()
+          .from("quotes")
+          .select("id", { count: "exact", head: true })
+          .eq("is_test", true);
+        testCount = count ?? 0;
+      }
 
       // Billing rollup per quote so the client list can show what is owed.
       const quotes = (rows ?? []) as Partial<QuoteRecord>[];
@@ -226,7 +257,119 @@ export const listQuotes = createServerFn({ method: "POST" })
         }
       }
 
-      return { quotes, counts, billing, invoicesByQuote, hasProposal };
+      return { quotes, counts, billing, invoicesByQuote, hasProposal, testAware, testCount };
+    }),
+  );
+
+/** Moves a project in or out of the test-data region (admin only). */
+export const setQuoteTestFlag = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; isTest: boolean }) => data)
+  .handler(
+    guarded("setQuoteTestFlag", "updating the test marker", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+
+      const { error } = await adminDb()
+        .from("quotes")
+        .update({ is_test: data.isTest })
+        .eq("id", data.quoteId);
+      if (error) {
+        throw new Error(
+          /is_test/.test(error.message)
+            ? "Run the 013 test-data migration in Supabase before using this."
+            : error.message,
+        );
+      }
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? context.userId),
+        action: "quote.test_flag_changed",
+        entity: "quote",
+        entityId: data.quoteId,
+        metadata: { isTest: data.isTest },
+      });
+      return { ok: true, isTest: data.isTest };
+    }),
+  );
+
+import { pickTestOnlyClients, type QuoteOwnerRow, type TestClient } from "@/lib/test-data";
+
+/** Sign-in accounts whose only projects are test projects, and who hold no staff role. */
+async function collectTestOnlyClients(): Promise<TestClient[]> {
+  const { adminDb } = await import("@/lib/blex.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = adminDb();
+
+  const { data: rows, error } = await db
+    .from("quotes")
+    .select("contact_email, contact_name, is_test");
+  if (error) {
+    throw new Error(
+      /is_test/.test(error.message)
+        ? "Run the 013 test-data migration in Supabase before using this."
+        : error.message,
+    );
+  }
+
+  // Anyone holding an admin/staff role is never a candidate.
+  const { data: roleRows } = await db.from("user_roles").select("user_id");
+  const roleHolders = new Set((roleRows ?? []).map((row: { user_id: string }) => row.user_id));
+
+  const { data: userList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const usersByEmail = new Map<string, string>();
+  for (const user of userList?.users ?? []) {
+    if (user.email) usersByEmail.set(user.email.toLowerCase(), user.id);
+  }
+
+  return pickTestOnlyClients(
+    (rows ?? []) as QuoteOwnerRow[],
+    roleHolders,
+    usersByEmail,
+  );
+}
+
+
+export const listTestOnlyClients = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data ?? {})
+  .handler(
+    guarded("listTestOnlyClients", "listing test clients", async ({ context }) => {
+      const { requireAdmin } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      return { clients: await collectTestOnlyClients() };
+    }),
+  );
+
+export const deleteTestClients = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { emails: string[] }) => data)
+  .handler(
+    guarded("deleteTestClients", "removing test client accounts", async ({ data, context }) => {
+      const { requireAdmin, writeAudit } = await import("@/lib/blex.server");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await requireAdmin(context.supabase, context.userId);
+
+      const allowed = await collectTestOnlyClients();
+      const wanted = new Set(data.emails.map((email) => email.trim().toLowerCase()));
+      const targets = allowed.filter((entry) => wanted.has(entry.email) && entry.userId);
+
+      let removed = 0;
+      for (const target of targets) {
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(target.userId as string);
+        if (error) continue;
+        removed += 1;
+        await writeAudit({
+          actorId: context.userId,
+          actorLabel: String(context.claims["email"] ?? context.userId),
+          action: "client.test_account_deleted",
+          entity: "client",
+          entityId: target.email,
+          metadata: { projectCount: target.projectCount },
+        });
+      }
+      return { removed, skipped: targets.length - removed };
     }),
   );
 
