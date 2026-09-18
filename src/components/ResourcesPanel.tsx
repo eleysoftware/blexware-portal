@@ -461,29 +461,38 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
               <div className="min-w-0">
                 {(() => {
                   const kind = previewKindFor(viewing.mime, viewing.name);
-                  if (kind === "pdf")
+                  const inline = ["pdf", "image", "video", "audio"].includes(kind);
+                  if (inline && !preview.localUrl && !preview.failed)
+                    return <p className="text-sm text-slate">Loading…</p>;
+                  const src = preview.localUrl ?? viewing.url;
+                  if (kind === "pdf" && !preview.failed)
                     return (
                       <iframe
-                        src={viewing.url}
+                        src={src}
                         title={viewing.name}
                         className="h-[70vh] w-full rounded-lg border border-border bg-surface"
                       />
                     );
-                  if (kind === "image")
+                  if (kind === "image" && !preview.failed)
                     return (
                       <img
-                        src={viewing.url}
+                        src={src}
                         alt={viewing.name}
                         className="mx-auto max-h-[70vh] w-auto rounded-lg border border-border object-contain"
                       />
                     );
                   if (kind === "text") return <TextPreview url={viewing.url} />;
-                  if (kind === "video")
+                  if (kind === "video" && !preview.failed)
+                    return <video src={src} controls className="max-h-[70vh] w-full rounded-lg" />;
+                  if (kind === "audio" && !preview.failed)
+                    return <audio src={src} controls className="w-full" />;
+                  if (preview.failed)
                     return (
-                      <video src={viewing.url} controls className="max-h-[70vh] w-full rounded-lg" />
+                      <p className="text-sm text-slate">
+                        We couldn't display this file here. Open it in a new tab or download it to
+                        view it.
+                      </p>
                     );
-                  if (kind === "audio")
-                    return <audio src={viewing.url} controls className="w-full" />;
                   return (
                     <p className="text-sm text-slate">
                       This file opens in its own app — browsers can't display it here. Open it in a
