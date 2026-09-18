@@ -331,7 +331,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
                   {attachmentsOf(selected).map((attachment) => (
                     <div
                       key={attachment.path}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm"
+                      className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm"
                     >
                       <Paperclip className="size-4 shrink-0 text-primary" aria-hidden="true" />
                       <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
