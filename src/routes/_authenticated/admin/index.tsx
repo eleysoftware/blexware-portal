@@ -30,6 +30,7 @@ import {
   setQuoteTestFlag,
 } from "@/lib/admin.functions";
 import { sendInvoiceNow } from "@/lib/engagement.functions";
+import { scheduledSendLabel } from "@/lib/invoice-status";
 import { quoteStatusLabels, quoteStatuses } from "@/lib/quote-schema";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
@@ -584,6 +585,15 @@ function AdminDashboard() {
                                                   ? `Issued ${invoice.issueDate}`
                                                   : "Not issued"}
                                                 {invoice.dueDate ? ` · due ${invoice.dueDate}` : ""}
+                                                {scheduledSendLabel(
+                                                  invoice.status,
+                                                  invoice.scheduledSendAt,
+                                                )
+                                                  ? ` · ${scheduledSendLabel(
+                                                      invoice.status,
+                                                      invoice.scheduledSendAt,
+                                                    )}`
+                                                  : ""}
                                               </span>
                                             </span>
                                             <span className="flex items-center gap-3 text-slate">

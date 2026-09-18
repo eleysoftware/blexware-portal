@@ -32,6 +32,7 @@ export type PortalInvoiceRow = {
   status: string;
   issueDate: string | null;
   dueDate: string | null;
+  scheduledSendAt: string | null;
   payToken: string | null;
   description: string | null;
 };
@@ -83,7 +84,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
         const { data: invoices } = await db
           .from("invoices")
           .select(
-            "id, quote_id, invoice_number, sequence, description, amount_cents, amount_paid_cents, status, issue_date, due_date, pay_token",
+            "id, quote_id, invoice_number, sequence, description, amount_cents, amount_paid_cents, status, issue_date, due_date, scheduled_send_at, pay_token",
           )
           .in("quote_id", ids)
           .not("status", "in", "(void,cancelled,draft)")
@@ -101,6 +102,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
           status: string;
           issue_date: string | null;
           due_date: string | null;
+          scheduled_send_at: string | null;
           pay_token: string | null;
         }[]) {
           const bucket = (billing[row.quote_id] ??= {
@@ -130,6 +132,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
             status: row.status,
             issueDate: row.issue_date,
             dueDate: row.due_date,
+            scheduledSendAt: row.scheduled_send_at ?? null,
             payToken: balance > 0 && row.status !== "scheduled" ? row.pay_token : null,
             description: row.description,
           });

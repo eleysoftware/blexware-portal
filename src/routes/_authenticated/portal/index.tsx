@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getViewerRole } from "@/lib/auth.functions";
 import { formatMoney } from "@/lib/documents/types";
 
+import { scheduledSendLabel } from "@/lib/invoice-status";
 import { listMyQuotes } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
 
@@ -157,6 +158,14 @@ function PortalHome() {
                     <p className="mt-3 text-xs text-slate" data-testid="portal-project-invoices">
                       {rows.length} invoice{rows.length === 1 ? "" : "s"} on this project — open the
                       project to view and pay them.
+                      {(() => {
+                        const upcoming = rows
+                          .map((row) =>
+                            scheduledSendLabel(row.status, row.scheduledSendAt, "arrives"),
+                          )
+                          .find(Boolean);
+                        return upcoming ? ` Next invoice ${upcoming}.` : "";
+                      })()}
                     </p>
                   ) : null}
 

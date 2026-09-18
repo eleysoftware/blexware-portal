@@ -192,6 +192,7 @@ export const listQuotes = createServerFn({ method: "POST" })
           status: string;
           issueDate: string | null;
           dueDate: string | null;
+          scheduledSendAt: string | null;
           payToken: string | null;
           deliveryError: string | null;
         }[]
@@ -202,7 +203,7 @@ export const listQuotes = createServerFn({ method: "POST" })
         const { data: invoices } = await adminDb()
           .from("invoices")
           .select(
-            "id, quote_id, invoice_number, sequence, amount_cents, amount_paid_cents, status, issue_date, due_date, pay_token",
+            "id, quote_id, invoice_number, sequence, amount_cents, amount_paid_cents, status, issue_date, due_date, scheduled_send_at, pay_token",
           )
           .in("quote_id", ids)
           .order("sequence", { ascending: true });
@@ -233,6 +234,7 @@ export const listQuotes = createServerFn({ method: "POST" })
             status,
             issueDate: (row.issue_date as string | null) ?? null,
             dueDate: (row.due_date as string | null) ?? null,
+            scheduledSendAt: (row.scheduled_send_at as string | null) ?? null,
             payToken: (row.pay_token as string | null) ?? null,
             deliveryError: deliveryErrors[String(row.id)] ?? null,
           });

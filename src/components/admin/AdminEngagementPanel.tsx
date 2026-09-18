@@ -56,6 +56,7 @@ import {
 
 
 import { getAiStatus } from "@/lib/admin.functions";
+import { scheduledSendLabel } from "@/lib/invoice-status";
 import { moveItem, nudgeItem } from "@/lib/reorder";
 import { AiModelPicker, useAiChoice } from "@/components/admin/AiModelPicker";
 
@@ -550,6 +551,7 @@ export function AdminEngagementPanel({
     amount_paid_cents?: number;
     status: string;
     due_date: string | null;
+    scheduled_send_at?: string | null;
     pay_token?: string | null;
   }[];
   const projectPayment = engagement.data?.projectPayment;
@@ -1364,6 +1366,9 @@ export function AdminEngagementPanel({
                       {invoice.invoice_number} · #{invoice.sequence}
                       {invoice.due_date
                         ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
+                        : ""}
+                      {scheduledSendLabel(invoice.status, invoice.scheduled_send_at)
+                        ? ` · ${scheduledSendLabel(invoice.status, invoice.scheduled_send_at)}`
                         : ""}
                     </span>
                     <span className="flex flex-wrap items-center gap-3">
