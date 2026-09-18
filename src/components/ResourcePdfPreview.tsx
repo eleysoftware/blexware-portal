@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 
 type LoadState =
   | { status: "loading" }
@@ -81,7 +81,7 @@ export function ResourcePdfPreview({ url, name }: { url: string; name: string })
 
   useEffect(() => {
     let active = true;
-    let loadedDocument: PDFDocumentProxy | null = null;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
 
     const load = async () => {
       setState({ status: "loading" });
@@ -94,10 +94,10 @@ export function ResourcePdfPreview({ url, name }: { url: string; name: string })
         const response = await fetch(url, { credentials: "same-origin" });
         if (!response.ok) throw new Error("PDF request failed");
         const data = new Uint8Array(await response.arrayBuffer());
-        const task = pdfjs.getDocument({ data });
-        loadedDocument = await task.promise;
+        loadingTask = pdfjs.getDocument({ data });
+        const loadedDocument = await loadingTask.promise;
         if (active) setState({ status: "ready", document: loadedDocument });
-        else void loadedDocument.destroy();
+        else void loadingTask.destroy();
       } catch {
         if (active) setState({ status: "failed" });
       }
@@ -106,7 +106,7 @@ export function ResourcePdfPreview({ url, name }: { url: string; name: string })
     void load();
     return () => {
       active = false;
-      if (loadedDocument) void loadedDocument.destroy();
+      if (loadingTask) void loadingTask.destroy();
     };
   }, [url]);
 
