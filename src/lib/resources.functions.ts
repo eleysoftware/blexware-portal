@@ -469,8 +469,24 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
       const admin = await isAdminViewer(context.supabase, context.userId);
       if (row["archived_at"] && !admin) throw new Error("That resource is no longer available.");
 
-      const signed = await db.storage.from(RESOURCE_BUCKET).createSignedUrl(target, 120);
-      if (signed.error || !signed.data) throw new Error("We couldn't prepare that download.");
-      return { url: signed.data.signedUrl };
+      const meta =
+        attachments.find((attachment) => attachment.path === target) ??
+        ({
+          path: target,
+          name: (row["original_name"] as string | null) ?? "file",
+          mime: (row["mime_type"] as string | null) ?? "application/octet-stream",
+          size: (row["byte_size"] as number | null) ?? 0,
+        } as ResourceAttachment);
+
+      const signed = await db.storage
+        .from(RESOURCE_BUCKET)
+        .createSignedUrl(target, viewing ? 600 : 120);
+      if (signed.error || !signed.data) throw new Error("We couldn't prepare that file.");
+      return {
+        url: signed.data.signedUrl,
+        name: meta.name,
+        mime: meta.mime,
+        size: meta.size,
+      };
     }),
   );
