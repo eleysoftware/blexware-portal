@@ -4,6 +4,7 @@ import {
   attachmentsOf,
   mergeAttachments,
   normalizeAttachments,
+  previewKindFor,
   removeAttachment,
   validateResourceFile,
 } from "../../src/lib/resource-rules";
@@ -54,4 +55,28 @@ test("still validates every file individually", () => {
   expect(validateResourceFile({ name: "a.exe", size: 10, type: "application/x-msdownload" })).toContain(
     "file type",
   );
+});
+
+test("accepts open-document formats", () => {
+  expect(
+    validateResourceFile({
+      name: "notes.odt",
+      size: 10,
+      type: "application/vnd.oasis.opendocument.text",
+    }),
+  ).toBeNull();
+  expect(validateResourceFile({ name: "sheet.ods", size: 10, type: "" })).toBeNull();
+  expect(validateResourceFile({ name: "deck.odp", size: 10, type: "" })).toBeNull();
+});
+
+test("picks the right preview kind", () => {
+  expect(previewKindFor("application/pdf", "a.pdf")).toBe("pdf");
+  expect(previewKindFor("image/png", "a.png")).toBe("image");
+  expect(previewKindFor("text/csv", "a.csv")).toBe("text");
+  expect(previewKindFor("video/mp4", "a.mp4")).toBe("video");
+  expect(previewKindFor("audio/mpeg", "a.mp3")).toBe("audio");
+  expect(previewKindFor("application/vnd.oasis.opendocument.text", "a.odt")).toBe("none");
+  expect(previewKindFor("", "a.pdf")).toBe("pdf");
+  expect(previewKindFor("application/octet-stream", "a.jpg")).toBe("image");
+  expect(previewKindFor("", "a.odt")).toBe("none");
 });

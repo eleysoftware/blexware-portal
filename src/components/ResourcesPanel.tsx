@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, FileText, Paperclip, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { Download, Eye, FileText, Paperclip, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   attachmentsOf,
   canEditResource,
   formatBytes,
+  previewKindFor,
   validateResourceDetails,
   validateResourceFile,
   type ResourceAttachment,
@@ -33,6 +34,46 @@ import {
   saveResource,
   setResourceArchived,
 } from "@/lib/resources.functions";
+
+type ViewedAttachment = {
+  resourceId: string;
+  path: string;
+  url: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+
+/** Fetches and shows a plain-text attachment. */
+function TextPreview({ url }: { url: string }) {
+  const [body, setBody] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setBody(null);
+    setFailed(false);
+    fetch(url)
+      .then((response) => (response.ok ? response.text() : Promise.reject(new Error("failed"))))
+      .then((text) => {
+        if (active) setBody(text.slice(0, 200_000));
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  if (failed) return <p className="text-sm text-slate">We couldn't display this file. Try downloading it.</p>;
+  if (body === null) return <p className="text-sm text-slate">Loading…</p>;
+  return (
+    <pre className="max-h-[65vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-4 text-xs text-foreground">
+      {body}
+    </pre>
+  );
+}
 
 function when(value: string): string {
   return new Date(value).toLocaleDateString(undefined, {
@@ -63,6 +104,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [removePaths, setRemovePaths] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<ViewedAttachment | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const key = ["resources", quoteId, showArchived];
@@ -157,6 +199,23 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   const downloadMutation = useMutation({
     mutationFn: (input: { id: string; path: string }) => download({ data: input }),
     onSuccess: (result: { url: string }) => window.open(result.url, "_blank", "noopener"),
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const viewMutation = useMutation({
+    mutationFn: async (input: { id: string; path: string }) => {
+      const result = await download({ data: { ...input, mode: "view" as const } });
+      return { ...result, resourceId: input.id, path: input.path };
+    },
+    onSuccess: (result) =>
+      setViewing({
+        resourceId: result.resourceId,
+        path: result.path,
+        url: result.url,
+        name: result.name,
+        mime: result.mime,
+        size: result.size,
+      }),
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -272,13 +331,24 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
                   {attachmentsOf(selected).map((attachment) => (
                     <div
                       key={attachment.path}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm"
+                      className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm"
                     >
                       <Paperclip className="size-4 shrink-0 text-primary" aria-hidden="true" />
                       <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
                       <span className="shrink-0 text-xs text-slate">
                         {attachment.size ? formatBytes(attachment.size) : ""}
                       </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={viewMutation.isPending}
+                        onClick={() =>
+                          viewMutation.mutate({ id: selected.id, path: attachment.path })
+                        }
+                      >
+                        <Eye className="size-4" aria-hidden="true" />
+                        View
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -330,6 +400,81 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
                   </Button>
                 ) : null}
                 <Button size="sm" onClick={() => setSelected(null)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Attachment preview */}
+      <Dialog open={Boolean(viewing)} onOpenChange={(value) => !value && setViewing(null)}>
+        <DialogContent className="max-w-4xl">
+          {viewing ? (
+            <>
+              <DialogHeader className="min-w-0">
+                <DialogTitle className="truncate">{viewing.name}</DialogTitle>
+                <DialogDescription>
+                  {viewing.size ? formatBytes(viewing.size) : "Attachment"}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="min-w-0">
+                {(() => {
+                  const kind = previewKindFor(viewing.mime, viewing.name);
+                  if (kind === "pdf")
+                    return (
+                      <iframe
+                        src={viewing.url}
+                        title={viewing.name}
+                        className="h-[70vh] w-full rounded-lg border border-border bg-surface"
+                      />
+                    );
+                  if (kind === "image")
+                    return (
+                      <img
+                        src={viewing.url}
+                        alt={viewing.name}
+                        className="mx-auto max-h-[70vh] w-auto rounded-lg border border-border object-contain"
+                      />
+                    );
+                  if (kind === "text") return <TextPreview url={viewing.url} />;
+                  if (kind === "video")
+                    return (
+                      <video src={viewing.url} controls className="max-h-[70vh] w-full rounded-lg" />
+                    );
+                  if (kind === "audio")
+                    return <audio src={viewing.url} controls className="w-full" />;
+                  return (
+                    <p className="text-sm text-slate">
+                      This file opens in its own app — browsers can't display it here. Open it in a
+                      new tab or download it to view it.
+                    </p>
+                  );
+                })()}
+              </div>
+
+              <DialogFooter className="flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(viewing.url, "_blank", "noopener")}
+                >
+                  Open in a new tab
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={downloadMutation.isPending}
+                  onClick={() =>
+                    downloadMutation.mutate({ id: viewing.resourceId, path: viewing.path })
+                  }
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Download
+                </Button>
+                <Button size="sm" onClick={() => setViewing(null)}>
                   Close
                 </Button>
               </DialogFooter>

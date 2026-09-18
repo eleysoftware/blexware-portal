@@ -418,7 +418,7 @@ export const setResourceArchived = createServerFn({ method: "POST" })
 /** Short-lived download link for one attachment of a resource. */
 export const resourceDownloadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { id: string; path?: string }) => {
+  .validator((data: { id: string; path?: string; mode?: "view" | "download" }) => {
     if (!data?.id) throw new Error("Missing resource");
     return data;
   })
@@ -431,7 +431,7 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
         db
           .from("project_resources")
           .select(
-            `id, quote_id, storage_path, archived_at${withAttachments ? ", attachments" : ""}`,
+            `id, quote_id, storage_path, original_name, mime_type, byte_size, archived_at${withAttachments ? ", attachments" : ""}`,
           )
           .eq("id", data.id)
           .maybeSingle();
@@ -448,6 +448,7 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
       if (!row) throw new Error("That resource no longer exists.");
 
       const attachments = withAttachments ? normalizeAttachments(row["attachments"]) : [];
+      const viewing = data.mode === "view";
       const legacyPath = (row["storage_path"] as string | null) ?? null;
 
       let target: string | null = null;
@@ -468,8 +469,24 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
       const admin = await isAdminViewer(context.supabase, context.userId);
       if (row["archived_at"] && !admin) throw new Error("That resource is no longer available.");
 
-      const signed = await db.storage.from(RESOURCE_BUCKET).createSignedUrl(target, 120);
-      if (signed.error || !signed.data) throw new Error("We couldn't prepare that download.");
-      return { url: signed.data.signedUrl };
+      const meta =
+        attachments.find((attachment) => attachment.path === target) ??
+        ({
+          path: target,
+          name: (row["original_name"] as string | null) ?? "file",
+          mime: (row["mime_type"] as string | null) ?? "application/octet-stream",
+          size: (row["byte_size"] as number | null) ?? 0,
+        } as ResourceAttachment);
+
+      const signed = await db.storage
+        .from(RESOURCE_BUCKET)
+        .createSignedUrl(target, viewing ? 600 : 120);
+      if (signed.error || !signed.data) throw new Error("We couldn't prepare that file.");
+      return {
+        url: signed.data.signedUrl,
+        name: meta.name,
+        mime: meta.mime,
+        size: meta.size,
+      };
     }),
   );
