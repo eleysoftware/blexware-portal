@@ -192,6 +192,7 @@ export const listQuotes = createServerFn({ method: "POST" })
           status: string;
           issueDate: string | null;
           dueDate: string | null;
+          scheduledSendAt: string | null;
           payToken: string | null;
           deliveryError: string | null;
         }[]
