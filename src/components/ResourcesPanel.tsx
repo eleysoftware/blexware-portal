@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, FileText, Paperclip } from "lucide-react";
+import { Download, FileText, Paperclip, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,10 +18,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   MAX_RESOURCE_DESCRIPTION,
+  attachmentsOf,
   canEditResource,
   formatBytes,
   validateResourceDetails,
   validateResourceFile,
+  type ResourceAttachment,
   type ResourceRecord,
 } from "@/lib/resource-rules";
 import {
@@ -41,8 +43,9 @@ function when(value: string): string {
 }
 
 /**
- * Shared project Resources tab: notes with optional attachments. Clients may
- * post and manage their own entries; admins may manage and archive any entry.
+ * Shared project Resources tab: notes with any number of optional attachments.
+ * Clients may post and manage their own entries; admins may manage and archive
+ * any entry.
  */
 export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   const queryClient = useQueryClient();
@@ -58,8 +61,8 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   const [selected, setSelected] = useState<ResourceRecord | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [removeFile, setRemoveFile] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [removePaths, setRemovePaths] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const key = ["resources", quoteId, showArchived];
@@ -78,8 +81,8 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
     setEditing(null);
     setTitle("");
     setDescription("");
-    setFile(null);
-    setRemoveFile(false);
+    setFiles([]);
+    setRemovePaths([]);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -92,10 +95,25 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
     setEditing(resource);
     setTitle(resource.title);
     setDescription(resource.description ?? "");
-    setFile(null);
-    setRemoveFile(false);
+    setFiles([]);
+    setRemovePaths([]);
     setSelected(null);
     setOpen(true);
+  };
+
+  const chooseFiles = (chosen: FileList | null) => {
+    if (!chosen || chosen.length === 0) return;
+    const accepted: File[] = [];
+    for (const file of Array.from(chosen)) {
+      const problem = validateResourceFile(file);
+      if (problem) {
+        toast.error(problem);
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const saveMutation = useMutation({
@@ -105,8 +123,8 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
       if (editing) form.set("id", editing.id);
       form.set("title", title);
       form.set("description", description);
-      form.set("removeFile", removeFile ? "true" : "false");
-      if (file) form.set("file", file);
+      form.set("removePaths", JSON.stringify(removePaths));
+      for (const file of files) form.append("files", file);
       return save({ data: form });
     },
     onSuccess: () => {
@@ -137,7 +155,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   });
 
   const downloadMutation = useMutation({
-    mutationFn: (id: string) => download({ data: { id } }),
+    mutationFn: (input: { id: string; path: string }) => download({ data: input }),
     onSuccess: (result: { url: string }) => window.open(result.url, "_blank", "noopener"),
     onError: (error: Error) => toast.error(error.message),
   });
@@ -148,7 +166,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
       toast.error(problem);
       return;
     }
-    if (file) {
+    for (const file of files) {
       const fileProblem = validateResourceFile(file);
       if (fileProblem) {
         toast.error(fileProblem);
@@ -157,6 +175,8 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
     }
     saveMutation.mutate();
   };
+
+  const existingAttachments: ResourceAttachment[] = editing ? attachmentsOf(editing) : [];
 
   return (
     <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
@@ -194,34 +214,37 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
         <p className="mt-4 text-sm text-slate">
           {showArchived
             ? "Nothing has been archived."
-            : "No resources yet. Add a title and a short note — attach a file if there's one to share."}
+            : "No resources yet. Add a title and a short note — attach files if there are some to share."}
         </p>
       ) : (
         <ul className="mt-5 divide-y divide-border rounded-xl border border-border">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <button
-                type="button"
-                onClick={() => setSelected(row)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <FileText className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-foreground">{row.title}</span>
-                  <span className="block truncate text-xs text-slate">
-                    {row.author_role === "client" ? "Client" : "BLEXware team"} · {when(row.created_at)}
-                    {row.description ? ` · ${row.description}` : ""}
+          {rows.map((row) => {
+            const attachmentCount = attachmentsOf(row).length;
+            return (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(row)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <FileText className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-foreground">{row.title}</span>
+                    <span className="block truncate text-xs text-slate">
+                      {row.author_role === "client" ? "Client" : "BLEXware team"} · {when(row.created_at)}
+                      {row.description ? ` · ${row.description}` : ""}
+                    </span>
                   </span>
-                </span>
-                {row.storage_path ? (
-                  <span className="flex shrink-0 items-center gap-1 text-xs text-slate">
-                    <Paperclip className="size-3.5" aria-hidden="true" />
-                    <span className="max-w-[12rem] truncate">{row.original_name}</span>
-                  </span>
-                ) : null}
-              </button>
-            </li>
-          ))}
+                  {attachmentCount > 0 ? (
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-slate">
+                      <Paperclip className="size-3.5" aria-hidden="true" />
+                      {attachmentCount} {attachmentCount === 1 ? "file" : "files"}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -244,22 +267,31 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
                 <p className="text-sm text-slate">No description was added.</p>
               )}
 
-              {selected.storage_path ? (
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
-                  <Paperclip className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate">{selected.original_name}</span>
-                  <span className="shrink-0 text-xs text-slate">
-                    {selected.byte_size ? formatBytes(selected.byte_size) : ""}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={downloadMutation.isPending}
-                    onClick={() => downloadMutation.mutate(selected.id)}
-                  >
-                    <Download className="size-4" aria-hidden="true" />
-                    Download
-                  </Button>
+              {attachmentsOf(selected).length > 0 ? (
+                <div className="space-y-2">
+                  {attachmentsOf(selected).map((attachment) => (
+                    <div
+                      key={attachment.path}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm"
+                    >
+                      <Paperclip className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+                      <span className="shrink-0 text-xs text-slate">
+                        {attachment.size ? formatBytes(attachment.size) : ""}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={downloadMutation.isPending}
+                        onClick={() =>
+                          downloadMutation.mutate({ id: selected.id, path: attachment.path })
+                        }
+                      >
+                        <Download className="size-4" aria-hidden="true" />
+                        Download
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               ) : null}
 
@@ -319,7 +351,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
             <DialogTitle>{editing ? "Edit resource" : "Add a resource"}</DialogTitle>
             <DialogDescription>
               A title is required. The description is limited to {MAX_RESOURCE_DESCRIPTION} characters.
-              Files are optional, up to 50 MB each.
+              Files are optional — attach as many as you need, up to 50 MB each.
             </DialogDescription>
           </DialogHeader>
 
@@ -349,28 +381,68 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resource-file">Attachment (optional)</Label>
+              <Label htmlFor="resource-file">Attachments (optional)</Label>
               <Input
                 id="resource-file"
                 ref={fileRef}
                 type="file"
-                onChange={(event) => {
-                  const chosen = event.target.files?.[0] ?? null;
-                  setFile(chosen);
-                  if (chosen) setRemoveFile(false);
-                }}
+                multiple
+                onChange={(event) => chooseFiles(event.target.files)}
               />
-              {editing?.original_name && !file ? (
-                <p className="text-xs text-slate">
-                  Currently attached: {editing.original_name}.{" "}
-                  <button
-                    type="button"
-                    className="text-primary underline"
-                    onClick={() => setRemoveFile((value) => !value)}
-                  >
-                    {removeFile ? "Keep the file" : "Remove the file"}
-                  </button>
-                </p>
+
+              {existingAttachments.length > 0 ? (
+                <ul className="space-y-1">
+                  {existingAttachments.map((attachment) => {
+                    const marked = removePaths.includes(attachment.path);
+                    return (
+                      <li
+                        key={attachment.path}
+                        className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      >
+                        <Paperclip className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+                        <button
+                          type="button"
+                          className="shrink-0 text-xs text-primary underline"
+                          onClick={() =>
+                            setRemovePaths((current) =>
+                              marked
+                                ? current.filter((path) => path !== attachment.path)
+                                : [...current, attachment.path],
+                            )
+                          }
+                        >
+                          {marked ? "Keep the file" : "Remove"}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+
+              {files.length > 0 ? (
+                <ul className="space-y-1">
+                  {files.map((file, index) => (
+                    <li
+                      key={`${file.name}-${index}`}
+                      className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                    >
+                      <Paperclip className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                      <span className="shrink-0 text-xs text-slate">{formatBytes(file.size)}</span>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${file.name}`}
+                        className="shrink-0 rounded-sm p-1 text-slate hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() =>
+                          setFiles((current) => current.filter((_, at) => at !== index))
+                        }
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
             </div>
           </div>
