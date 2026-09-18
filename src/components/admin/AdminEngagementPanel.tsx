@@ -1367,6 +1367,9 @@ export function AdminEngagementPanel({
                       {invoice.due_date
                         ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
                         : ""}
+                      {scheduledSendLabel(invoice.status, invoice.scheduled_send_at)
+                        ? ` · ${scheduledSendLabel(invoice.status, invoice.scheduled_send_at)}`
+                        : ""}
                     </span>
                     <span className="flex flex-wrap items-center gap-3">
                       <span className="font-semibold">
