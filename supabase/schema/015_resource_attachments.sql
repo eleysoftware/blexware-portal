@@ -77,21 +77,5 @@ create trigger project_resources_touch_updated_at
 
 -- Private bucket `project-resources` already exists (50 MB per file).
 -- Browser writes stay impossible on purpose.
-drop policy if exists "project resources no client insert" on storage.objects;
-create policy "project resources no client insert"
-  on storage.objects for insert
-  to anon, authenticated
-  with check (bucket_id <> 'project-resources');
-
-drop policy if exists "project resources no client update" on storage.objects;
-create policy "project resources no client update"
-  on storage.objects for update
-  to anon, authenticated
-  using (bucket_id <> 'project-resources')
-  with check (bucket_id <> 'project-resources');
-
-drop policy if exists "project resources no client delete" on storage.objects;
-create policy "project resources no client delete"
-  on storage.objects for delete
-  to anon, authenticated
-  using (bucket_id <> 'project-resources');
+-- Browser access to the `project-resources` bucket is denied by RLS default
+-- (no storage.objects policy grants it). Server code uses the service role.
