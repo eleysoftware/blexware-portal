@@ -34,6 +34,7 @@ type PortalInvoice = {
   status: string;
   issue_date: string | null;
   due_date: string | null;
+  scheduled_send_at?: string | null;
   pay_token: string;
 };
 
