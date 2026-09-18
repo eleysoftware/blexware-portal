@@ -365,7 +365,7 @@ export const deleteResource = createServerFn({ method: "POST" })
       if (!admin && resource.author_id !== context.userId)
         throw new Error("You can only delete resources you posted.");
 
-      const paths = resource.attachments.map((attachment) => attachment.path);
+      const paths = (resource.attachments ?? []).map((attachment) => attachment.path);
       if (paths.length > 0) await db.storage.from(RESOURCE_BUCKET).remove(paths);
 
       const removal = await db.from("project_resources").delete().eq("id", resource.id);
