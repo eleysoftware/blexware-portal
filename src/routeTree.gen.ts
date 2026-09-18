@@ -30,6 +30,7 @@ import { Route as ResourcesSlugRouteImport } from './routes/resources.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin/import'
 import { Route as AuthenticatedPortalIndexRouteImport } from './routes/_authenticated/portal/index'
+import { Route as ApiResourcesFileRouteImport } from './routes/api/resources/file'
 import { Route as AuthenticatedAdminInvoicesNewRouteImport } from './routes/_authenticated/admin/invoices/new'
 import { Route as AuthenticatedAdminQuotesIdRouteImport } from './routes/_authenticated/admin/quotes/$id'
 import { Route as AuthenticatedPortalQuotesIdRouteImport } from './routes/_authenticated/portal/quotes/$id'
@@ -144,6 +145,11 @@ const AuthenticatedPortalIndexRoute =
     path: '/portal/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiResourcesFileRoute = ApiResourcesFileRouteImport.update({
+  id: '/api/resources/file',
+  path: '/api/resources/file',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminInvoicesNewRoute =
   AuthenticatedAdminInvoicesNewRouteImport.update({
     id: '/admin/invoices/new',
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
+  '/api/resources/file': typeof ApiResourcesFileRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/portal/': typeof AuthenticatedPortalIndexRoute
   '/admin/invoices/new': typeof AuthenticatedAdminInvoicesNewRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/portfolio': typeof PortfolioIndexRoute
   '/resources': typeof ResourcesIndexRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
+  '/api/resources/file': typeof ApiResourcesFileRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/portal': typeof AuthenticatedPortalIndexRoute
   '/admin/invoices/new': typeof AuthenticatedAdminInvoicesNewRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/portfolio/': typeof PortfolioIndexRoute
   '/resources/': typeof ResourcesIndexRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
+  '/api/resources/file': typeof ApiResourcesFileRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/portal/': typeof AuthenticatedPortalIndexRoute
   '/_authenticated/admin/invoices/new': typeof AuthenticatedAdminInvoicesNewRoute
@@ -295,6 +304,7 @@ export interface FileRouteTypes {
     | '/portfolio/'
     | '/resources/'
     | '/admin/import'
+    | '/api/resources/file'
     | '/admin/'
     | '/portal/'
     | '/admin/invoices/new'
@@ -324,6 +334,7 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/resources'
     | '/admin/import'
+    | '/api/resources/file'
     | '/admin'
     | '/portal'
     | '/admin/invoices/new'
@@ -354,6 +365,7 @@ export interface FileRouteTypes {
     | '/portfolio/'
     | '/resources/'
     | '/_authenticated/admin/import'
+    | '/api/resources/file'
     | '/_authenticated/admin/'
     | '/_authenticated/portal/'
     | '/_authenticated/admin/invoices/new'
@@ -384,6 +396,7 @@ export interface RootRouteChildren {
   ResourcesSlugRoute: typeof ResourcesSlugRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ResourcesIndexRoute: typeof ResourcesIndexRoute
+  ApiResourcesFileRoute: typeof ApiResourcesFileRoute
   ApiPublicAuthHooksPasswordCheckRoute: typeof ApiPublicAuthHooksPasswordCheckRoute
   ApiPublicCronEngagementRoute: typeof ApiPublicCronEngagementRoute
   ApiPublicHyperswitchWebhookRoute: typeof ApiPublicHyperswitchWebhookRoute
@@ -539,6 +552,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPortalIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/resources/file': {
+      id: '/api/resources/file'
+      path: '/api/resources/file'
+      fullPath: '/api/resources/file'
+      preLoaderRoute: typeof ApiResourcesFileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/invoices/new': {
       id: '/_authenticated/admin/invoices/new'
       path: '/admin/invoices/new'
@@ -631,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesSlugRoute: ResourcesSlugRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ResourcesIndexRoute: ResourcesIndexRoute,
+  ApiResourcesFileRoute: ApiResourcesFileRoute,
   ApiPublicAuthHooksPasswordCheckRoute: ApiPublicAuthHooksPasswordCheckRoute,
   ApiPublicCronEngagementRoute: ApiPublicCronEngagementRoute,
   ApiPublicHyperswitchWebhookRoute: ApiPublicHyperswitchWebhookRoute,
