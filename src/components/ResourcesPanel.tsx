@@ -35,6 +35,46 @@ import {
   setResourceArchived,
 } from "@/lib/resources.functions";
 
+type ViewedAttachment = {
+  resourceId: string;
+  path: string;
+  url: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+
+/** Fetches and shows a plain-text attachment. */
+function TextPreview({ url }: { url: string }) {
+  const [body, setBody] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setBody(null);
+    setFailed(false);
+    fetch(url)
+      .then((response) => (response.ok ? response.text() : Promise.reject(new Error("failed"))))
+      .then((text) => {
+        if (active) setBody(text.slice(0, 200_000));
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  if (failed) return <p className="text-sm text-slate">We couldn't display this file. Try downloading it.</p>;
+  if (body === null) return <p className="text-sm text-slate">Loading…</p>;
+  return (
+    <pre className="max-h-[65vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-4 text-xs text-foreground">
+      {body}
+    </pre>
+  );
+}
+
 function when(value: string): string {
   return new Date(value).toLocaleDateString(undefined, {
     month: "short",
