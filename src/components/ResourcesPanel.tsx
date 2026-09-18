@@ -143,6 +143,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   const [removePaths, setRemovePaths] = useState<string[]>([]);
   const [viewing, setViewing] = useState<ViewedAttachment | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const preview = useLocalCopy(viewing ? viewing.url : null);
 
   const key = ["resources", quoteId, showArchived];
   const resources = useQuery({
