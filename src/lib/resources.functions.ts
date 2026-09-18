@@ -448,6 +448,7 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
       if (!row) throw new Error("That resource no longer exists.");
 
       const attachments = withAttachments ? normalizeAttachments(row["attachments"]) : [];
+      const viewing = data.mode === "view";
       const legacyPath = (row["storage_path"] as string | null) ?? null;
 
       let target: string | null = null;
