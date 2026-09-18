@@ -268,7 +268,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
               )}
 
               {attachmentsOf(selected).length > 0 ? (
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   {attachmentsOf(selected).map((attachment) => (
                     <div
                       key={attachment.path}
@@ -355,7 +355,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="resource-title">Title</Label>
               <Input
