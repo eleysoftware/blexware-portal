@@ -573,6 +573,7 @@ export type Database = {
       project_resources: {
         Row: {
           archived_at: string | null
+          attachments: Json
           author_email: string | null
           author_id: string | null
           author_label: string | null
@@ -590,6 +591,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          attachments?: Json
           author_email?: string | null
           author_id?: string | null
           author_label?: string | null
@@ -607,6 +609,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          attachments?: Json
           author_email?: string | null
           author_id?: string | null
           author_label?: string | null
