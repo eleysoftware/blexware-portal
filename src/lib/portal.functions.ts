@@ -84,7 +84,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
         const { data: invoices } = await db
           .from("invoices")
           .select(
-            "id, quote_id, invoice_number, sequence, description, amount_cents, amount_paid_cents, status, issue_date, due_date, pay_token",
+            "id, quote_id, invoice_number, sequence, description, amount_cents, amount_paid_cents, status, issue_date, due_date, scheduled_send_at, pay_token",
           )
           .in("quote_id", ids)
           .not("status", "in", "(void,cancelled,draft)")
