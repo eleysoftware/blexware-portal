@@ -4,6 +4,7 @@ import {
   attachmentsOf,
   mergeAttachments,
   normalizeAttachments,
+  previewKindFor,
   removeAttachment,
   validateResourceFile,
 } from "../../src/lib/resource-rules";
