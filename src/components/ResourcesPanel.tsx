@@ -64,6 +64,7 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [removePaths, setRemovePaths] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<ViewedAttachment | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const key = ["resources", quoteId, showArchived];
