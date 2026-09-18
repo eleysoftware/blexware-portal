@@ -74,6 +74,14 @@ function AuthPage() {
       />
       <Section tone="surface">
         <div className="mx-auto max-w-md rounded-2xl border border-border bg-background p-8 shadow-card">
+          {reason === "timeout" ? (
+            <p
+              className="mb-6 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-foreground"
+              role="status"
+            >
+              You were signed out after 20 minutes of inactivity. Sign in again to continue.
+            </p>
+          ) : null}
           <Tabs defaultValue={tab === "signup" ? "signup" : "signin"}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
