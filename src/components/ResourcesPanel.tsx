@@ -202,6 +202,23 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const viewMutation = useMutation({
+    mutationFn: async (input: { id: string; path: string }) => {
+      const result = await download({ data: { ...input, mode: "view" as const } });
+      return { ...result, resourceId: input.id, path: input.path };
+    },
+    onSuccess: (result) =>
+      setViewing({
+        resourceId: result.resourceId,
+        path: result.path,
+        url: result.url,
+        name: result.name,
+        mime: result.mime,
+        size: result.size,
+      }),
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const submit = () => {
     const problem = validateResourceDetails({ title, description });
     if (problem) {
