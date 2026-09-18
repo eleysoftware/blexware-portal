@@ -132,6 +132,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
             status: row.status,
             issueDate: row.issue_date,
             dueDate: row.due_date,
+            scheduledSendAt: row.scheduled_send_at ?? null,
             payToken: balance > 0 && row.status !== "scheduled" ? row.pay_token : null,
             description: row.description,
           });
