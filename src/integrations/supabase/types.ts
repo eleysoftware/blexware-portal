@@ -570,6 +570,68 @@ export type Database = {
           },
         ]
       }
+      project_resources: {
+        Row: {
+          archived_at: string | null
+          author_email: string | null
+          author_id: string | null
+          author_label: string | null
+          author_role: string
+          byte_size: number | null
+          created_at: string
+          description: string | null
+          id: string
+          mime_type: string | null
+          original_name: string | null
+          quote_id: string
+          storage_path: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          author_email?: string | null
+          author_id?: string | null
+          author_label?: string | null
+          author_role?: string
+          byte_size?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          mime_type?: string | null
+          original_name?: string | null
+          quote_id: string
+          storage_path?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          author_email?: string | null
+          author_id?: string | null
+          author_label?: string | null
+          author_role?: string
+          byte_size?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          mime_type?: string | null
+          original_name?: string | null
+          quote_id?: string
+          storage_path?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_resources_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proposal_versions: {
         Row: {
           change_request: string | null
