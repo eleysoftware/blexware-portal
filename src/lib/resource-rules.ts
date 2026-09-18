@@ -81,7 +81,7 @@ export function validateResourceFile(file: { name: string; size: number; type: s
   if (file.size > MAX_RESOURCE_BYTES)
     return `${file.name} is ${formatBytes(file.size)} — the limit is 50 MB per file.`;
   if (!isAllowedResourceType(file.type, file.name))
-    return `${file.name} isn't a file type we accept here. Try a document, spreadsheet, image, or video.`;
+    return `${file.name} isn't a file type we accept here. Try a document (Word, PDF or OpenDocument), spreadsheet, presentation, image, or video.`;
   return null;
 }
 
