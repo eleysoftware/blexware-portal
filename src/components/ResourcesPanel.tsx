@@ -21,6 +21,7 @@ import {
   attachmentsOf,
   canEditResource,
   formatBytes,
+  previewKindFor,
   validateResourceDetails,
   validateResourceFile,
   type ResourceAttachment,
