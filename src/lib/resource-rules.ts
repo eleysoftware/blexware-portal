@@ -35,11 +35,38 @@ export function isAllowedResourceType(mime: string, name = ""): boolean {
   if (ALLOWED_RESOURCE_TYPES.includes(mime as (typeof ALLOWED_RESOURCE_TYPES)[number])) return true;
   if (ALLOWED_PREFIXES.some((prefix) => mime.startsWith(prefix))) return true;
   // Some browsers send an empty type — fall back to the extension.
-  const ext = name.toLowerCase().split(".").pop() ?? "";
+  const ext = extensionOf(name);
   return [
     "pdf","doc","docx","xls","xlsx","ppt","pptx","csv","txt","md","rtf","zip",
+    "odt","ods","odp","odg","odf","fodt","fods","fodp",
     "png","jpg","jpeg","gif","webp","heic","svg","mp4","mov","webm","mp3","wav","m4a",
   ].includes(ext);
+}
+
+function extensionOf(name: string): string {
+  return name.toLowerCase().split(".").pop() ?? "";
+}
+
+/** How an attachment can be shown in the browser. */
+export type PreviewKind = "pdf" | "image" | "text" | "video" | "audio" | "none";
+
+/** What kind of in-app preview an attachment supports. */
+export function previewKindFor(mime: string, name = ""): PreviewKind {
+  const type = (mime ?? "").toLowerCase();
+  if (type === "application/pdf") return "pdf";
+  if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+  if (type === "text/plain" || type === "text/csv" || type === "text/markdown") return "text";
+  if (type && type !== "application/octet-stream") return "none";
+  // Empty or generic type — fall back to the extension.
+  const ext = extensionOf(name);
+  if (ext === "pdf") return "pdf";
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return "image";
+  if (["mp4", "mov", "webm"].includes(ext)) return "video";
+  if (["mp3", "wav", "m4a"].includes(ext)) return "audio";
+  if (["txt", "csv", "md"].includes(ext)) return "text";
+  return "none";
 }
 
 export function formatBytes(bytes: number): string {
