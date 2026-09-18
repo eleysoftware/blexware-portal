@@ -75,6 +75,43 @@ function TextPreview({ url }: { url: string }) {
   );
 }
 
+/**
+ * Loads a remote file into memory and returns a same-origin blob URL, so the
+ * browser doesn't block displaying another origin's document in a frame.
+ */
+function useLocalCopy(url: string | null) {
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!url) {
+      setLocalUrl(null);
+      setFailed(false);
+      return;
+    }
+    let active = true;
+    let created: string | null = null;
+    setLocalUrl(null);
+    setFailed(false);
+    fetch(url)
+      .then((response) => (response.ok ? response.blob() : Promise.reject(new Error("failed"))))
+      .then((blob) => {
+        if (!active) return;
+        created = URL.createObjectURL(blob);
+        setLocalUrl(created);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [url]);
+
+  return { localUrl, failed };
+}
+
 function when(value: string): string {
   return new Date(value).toLocaleDateString(undefined, {
     month: "short",
