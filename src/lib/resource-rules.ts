@@ -60,11 +60,83 @@ export function validateResourceDetails(input: { title: string; description?: st
   return null;
 }
 
+export type ResourceAttachment = {
+  path: string;
+  name: string;
+  mime: string;
+  size: number;
+};
+
+/** Coerces one stored jsonb attachment into shape; null when unusable. */
+export function normalizeAttachment(raw: unknown): ResourceAttachment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const path = typeof row.path === "string" ? row.path : "";
+  if (!path) return null;
+  return {
+    path,
+    name: typeof row.name === "string" && row.name ? row.name : "file",
+    mime:
+      typeof row.mime === "string" && row.mime ? row.mime : "application/octet-stream",
+    size: typeof row.size === "number" && Number.isFinite(row.size) ? row.size : 0,
+  };
+}
+
+/** Normalizes the stored attachments jsonb (missing column / junk tolerated). */
+export function normalizeAttachments(value: unknown): ResourceAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(normalizeAttachment)
+    .filter((attachment): attachment is ResourceAttachment => attachment !== null);
+}
+
+/** Adds newly uploaded attachments, keyed by storage path (no duplicates). */
+export function mergeAttachments(
+  existing: ResourceAttachment[],
+  added: ResourceAttachment[],
+): ResourceAttachment[] {
+  const byPath = new Map(existing.map((attachment) => [attachment.path, attachment]));
+  for (const attachment of added) byPath.set(attachment.path, attachment);
+  return [...byPath.values()];
+}
+
+/** Drops the attachment stored at `path` from the list. */
+export function removeAttachment(
+  list: ResourceAttachment[],
+  path: string,
+): ResourceAttachment[] {
+  return list.filter((attachment) => attachment.path !== path);
+}
+
+/**
+ * The attachments to show for a resource: the `attachments` list when present,
+ * otherwise the legacy single-file columns (pre-backfill rows).
+ */
+export function attachmentsOf(
+  resource: Pick<
+    ResourceRecord,
+    "attachments" | "storage_path" | "original_name" | "mime_type" | "byte_size"
+  >,
+): ResourceAttachment[] {
+  const list = normalizeAttachments(resource.attachments);
+  if (list.length > 0) return list;
+  if (!resource.storage_path) return [];
+  return [
+    {
+      path: resource.storage_path,
+      name: resource.original_name ?? "file",
+      mime: resource.mime_type ?? "application/octet-stream",
+      size: resource.byte_size ?? 0,
+    },
+  ];
+}
+
 export type ResourceRecord = {
   id: string;
   quote_id: string;
   title: string;
   description: string | null;
+  attachments: ResourceAttachment[] | null;
   storage_path: string | null;
   original_name: string | null;
   mime_type: string | null;
