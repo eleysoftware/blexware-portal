@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 type LoadState =
   | { status: "loading" }
@@ -87,10 +88,7 @@ export function ResourcePdfPreview({ url, name }: { url: string; name: string })
       setState({ status: "loading" });
       try {
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
         const response = await fetch(url, { credentials: "same-origin" });
         if (!response.ok) throw new Error("PDF request failed");
         const data = new Uint8Array(await response.arrayBuffer());
