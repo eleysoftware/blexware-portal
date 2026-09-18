@@ -110,6 +110,7 @@ function QuoteDetailPage() {
           { id: "sow", label: "SOW" },
         ]),
     { id: "milestones", label: "Milestones" },
+    { id: "resources", label: "Resources" },
     { id: "invoices", label: "Invoices" },
     { id: "activity", label: "Activity" },
   ].map((item) =>
@@ -620,6 +621,11 @@ function QuoteDetailPage() {
         <WorkspacePanel id="milestones" active={tab === "milestones"}>
           <TabIntro purpose={getTabPurpose("milestones", "admin")} />
           <MilestoneBoard quoteId={id} />
+        </WorkspacePanel>
+
+        <WorkspacePanel id="resources" active={tab === "resources"}>
+          <TabIntro purpose="Shared instructions, references and files for this project." />
+          <ResourcesPanel quoteId={id} />
         </WorkspacePanel>
 
         <WorkspacePanel id="invoices" active={tab === "invoices"}>

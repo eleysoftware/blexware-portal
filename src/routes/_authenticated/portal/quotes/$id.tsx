@@ -134,6 +134,7 @@ function PortalQuoteDetail() {
           { id: "sow", label: "SOW" },
         ]),
     { id: "milestones", label: "Milestones" },
+    { id: "resources", label: "Resources" },
     { id: "invoices", label: "Invoices" },
   ].map((item) =>
     item.id === nextStep.tab
@@ -304,6 +305,11 @@ function PortalQuoteDetail() {
         <WorkspacePanel id="milestones" active={tab === "milestones"}>
           <TabIntro purpose={getTabPurpose("milestones", "client")} />
           <MilestoneBoard quoteId={id} readOnly />
+        </WorkspacePanel>
+
+        <WorkspacePanel id="resources" active={tab === "resources"}>
+          <TabIntro purpose="Instructions, references and files shared with the BLEXware team." />
+          <ResourcesPanel quoteId={id} />
         </WorkspacePanel>
 
         <WorkspacePanel id="invoices" active={tab === "invoices"}>
