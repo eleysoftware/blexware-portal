@@ -202,7 +202,7 @@ export const listQuotes = createServerFn({ method: "POST" })
         const { data: invoices } = await adminDb()
           .from("invoices")
           .select(
-            "id, quote_id, invoice_number, sequence, amount_cents, amount_paid_cents, status, issue_date, due_date, pay_token",
+            "id, quote_id, invoice_number, sequence, amount_cents, amount_paid_cents, status, issue_date, due_date, scheduled_send_at, pay_token",
           )
           .in("quote_id", ids)
           .order("sequence", { ascending: true });
