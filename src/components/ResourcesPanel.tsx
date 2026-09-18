@@ -341,6 +341,17 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={viewMutation.isPending}
+                        onClick={() =>
+                          viewMutation.mutate({ id: selected.id, path: attachment.path })
+                        }
+                      >
+                        <Eye className="size-4" aria-hidden="true" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         disabled={downloadMutation.isPending}
                         onClick={() =>
                           downloadMutation.mutate({ id: selected.id, path: attachment.path })
