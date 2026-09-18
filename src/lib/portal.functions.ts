@@ -102,6 +102,7 @@ export const listMyQuotes = createServerFn({ method: "POST" })
           status: string;
           issue_date: string | null;
           due_date: string | null;
+          scheduled_send_at: string | null;
           pay_token: string | null;
         }[]) {
           const bucket = (billing[row.quote_id] ??= {
