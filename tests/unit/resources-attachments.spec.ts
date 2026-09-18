@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 import {
   attachmentsOf,
@@ -109,4 +110,11 @@ test("rejects changed delivery tokens and sanitizes attachment names", async () 
   const changed = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
   await expect(verifyResourceDeliveryToken(changed, "test-secret", 1)).resolves.toBeNull();
   expect(safeAttachmentName('../bad\r\n"name.pdf')).toBe(".._bad___name.pdf");
+});
+
+test("renders PDFs in the app instead of embedding a browser page", async () => {
+  const source = await readFile("src/components/ResourcesPanel.tsx", "utf8");
+  expect(source).toContain("<ResourcePdfPreview");
+  expect(source).not.toContain("<iframe");
+  expect(source).not.toContain("sandbox=");
 });
