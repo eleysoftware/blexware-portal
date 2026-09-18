@@ -12,6 +12,7 @@ import { listClientProjects, moveInvoicesToProject } from "@/lib/direct-invoice.
 import { DocumentDownloads } from "@/components/DocumentDownloads";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { MilestoneBoard } from "@/components/MilestoneBoard";
+import { ResourcesPanel } from "@/components/ResourcesPanel";
 import { Section } from "@/components/Section";
 import { NextStepBanner } from "@/components/NextStepBanner";
 import { StageRail } from "@/components/StageRail";
