@@ -32,6 +32,7 @@ export type PortalInvoiceRow = {
   status: string;
   issueDate: string | null;
   dueDate: string | null;
+  scheduledSendAt: string | null;
   payToken: string | null;
   description: string | null;
 };
