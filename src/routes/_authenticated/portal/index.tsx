@@ -157,6 +157,14 @@ function PortalHome() {
                     <p className="mt-3 text-xs text-slate" data-testid="portal-project-invoices">
                       {rows.length} invoice{rows.length === 1 ? "" : "s"} on this project — open the
                       project to view and pay them.
+                      {(() => {
+                        const upcoming = rows
+                          .map((row) =>
+                            scheduledSendLabel(row.status, row.scheduledSendAt, "arrives"),
+                          )
+                          .find(Boolean);
+                        return upcoming ? ` Next invoice ${upcoming}.` : "";
+                      })()}
                     </p>
                   ) : null}
 
