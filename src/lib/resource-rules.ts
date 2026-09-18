@@ -18,6 +18,15 @@ export const ALLOWED_RESOURCE_TYPES = [
   "text/plain",
   "text/csv",
   "text/markdown",
+  // OpenDocument (OpenOffice / LibreOffice)
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.presentation",
+  "application/vnd.oasis.opendocument.graphics",
+  "application/vnd.oasis.opendocument.formula",
+  "application/vnd.oasis.opendocument.text-flat-xml",
+  "application/vnd.oasis.opendocument.spreadsheet-flat-xml",
+  "application/vnd.oasis.opendocument.presentation-flat-xml",
 ] as const;
 
 const ALLOWED_PREFIXES = ["image/", "video/", "audio/"];
