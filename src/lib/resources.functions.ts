@@ -418,7 +418,7 @@ export const setResourceArchived = createServerFn({ method: "POST" })
 /** Short-lived download link for one attachment of a resource. */
 export const resourceDownloadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { id: string; path?: string }) => {
+  .validator((data: { id: string; path?: string; mode?: "view" | "download" }) => {
     if (!data?.id) throw new Error("Missing resource");
     return data;
   })
