@@ -234,6 +234,7 @@ export const listQuotes = createServerFn({ method: "POST" })
             status,
             issueDate: (row.issue_date as string | null) ?? null,
             dueDate: (row.due_date as string | null) ?? null,
+            scheduledSendAt: (row.scheduled_send_at as string | null) ?? null,
             payToken: (row.pay_token as string | null) ?? null,
             deliveryError: deliveryErrors[String(row.id)] ?? null,
           });
