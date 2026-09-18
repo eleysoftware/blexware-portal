@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ResourcePdfPreview } from "@/components/ResourcePdfPreview";
 import {
   Dialog,
   DialogContent,
@@ -423,15 +424,8 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
               <div className="min-w-0">
                 {(() => {
                   const kind = previewKindFor(viewing.mime, viewing.name);
-                  if (kind === "pdf")
-                    return (
-                      <iframe
-                        src={viewing.url}
-                        title={viewing.name}
-                        sandbox=""
-                        className="h-[70vh] w-full rounded-lg border border-border bg-surface"
-                      />
-                    );
+                   if (kind === "pdf")
+                     return <ResourcePdfPreview url={viewing.url} name={viewing.name} />;
                   if (kind === "image")
                     return (
                       <img
