@@ -431,7 +431,7 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
         db
           .from("project_resources")
           .select(
-            `id, quote_id, storage_path, archived_at${withAttachments ? ", attachments" : ""}`,
+            `id, quote_id, storage_path, original_name, mime_type, byte_size, archived_at${withAttachments ? ", attachments" : ""}`,
           )
           .eq("id", data.id)
           .maybeSingle();
