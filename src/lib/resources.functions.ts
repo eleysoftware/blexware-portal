@@ -72,6 +72,16 @@ function toResource(row: Record<string, unknown>, withAttachments: boolean): Res
   };
 }
 
+function parseRemovePaths(raw: FormDataEntryValue | null): string[] {
+  try {
+    const parsed: unknown = JSON.parse(String(raw ?? "[]"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === "string");
+  } catch {
+    return [];
+  }
+}
+
 export const listResources = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { quoteId: string; includeArchived?: boolean }) => {
@@ -130,11 +140,7 @@ export const saveResource = createServerFn({ method: "POST" })
       const id = String(data.get("id") ?? "");
       const title = String(data.get("title") ?? "").trim();
       const description = String(data.get("description") ?? "").trim();
-      const removePaths = normalizeAttachments
-        ? (JSON.parse(String(data.get("removePaths") ?? "[]")) as unknown).filter
-          ? (JSON.parse(String(data.get("removePaths") ?? "[]")) as string[])
-          : []
-        : [];
+      const removePaths = parseRemovePaths(data.get("removePaths"));
       const files = data
         .getAll("files")
         .filter((entry): entry is File => entry instanceof File && entry.size > 0);
@@ -143,7 +149,11 @@ export const saveResource = createServerFn({ method: "POST" })
       const problem = validateResourceDetails({ title, description });
       if (problem) throw new Error(problem);
       for (const file of files) {
-        const fileProblem = validateResourceFile({ name: file.name, size: file.size, type: file.type });
+        const fileProblem = validateResourceFile({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        });
         if (fileProblem) throw new Error(fileProblem);
       }
 
@@ -155,30 +165,36 @@ export const saveResource = createServerFn({ method: "POST" })
 
       let existing: ResourceRecord | null = null;
       if (id) {
-        const { data: row, error } = await db
+        let row: Record<string, unknown> | null = null;
+        const withAttachments = true;
+        const primary = await db
           .from("project_resources")
-          .select(selectColumns(true))
+          .select(selectColumns(withAttachments))
           .eq("id", id)
           .maybeSingle();
-        if (error && missingAttachmentsColumn(error.message)) {
+        if (primary.error && missingAttachmentsColumn(primary.error.message)) {
           const retry = await db
             .from("project_resources")
             .select(selectColumns(false))
             .eq("id", id)
             .maybeSingle();
-          if (retry.error) throw new Error(missingTable(retry.error.message) ? notSetUp : retry.error.message);
-          existing = retry.data ? toResource(retry.data as Record<string, unknown>, false) : null;
+          if (retry.error)
+            throw new Error(missingTable(retry.error.message) ? notSetUp : retry.error.message);
+          row = (retry.data ?? null) as Record<string, unknown> | null;
         } else {
-          if (error) throw new Error(missingTable(error.message) ? notSetUp : error.message);
-          existing = row ? toResource(row as unknown as Record<string, unknown>, true) : null;
+          if (primary.error)
+            throw new Error(missingTable(primary.error.message) ? notSetUp : primary.error.message);
+          row = (primary.data ?? null) as Record<string, unknown> | null;
         }
-        if (!existing) throw new Error("That resource no longer exists.");
-        if (existing.quote_id !== quoteId) throw new Error("That resource belongs to another project.");
+        if (!row) throw new Error("That resource no longer exists.");
+        existing = toResource(row, true);
+        if (existing.quote_id !== quoteId)
+          throw new Error("That resource belongs to another project.");
         if (!admin && existing.author_id !== context.userId)
           throw new Error("You can only change resources you posted.");
       }
 
-      // Upload every new file first; each becomes an attachment entry.
+      // Upload every new file; each becomes an attachment entry.
       const uploaded: ResourceAttachment[] = [];
       for (const file of files) {
         const bytes = new Uint8Array(await file.arrayBuffer());
@@ -186,7 +202,10 @@ export const saveResource = createServerFn({ method: "POST" })
         const path = `${quoteId}/${crypto.randomUUID()}-${safeName}`;
         const upload = await db.storage
           .from(RESOURCE_BUCKET)
-          .upload(path, bytes, { contentType: file.type || "application/octet-stream", upsert: false });
+          .upload(path, bytes, {
+            contentType: file.type || "application/octet-stream",
+            upsert: false,
+          });
         if (upload.error) {
           console.error("[saveResource:upload]", upload.error.message);
           throw new Error(`We couldn't upload ${file.name}. Please try again.`);
@@ -221,61 +240,35 @@ export const saveResource = createServerFn({ method: "POST" })
       const stalePaths = removePaths.filter((path) =>
         existingAttachments.some((attachment) => attachment.path === path),
       );
-      if (legacyRemoved) stalePaths.push(legacyPath as string);
+      if (legacyRemoved && legacyPath) stalePaths.push(legacyPath);
+
+      const authorFields = (): Record<string, unknown> => ({
+        author_id: context.userId,
+        author_email: (context.claims as { email?: string } | undefined)?.email ?? null,
+        author_label:
+          (context.claims as { email?: string } | undefined)?.email ??
+          (admin ? "BLEXware team" : "Client"),
+        author_role: admin ? "staff" : "client",
+      });
+
+      const write = async (payload: Record<string, unknown>): Promise<void> => {
+        if (existing) {
+          const { error } = await db
+            .from("project_resources")
+            .update(payload)
+            .eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await db
+            .from("project_resources")
+            .insert({ ...payload, ...authorFields() });
+          if (error) throw error;
+        }
+      };
 
       let attachmentsMode = true;
-      const writeWithAttachments = async (): Promise<void> => {
-        const payload = { ...basePayload, attachments: nextAttachments };
-        if (existing) {
-          const { error } = await db
-            .from("project_resources")
-            .update(payload)
-            .eq("id", existing.id);
-          if (error) throw error;
-        } else {
-          payload["author_id"] = context.userId;
-          payload["author_email"] = (context.claims as { email?: string } | undefined)?.email ?? null;
-          payload["author_label"] =
-            (context.claims as { email?: string } | undefined)?.email ?? (admin ? "BLEXware team" : "Client");
-          payload["author_role"] = admin ? "staff" : "client";
-          const { error } = await db.from("project_resources").insert(payload);
-          if (error) throw error;
-        }
-      };
-
-      const writeLegacy = async (): Promise<void> => {
-        const payload = { ...basePayload };
-        if (uploaded.length > 0) {
-          const first = uploaded[0];
-          payload["storage_path"] = first.path;
-          payload["original_name"] = first.name;
-          payload["mime_type"] = first.mime;
-          payload["byte_size"] = first.size;
-        } else if (legacyRemoved) {
-          payload["storage_path"] = null;
-          payload["original_name"] = null;
-          payload["mime_type"] = null;
-          payload["byte_size"] = null;
-        }
-        if (existing) {
-          const { error } = await db
-            .from("project_resources")
-            .update(payload)
-            .eq("id", existing.id);
-          if (error) throw error;
-        } else {
-          payload["author_id"] = context.userId;
-          payload["author_email"] = (context.claims as { email?: string } | undefined)?.email ?? null;
-          payload["author_label"] =
-            (context.claims as { email?: string } | undefined)?.email ?? (admin ? "BLEXware team" : "Client");
-          payload["author_role"] = admin ? "staff" : "client";
-          const { error } = await db.from("project_resources").insert(payload);
-          if (error) throw error;
-        }
-      };
-
       try {
-        await writeWithAttachments();
+        await write({ ...basePayload, attachments: nextAttachments });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!missingAttachmentsColumn(message)) {
@@ -283,19 +276,34 @@ export const saveResource = createServerFn({ method: "POST" })
           throw new Error("We couldn't save that resource. Please try again.");
         }
         attachmentsMode = false;
-        await writeLegacy();
+        const legacyPayload: Record<string, unknown> = { ...basePayload };
+        if (uploaded.length > 0) {
+          legacyPayload["storage_path"] = uploaded[0].path;
+          legacyPayload["original_name"] = uploaded[0].name;
+          legacyPayload["mime_type"] = uploaded[0].mime;
+          legacyPayload["byte_size"] = uploaded[0].size;
+        } else if (legacyRemoved) {
+          legacyPayload["storage_path"] = null;
+          legacyPayload["original_name"] = null;
+          legacyPayload["mime_type"] = null;
+          legacyPayload["byte_size"] = null;
+        }
+        try {
+          await write(legacyPayload);
+        } catch (legacyError) {
+          console.error(
+            "[saveResource:writeLegacy]",
+            legacyError instanceof Error ? legacyError.message : String(legacyError),
+          );
+          throw new Error("We couldn't save that resource. Please try again.");
+        }
       }
 
-      // Drop removed (and legacy-replaced) attachments from storage.
-      if (stalePaths.length > 0) {
-        await db.storage.from(RESOURCE_BUCKET).remove(stalePaths);
-        // Legacy replace: the previous single file is superseded by the new one.
-        if (attachmentsMode && legacyRemoved && !stalePaths.includes(legacyPath as string)) {
-          /* already covered above */
-        }
-      } else if (!attachmentsMode && legacyPath && uploaded.length > 0) {
-        await db.storage.from(RESOURCE_BUCKET).remove([legacyPath]);
-      }
+      // Drop removed attachments from storage. Legacy replace: the previous
+      // single file is superseded by the new upload.
+      const cleanup = [...stalePaths];
+      if (!attachmentsMode && legacyPath && uploaded.length > 0) cleanup.push(legacyPath);
+      if (cleanup.length > 0) await db.storage.from(RESOURCE_BUCKET).remove(cleanup);
 
       await writeAudit({
         actorId: context.userId,
@@ -306,7 +314,13 @@ export const saveResource = createServerFn({ method: "POST" })
         metadata: {
           resourceId: id || null,
           title,
-          attachmentCount: attachmentsMode ? nextAttachments.length : uploaded.length > 0 ? 1 : existing ? 1 : 0,
+          attachmentCount: attachmentsMode
+            ? nextAttachments.length
+            : uploaded.length > 0
+              ? 1
+              : existing?.storage_path
+                ? 1
+                : 0,
         },
       });
 
@@ -327,73 +341,47 @@ export const deleteResource = createServerFn({ method: "POST" })
     guarded("deleteResource", "deleting the resource", async ({ data, context }) => {
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
       const db = adminDb();
-      const { data: row, error } = await db
-        .from("project_resources")
-        .select(selectColumns(true))
-        .eq("id", data.id)
-        .maybeSingle();
-      if (error && missingAttachmentsColumn(error.message)) {
-        const retry = await db
+
+      const fetchRow = async (withAttachments: boolean) =>
+        db
           .from("project_resources")
-          .select(selectColumns(false))
+          .select(selectColumns(withAttachments))
           .eq("id", data.id)
           .maybeSingle();
-        if (retry.error) throw new Error(missingTable(retry.error.message) ? notSetUp : retry.error.message);
-        await removeResourceRow(db, retry.data as Record<string, unknown> | null, context, writeAudit);
-        return { ok: true };
+
+      let withAttachments = true;
+      let result = await fetchRow(true);
+      if (result.error && missingAttachmentsColumn(result.error.message)) {
+        withAttachments = false;
+        result = await fetchRow(false);
       }
-      if (error) throw new Error(missingTable(error.message) ? notSetUp : error.message);
-      await removeResourceRow(db, row as Record<string, unknown> | null, context, writeAudit);
+      if (result.error) throw new Error(missingTable(result.error.message) ? notSetUp : result.error.message);
+      const row = result.data as Record<string, unknown> | null;
+      if (!row) return { ok: true };
+      const resource = toResource(row, withAttachments);
+
+      await assertProjectAccess(context.supabase, resource.quote_id);
+      const admin = await isAdminViewer(context.supabase, context.userId);
+      if (!admin && resource.author_id !== context.userId)
+        throw new Error("You can only delete resources you posted.");
+
+      const paths = resource.attachments.map((attachment) => attachment.path);
+      if (paths.length > 0) await db.storage.from(RESOURCE_BUCKET).remove(paths);
+
+      const removal = await db.from("project_resources").delete().eq("id", resource.id);
+      if (removal.error) throw new Error(removal.error.message);
+
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: (context.claims as { email?: string } | undefined)?.email ?? null,
+        action: "resource.deleted",
+        entity: "quote",
+        entityId: resource.quote_id,
+        metadata: { resourceId: resource.id, title: resource.title },
+      });
       return { ok: true };
     }),
   );
-
-type WriteAudit = (input: {
-  actorId?: string | null;
-  actorLabel?: string | null;
-  action: string;
-  entity: string;
-  entityId?: string | null;
-  metadata?: Record<string, unknown>;
-}) => Promise<unknown>;
-
-async function removeResourceRow(
-  db: SupabaseClient,
-  row: Record<string, unknown> | null,
-  context: { userId: string; claims?: unknown },
-  writeAudit: WriteAudit,
-): Promise<void> {
-  if (!row) return;
-  const resource = toResource(row, normalizeAttachments(row["attachments"]).length > 0);
-  const paths = [
-    ...resource.attachments.map((attachment) => attachment.path),
-    ...(resource.storage_path && resource.attachments.length === 0 ? [resource.storage_path] : []),
-  ];
-
-  await assertProjectAccess(viewerGuard(), resource.quote_id).catch(() => {
-    throw new Error("We couldn't confirm your access to that project.");
-  });
-
-  const admin = await isAdminViewer(viewerGuard(), context.userId);
-  if (!admin && resource.author_id !== context.userId)
-    throw new Error("You can only delete resources you posted.");
-
-  if (paths.length > 0) await db.storage.from(RESOURCE_BUCKET).remove(paths);
-  const removal = await db.from("project_resources").delete().eq("id", resource.id);
-  if (removal.error) throw new Error(removal.error.message);
-
-  await writeAudit({
-    actorId: context.userId,
-    actorLabel: (context.claims as { email?: string } | undefined)?.email ?? null,
-    action: "resource.deleted",
-    entity: "quote",
-    entityId: resource.quote_id,
-    metadata: { resourceId: resource.id, title: resource.title },
-  });
-}
-
-// Placeholder replaced below — see note.
-declare function viewerGuard(): SupabaseClient;
 
 /** Archive hides a resource from everyone; admins can restore it. */
 export const setResourceArchived = createServerFn({ method: "POST" })
@@ -454,7 +442,8 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
         withAttachments = false;
         result = await fetchRow(false);
       }
-      if (result.error) throw new Error(missingTable(result.error.message) ? notSetUp : result.error.message);
+      if (result.error)
+        throw new Error(missingTable(result.error.message) ? notSetUp : result.error.message);
       const row = result.data as Record<string, unknown> | null;
       if (!row) throw new Error("That resource no longer exists.");
 
