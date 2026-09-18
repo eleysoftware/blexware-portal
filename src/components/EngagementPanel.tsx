@@ -385,6 +385,9 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
                         {invoice.due_date
                           ? ` · due ${new Date(invoice.due_date).toLocaleDateString()}`
                           : ""}
+                        {scheduledSendLabel(invoice.status, invoice.scheduled_send_at, "arrives")
+                          ? ` · ${scheduledSendLabel(invoice.status, invoice.scheduled_send_at, "arrives")}`
+                          : ""}
                       </p>
                       {payment ? (
                         <p className="text-xs text-slate">
