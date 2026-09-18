@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { guarded } from "@/lib/errors";
+import { createResourceDeliveryToken, resourceDeliveryPath } from "@/lib/resource-delivery";
 import {
   MAX_RESOURCE_DESCRIPTION,
   mergeAttachments,
@@ -478,12 +479,19 @@ export const resourceDownloadUrl = createServerFn({ method: "POST" })
           size: (row["byte_size"] as number | null) ?? 0,
         } as ResourceAttachment);
 
-      const signed = await db.storage
-        .from(RESOURCE_BUCKET)
-        .createSignedUrl(target, viewing ? 600 : 120);
-      if (signed.error || !signed.data) throw new Error("We couldn't prepare that file.");
+      const secret = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+      if (!secret) throw new Error("File delivery is unavailable right now.");
+      const token = await createResourceDeliveryToken(
+        {
+          resourceId: data.id,
+          path: target,
+          mode: viewing ? "view" : "download",
+          expiresAt: Date.now() + (viewing ? 10 * 60_000 : 2 * 60_000),
+        },
+        secret,
+      );
       return {
-        url: signed.data.signedUrl,
+        url: resourceDeliveryPath(token),
         name: meta.name,
         mime: meta.mime,
         size: meta.size,

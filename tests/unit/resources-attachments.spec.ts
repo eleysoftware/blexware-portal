@@ -8,6 +8,12 @@ import {
   removeAttachment,
   validateResourceFile,
 } from "../../src/lib/resource-rules";
+import {
+  createResourceDeliveryToken,
+  resourceDeliveryPath,
+  safeAttachmentName,
+  verifyResourceDeliveryToken,
+} from "../../src/lib/resource-delivery";
 
 const file = (path: string, name = path) => ({ path, name, mime: "application/pdf", size: 10 });
 
@@ -79,4 +85,28 @@ test("picks the right preview kind", () => {
   expect(previewKindFor("", "a.pdf")).toBe("pdf");
   expect(previewKindFor("application/octet-stream", "a.jpg")).toBe("image");
   expect(previewKindFor("", "a.odt")).toBe("none");
+});
+
+test("signs and verifies exact short-lived file delivery claims", async () => {
+  const claims = {
+    resourceId: "resource-1",
+    path: "quote/file.pdf",
+    mode: "view" as const,
+    expiresAt: 10_000,
+  };
+  const token = await createResourceDeliveryToken(claims, "test-secret");
+  await expect(verifyResourceDeliveryToken(token, "test-secret", 9_999)).resolves.toEqual(claims);
+  await expect(verifyResourceDeliveryToken(token, "wrong-secret", 9_999)).resolves.toBeNull();
+  await expect(verifyResourceDeliveryToken(token, "test-secret", 10_000)).resolves.toBeNull();
+  expect(resourceDeliveryPath(token)).toMatch(/^\/api\/resources\/file\?token=/);
+});
+
+test("rejects changed delivery tokens and sanitizes attachment names", async () => {
+  const token = await createResourceDeliveryToken(
+    { resourceId: "resource-1", path: "file.pdf", mode: "download", expiresAt: 10_000 },
+    "test-secret",
+  );
+  const changed = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+  await expect(verifyResourceDeliveryToken(changed, "test-secret", 1)).resolves.toBeNull();
+  expect(safeAttachmentName('../bad\r\n"name.pdf')).toBe(".._bad___name.pdf");
 });
