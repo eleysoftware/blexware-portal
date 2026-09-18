@@ -551,6 +551,7 @@ export function AdminEngagementPanel({
     amount_paid_cents?: number;
     status: string;
     due_date: string | null;
+    scheduled_send_at?: string | null;
     pay_token?: string | null;
   }[];
   const projectPayment = engagement.data?.projectPayment;
