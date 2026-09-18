@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import {
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/api/resources/file")({
         if (!claims) return new Response("This file link has expired", { status: 401 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const db = supabaseAdmin as any;
+        const db = supabaseAdmin as unknown as SupabaseClient;
         const withAttachments = await db
           .from("project_resources")
           .select("id, storage_path, original_name, mime_type, byte_size, attachments")
