@@ -408,6 +408,81 @@ export function ResourcesPanel({ quoteId }: { quoteId: string }) {
         </DialogContent>
       </Dialog>
 
+      {/* Attachment preview */}
+      <Dialog open={Boolean(viewing)} onOpenChange={(value) => !value && setViewing(null)}>
+        <DialogContent className="max-w-4xl">
+          {viewing ? (
+            <>
+              <DialogHeader className="min-w-0">
+                <DialogTitle className="truncate">{viewing.name}</DialogTitle>
+                <DialogDescription>
+                  {viewing.size ? formatBytes(viewing.size) : "Attachment"}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="min-w-0">
+                {(() => {
+                  const kind = previewKindFor(viewing.mime, viewing.name);
+                  if (kind === "pdf")
+                    return (
+                      <iframe
+                        src={viewing.url}
+                        title={viewing.name}
+                        className="h-[70vh] w-full rounded-lg border border-border bg-surface"
+                      />
+                    );
+                  if (kind === "image")
+                    return (
+                      <img
+                        src={viewing.url}
+                        alt={viewing.name}
+                        className="mx-auto max-h-[70vh] w-auto rounded-lg border border-border object-contain"
+                      />
+                    );
+                  if (kind === "text") return <TextPreview url={viewing.url} />;
+                  if (kind === "video")
+                    return (
+                      <video src={viewing.url} controls className="max-h-[70vh] w-full rounded-lg" />
+                    );
+                  if (kind === "audio")
+                    return <audio src={viewing.url} controls className="w-full" />;
+                  return (
+                    <p className="text-sm text-slate">
+                      This file opens in its own app — browsers can't display it here. Open it in a
+                      new tab or download it to view it.
+                    </p>
+                  );
+                })()}
+              </div>
+
+              <DialogFooter className="flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(viewing.url, "_blank", "noopener")}
+                >
+                  Open in a new tab
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={downloadMutation.isPending}
+                  onClick={() =>
+                    downloadMutation.mutate({ id: viewing.resourceId, path: viewing.path })
+                  }
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Download
+                </Button>
+                <Button size="sm" onClick={() => setViewing(null)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       {/* Add / edit form */}
       <Dialog
         open={open}
