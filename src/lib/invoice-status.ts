@@ -43,3 +43,22 @@ export function canSetInvoiceStatus(from: string, to: string): boolean {
 export function invoiceStatusLabel(status: string): string {
   return invoiceStatusLabels[status] ?? status;
 }
+
+/**
+ * "sends Mar 4, 2026" for an invoice that is still waiting to go out.
+ * Returns "" for any other status, a missing date, or an unreadable one.
+ */
+export function scheduledSendLabel(
+  status: string,
+  scheduledSendAt: string | null | undefined,
+  verb = "sends",
+): string {
+  if (status !== "scheduled" || !scheduledSendAt) return "";
+  const when = new Date(scheduledSendAt);
+  if (Number.isNaN(when.getTime())) return "";
+  return `${verb} ${when.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+}
