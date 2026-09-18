@@ -585,6 +585,15 @@ function AdminDashboard() {
                                                   ? `Issued ${invoice.issueDate}`
                                                   : "Not issued"}
                                                 {invoice.dueDate ? ` · due ${invoice.dueDate}` : ""}
+                                                {scheduledSendLabel(
+                                                  invoice.status,
+                                                  invoice.scheduledSendAt,
+                                                )
+                                                  ? ` · ${scheduledSendLabel(
+                                                      invoice.status,
+                                                      invoice.scheduledSendAt,
+                                                    )}`
+                                                  : ""}
                                               </span>
                                             </span>
                                             <span className="flex items-center gap-3 text-slate">
