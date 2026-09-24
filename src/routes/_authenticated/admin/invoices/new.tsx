@@ -615,7 +615,7 @@ function NewInvoicePage() {
               {mutation.isPending ? "Working…" : "Create and send now"}
             </Button>
             <Button variant="outline" disabled={!canSubmit} onClick={() => mutation.mutate(false)}>
-              Save as draft
+              Schedule invoice
             </Button>
             <Button variant="ghost" asChild>
               <Link to="/admin">Back to the queue</Link>
