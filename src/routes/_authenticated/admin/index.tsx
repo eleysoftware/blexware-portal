@@ -640,8 +640,14 @@ function AdminDashboard() {
                                               />
                                               {invoice.reminderCount ? (
                                                 <span className="text-xs text-slate">
-                                                  {invoice.reminderCount} reminder{invoice.reminderCount === 1 ? "" : "s"}
+                                                  {invoice.reminderCount} email reminder{invoice.reminderCount === 1 ? "" : "s"}
                                                   {invoice.lastReminderAt ? ` · last ${new Date(invoice.lastReminderAt).toLocaleDateString()}` : ""}
+                                                </span>
+                                              ) : null}
+                                              {invoice.smsReminderCount ? (
+                                                <span className="text-xs text-slate">
+                                                  {invoice.smsReminderCount} text reminder{invoice.smsReminderCount === 1 ? "" : "s"}
+                                                  {invoice.lastSmsReminderAt ? ` · last ${new Date(invoice.lastSmsReminderAt).toLocaleDateString()}` : ""}
                                                 </span>
                                               ) : null}
                                               {invoice.payToken ? (
