@@ -74,8 +74,10 @@ export const submitQuote = createServerFn({ method: "POST" })
           contact_email: input.email,
           company: input.company ?? null,
           phone: input.phone ?? null,
+          sms_opt_in: input.smsOptIn === true && !!input.phone,
+          sms_opt_in_at: input.smsOptIn === true && input.phone ? new Date().toISOString() : null,
           consent: input.consent,
-        })
+        } as never)
         .select("id, quote_number")
         .single();
 

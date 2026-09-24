@@ -40,6 +40,7 @@ const schema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(160),
   company: z.string().trim().max(120).optional(),
   phone: z.string().trim().max(40).optional(),
+  smsOptIn: z.boolean().optional(),
   consent: z.literal(true, { message: "Please accept the privacy notice" }),
 });
 
@@ -55,6 +56,7 @@ type QuoteForm = {
   email: string;
   company: string;
   phone: string;
+  smsOptIn: boolean;
   consent: boolean;
 };
 
@@ -70,6 +72,7 @@ const initial: QuoteForm = {
   email: "",
   company: "",
   phone: "",
+  smsOptIn: false,
   consent: false,
 };
 
@@ -389,6 +392,18 @@ function FreeQuotePage() {
                       value={values.phone}
                       onChange={(e) => set("phone", e.target.value)}
                     />
+                  </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <label className="flex cursor-pointer items-start gap-3 text-sm text-slate">
+                      <Checkbox
+                        checked={values.smsOptIn}
+                        onCheckedChange={(state) => set("smsOptIn", state === true)}
+                        className="mt-0.5"
+                        disabled={!values.phone.trim()}
+                      />
+                      Text me invoice reminders (optional). Add your mobile number above first.
+                      You can ask us to stop at any time.
+                    </label>
                   </div>
                   <div className="sm:col-span-2 space-y-2">
                     <label

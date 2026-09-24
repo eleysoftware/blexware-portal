@@ -12,6 +12,7 @@ export const quoteSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(160),
   company: z.string().trim().max(120).optional(),
   phone: z.string().trim().max(40).optional(),
+  smsOptIn: z.boolean().optional(),
   consent: z.literal(true, { message: "Please accept the privacy notice" }),
 });
 
@@ -70,6 +71,7 @@ export type QuoteRecord = {
   contact_email: string;
   company: string | null;
   phone: string | null;
+  sms_opt_in?: boolean;
   internal_notes: string | null;
   deleted_at: string | null;
   created_at: string;
