@@ -1049,6 +1049,59 @@ export const sendInvoiceNow = createServerFn({ method: "POST" })
     }),
   );
 
+/** Lets the team correct due dates and schedule unsent invoices. */
+export const updateInvoiceDates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: { invoiceId: string; dueDate: string | null; scheduledSendDate: string | null }) => {
+      if (!data.invoiceId) throw new Error("Choose an invoice");
+      if (data.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(data.dueDate)) throw new Error("Choose a valid due date");
+      if (data.scheduledSendDate && !/^\d{4}-\d{2}-\d{2}$/.test(data.scheduledSendDate)) {
+        throw new Error("Choose a valid send date");
+      }
+      return data;
+    },
+  )
+  .handler(
+    guarded("updateInvoiceDates", "updating invoice dates", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+      const { data: invoice } = await db
+        .from("invoices")
+        .select("id, invoice_number, status, due_date, scheduled_send_at")
+        .eq("id", data.invoiceId)
+        .maybeSingle();
+      if (!invoice) throw new Error("Invoice not found");
+
+      const canEditSend = invoice.status === "draft" || invoice.status === "scheduled";
+      const patch: Record<string, unknown> = { due_date: data.dueDate };
+      if (canEditSend) {
+        patch["scheduled_send_at"] = data.scheduledSendDate
+          ? `${data.scheduledSendDate}T14:00:00.000Z`
+          : null;
+        patch["status"] = data.scheduledSendDate ? "scheduled" : "draft";
+      }
+      const { error } = await db.from("invoices").update(patch).eq("id", invoice.id);
+      if (error) throw new Error(error.message);
+      await writeAudit({
+        actorId: context.userId,
+        actorLabel: String(context.claims["email"] ?? context.userId),
+        action: "invoice.dates_changed",
+        entity: "invoice",
+        entityId: String(invoice.id),
+        metadata: {
+          invoice_number: invoice.invoice_number,
+          previous_due_date: invoice.due_date,
+          due_date: data.dueDate,
+          previous_scheduled_send_at: invoice.scheduled_send_at,
+          scheduled_send_date: canEditSend ? data.scheduledSendDate : undefined,
+        },
+      });
+      return { ok: true };
+    }),
+  );
+
 /**
  * Sets an invoice's status by hand (no email sent). Used when delivery fails
  * and the team shares the payment link themselves.

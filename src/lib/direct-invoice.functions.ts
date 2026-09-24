@@ -16,10 +16,16 @@ export type DirectInvoiceInput = {
   description: string;
   issueDate?: string;
   dueDate?: string;
+  scheduledSendDate?: string;
   lineItems: EstimateLineItem[];
   discountCents?: number;
   paymentKind: PaymentPlanKind;
-  customPayments?: { label: string; amountCents: number }[];
+  customPayments?: {
+    label: string;
+    amountCents: number;
+    scheduledSendDate?: string;
+    dueDate?: string;
+  }[];
   sendNow: boolean;
 };
 
@@ -281,15 +287,19 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
       const rows = entries.map((entry) => {
         // Custom split rows carry no send date of their own, so space them a
         // month apart — otherwise they would sit forever without being emailed.
-        const sendAt =
-          entry.sequence === 1
+        const custom = data.customPayments?.[entry.sequence - 1];
+        const selectedSendDate =
+          entry.sequence === 1 ? data.scheduledSendDate : custom?.scheduledSendDate;
+        const sendAt = selectedSendDate
+          ? `${selectedSendDate}T14:00:00.000Z`
+          : entry.sequence === 1
             ? null
             : (entry.scheduledSendAt ??
               new Date(anchor.getTime() + (entry.sequence - 1) * MONTH_MS).toISOString());
         const dueDate =
           entry.sequence === 1
             ? (data.dueDate ?? entry.dueDate)
-            : (entry.dueDate ??
+            : (custom?.dueDate ?? entry.dueDate ??
               (sendAt ? new Date(new Date(sendAt).getTime() + 7 * 86_400_000).toISOString().slice(0, 10) : null));
         return {
           quote_id: quoteId,
@@ -304,7 +314,7 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
           issue_date: entry.sequence === 1 ? (data.issueDate ?? null) : null,
           // Later payments must be "scheduled" with a send date or the nightly
           // worker never mails them; only the first is held for the manual send.
-          status: entry.sequence === 1 ? "draft" : "scheduled",
+          status: sendAt ? "scheduled" : "draft",
           line_items: entry.sequence === 1 ? data.lineItems : [],
           subtotal_cents: entry.sequence === 1 ? subtotalCents : entry.amountCents,
           discount_cents: entry.sequence === 1 ? discountCents : 0,

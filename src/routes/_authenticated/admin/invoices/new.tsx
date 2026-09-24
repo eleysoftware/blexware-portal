@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/admin/invoices/new")({
 
 type ItemRow = { label: string; qty: string; unit: string; note: string };
 type SplitMode = "full" | "even" | "custom";
-type CustomRow = { label: string; amount: string };
+type CustomRow = { label: string; amount: string; sendDate: string; dueDate: string };
 
 const today = () => new Date().toISOString().slice(0, 10);
 const plusDays = (days: number) =>
@@ -72,14 +72,15 @@ function NewInvoicePage() {
   const [description, setDescription] = useState("");
   const [issueDate, setIssueDate] = useState(today());
   const [dueDate, setDueDate] = useState(plusDays(7));
+  const [scheduledSendDate, setScheduledSendDate] = useState(today());
   const [rows, setRows] = useState<ItemRow[]>([{ label: "", qty: "1", unit: "", note: "" }]);
 
   const [discount, setDiscount] = useState("");
   const [splitMode, setSplitMode] = useState<SplitMode>("full");
   const [splitCount, setSplitCount] = useState(2);
   const [customRows, setCustomRows] = useState<CustomRow[]>([
-    { label: "Deposit", amount: "" },
-    { label: "Balance", amount: "" },
+    { label: "Deposit", amount: "", sendDate: today(), dueDate: plusDays(7) },
+    { label: "Balance", amount: "", sendDate: plusDays(30), dueDate: plusDays(37) },
   ]);
 
   const lineItems = rows
@@ -103,15 +104,21 @@ function NewInvoicePage() {
   const totalCents = subtotalCents - discountCents;
 
   const paymentRows = useMemo(() => {
-    if (splitMode === "full") return [{ label: "Due on receipt", amountCents: totalCents }];
-    if (splitMode === "even") return evenSplitRows(totalCents, splitCount);
+    if (splitMode === "full") return [{ label: "Due on receipt", amountCents: totalCents, scheduledSendDate, dueDate }];
+    if (splitMode === "even") return evenSplitRows(totalCents, splitCount).map((row, index) => ({
+      ...row,
+      scheduledSendDate: plusDays(index * 30),
+      dueDate: plusDays(index * 30 + 7),
+    }));
     return customRows
       .filter((row) => row.amount.trim())
       .map((row, index) => ({
         label: row.label.trim() || `Payment ${index + 1}`,
         amountCents: cents(row.amount),
+        scheduledSendDate: row.sendDate,
+        dueDate: row.dueDate,
       }));
-  }, [splitMode, splitCount, customRows, totalCents]);
+  }, [splitMode, splitCount, customRows, totalCents, scheduledSendDate, dueDate]);
 
   const scheduledTotal = paymentRows.reduce((sum, row) => sum + row.amountCents, 0);
   const balanced = scheduledTotal === totalCents;
@@ -141,6 +148,7 @@ function NewInvoicePage() {
           description,
           issueDate,
           dueDate,
+          scheduledSendDate: sendNow ? undefined : scheduledSendDate,
           lineItems,
           discountCents,
           paymentKind: splitMode === "full" ? "full" : "custom",
@@ -209,7 +217,7 @@ function NewInvoicePage() {
                 </select>
               </label>
             ) : null}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <label className="text-sm font-medium">
                 Contact name
                 <Input
@@ -352,7 +360,16 @@ function NewInvoicePage() {
                 />
               </label>
               <label className="text-sm font-medium">
-                Due date (first payment)
+                Send date
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={scheduledSendDate}
+                  onChange={(e) => setScheduledSendDate(e.target.value)}
+                />
+              </label>
+              <label className="text-sm font-medium">
+                Due date
                 <Input
                   className="mt-1"
                   type="date"
@@ -497,7 +514,7 @@ function NewInvoicePage() {
             {splitMode === "custom" ? (
               <div className="mt-4 space-y-2">
                 {customRows.map((row, index) => (
-                  <div key={index} className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]">
+                  <div key={index} className="grid gap-2 sm:grid-cols-[1.5fr_1fr_1fr_1fr_auto]">
                     <Input
                       aria-label="Payment label"
                       value={row.label}
@@ -508,6 +525,18 @@ function NewInvoicePage() {
                           ),
                         )
                       }
+                    />
+                    <Input
+                      aria-label={`Payment ${index + 1} send date`}
+                      type="date"
+                      value={row.sendDate}
+                      onChange={(e) => setCustomRows(customRows.map((r, i) => i === index ? { ...r, sendDate: e.target.value } : r))}
+                    />
+                    <Input
+                      aria-label={`Payment ${index + 1} due date`}
+                      type="date"
+                      value={row.dueDate}
+                      onChange={(e) => setCustomRows(customRows.map((r, i) => i === index ? { ...r, dueDate: e.target.value } : r))}
                     />
                     <Input
                       aria-label="Payment amount in dollars"
@@ -538,7 +567,7 @@ function NewInvoicePage() {
                   onClick={() =>
                     setCustomRows([
                       ...customRows,
-                      { label: `Payment ${customRows.length + 1}`, amount: "" },
+                      { label: `Payment ${customRows.length + 1}`, amount: "", sendDate: plusDays(customRows.length * 30), dueDate: plusDays(customRows.length * 30 + 7) },
                     ])
                   }
                 >
@@ -549,10 +578,10 @@ function NewInvoicePage() {
 
             <ul className="mt-4 space-y-1 text-sm text-slate">
               {paymentRows.map((row, index) => (
-                <li key={index} className="flex justify-between">
+                <li key={index} className="flex flex-wrap justify-between gap-2">
                   <span>
                     {index + 1}. {row.label}
-                    {index === 0 ? " (sent first)" : ""}
+                    {` · sends ${row.scheduledSendDate || "when you choose"} · due ${row.dueDate || "not set"}`}
                   </span>
                   <span>{formatMoney(row.amountCents)}</span>
                 </li>
@@ -565,8 +594,8 @@ function NewInvoicePage() {
               </p>
             ) : null}
             <p className="mt-3 text-xs text-slate">
-              The first payment can go out now; the rest are saved as drafts you send from the
-              project's invoices tab.
+              “Create and send now” sends the first invoice immediately. Otherwise, every invoice
+              follows the send date shown above.
             </p>
           </div>
 
