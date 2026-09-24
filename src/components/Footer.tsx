@@ -64,6 +64,11 @@ export function Footer() {
               Industries
             </Link>
           </li>
+          <li>
+            <Link to="/auth" className="hover:text-headline">
+              Client portal
+            </Link>
+          </li>
         </FooterColumn>
 
         <FooterColumn title="Legal">

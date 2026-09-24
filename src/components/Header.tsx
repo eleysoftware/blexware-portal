@@ -1,14 +1,33 @@
 import { Link } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { navLinks } from "@/content/site";
+import { supabase } from "@/integrations/supabase/client";
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [portalLink, setPortalLink] = useState<"/auth" | "/portal" | "/admin">("/auth");
+  const signedIn = portalLink !== "/auth";
+
+  useEffect(() => {
+    const resolvePortal = async () => {
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user.id;
+      if (!userId) return setPortalLink("/auth");
+      const { data: isAdmin } = await supabase.rpc("has_role", {
+        _user_id: userId,
+        _role: "admin",
+      });
+      setPortalLink(isAdmin ? "/admin" : "/portal");
+    };
+    void resolvePortal();
+    const { data } = supabase.auth.onAuthStateChange(() => void resolvePortal());
+    return () => data.subscription.unsubscribe();
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-surface/85 backdrop-blur-md">
@@ -29,6 +48,9 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="hidden sm:inline-flex">
+            <Link to={portalLink}>{signedIn ? "My portal" : "Client login"}</Link>
+          </Button>
           <Button asChild className="hidden shadow-cta sm:inline-flex">
             <Link to="/free-quote">Get a Free Quote</Link>
           </Button>
@@ -52,7 +74,12 @@ export function Header() {
                     {link.label}
                   </Link>
                 ))}
-                <Button asChild className="mt-4 w-full">
+                <Button asChild variant="outline" className="mt-4 w-full">
+                  <Link to={portalLink} onClick={() => setOpen(false)}>
+                    {signedIn ? "My portal" : "Client login"}
+                  </Link>
+                </Button>
+                <Button asChild className="mt-2 w-full">
                   <Link to="/free-quote" onClick={() => setOpen(false)}>
                     Get a Free Quote
                   </Link>

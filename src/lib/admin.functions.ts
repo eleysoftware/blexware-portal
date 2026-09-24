@@ -175,6 +175,39 @@ export const listQuotes = createServerFn({ method: "POST" })
 
       // Billing rollup per quote so the client list can show what is owed.
       const quotes = (rows ?? []) as Partial<QuoteRecord>[];
+      const clientAccountStatus: Record<
+        string,
+        { hasAccount: boolean; lastSignInAt: string | null }
+      > = {};
+      const requestedEmails = new Set(
+        quotes.map((quote) => String(quote.contact_email ?? "").toLowerCase()).filter(Boolean),
+      );
+      if (requestedEmails.size) {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        let page = 1;
+        while (requestedEmails.size && page <= 20) {
+          const { data: userPage, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
+            page,
+            perPage: 1000,
+          });
+          if (usersError) throw new Error(usersError.message);
+          const users = userPage?.users ?? [];
+          for (const user of users) {
+            const email = user.email?.toLowerCase();
+            if (!email || !requestedEmails.has(email)) continue;
+            clientAccountStatus[email] = {
+              hasAccount: true,
+              lastSignInAt: user.last_sign_in_at ?? null,
+            };
+            requestedEmails.delete(email);
+          }
+          if (users.length < 1000) break;
+          page += 1;
+        }
+      }
+      for (const email of requestedEmails) {
+        clientAccountStatus[email] = { hasAccount: false, lastSignInAt: null };
+      }
       const ids = quotes.map((quote) => quote.id).filter(Boolean) as string[];
       const billing: Record<
         string,
@@ -259,7 +292,7 @@ export const listQuotes = createServerFn({ method: "POST" })
         }
       }
 
-      return { quotes, counts, billing, invoicesByQuote, hasProposal, testAware, testCount };
+      return { quotes, counts, billing, invoicesByQuote, hasProposal, clientAccountStatus, testAware, testCount };
     }),
   );
 
