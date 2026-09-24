@@ -30,6 +30,7 @@ export type EditClientDialogProps = {
   contactName: string;
   company?: string | null;
   phone?: string | null;
+  smsOptIn?: boolean;
   projectCount: number;
   /** Emails of every other client in the queue, used to warn about a merge. */
   otherEmails?: string[];
@@ -41,6 +42,7 @@ export function EditClientDialog({
   contactName,
   company,
   phone,
+  smsOptIn = false,
   projectCount,
   otherEmails = [],
   children,
@@ -50,6 +52,7 @@ export function EditClientDialog({
   const [companyValue, setCompanyValue] = useState(company ?? "");
   const [email, setEmail] = useState(currentEmail);
   const [phoneValue, setPhoneValue] = useState(phone ?? "");
+  const [smsOptInValue, setSmsOptInValue] = useState(smsOptIn);
   const [error, setError] = useState<string | null>(null);
   const [mergeAcknowledged, setMergeAcknowledged] = useState(false);
 
@@ -62,9 +65,10 @@ export function EditClientDialog({
     setCompanyValue(company ?? "");
     setEmail(currentEmail);
     setPhoneValue(phone ?? "");
+    setSmsOptInValue(smsOptIn);
     setError(null);
     setMergeAcknowledged(false);
-  }, [open, contactName, company, currentEmail, phone]);
+  }, [open, contactName, company, currentEmail, phone, smsOptIn]);
 
   const normalised = email.trim().toLowerCase();
   const emailChanged = normalised !== currentEmail.trim().toLowerCase();
