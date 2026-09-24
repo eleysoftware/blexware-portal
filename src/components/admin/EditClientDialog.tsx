@@ -82,6 +82,7 @@ export function EditClientDialog({
       company: string | null;
       contactEmail: string;
       phone: string | null;
+      smsOptIn: boolean;
     }) => save({ data: input }),
     onSuccess: (result) => {
       const count = result?.updated ?? projectCount;
@@ -113,6 +114,10 @@ export function EditClientDialog({
       setError(null);
       return;
     }
+    if (smsOptInValue && !parsed.data.phone) {
+      setError("Add a mobile number before turning on text reminders.");
+      return;
+    }
     setError(null);
     mutation.mutate({
       currentEmail,
@@ -120,6 +125,7 @@ export function EditClientDialog({
       company: parsed.data.company ? parsed.data.company : null,
       contactEmail: parsed.data.contactEmail,
       phone: parsed.data.phone ? parsed.data.phone : null,
+      smsOptIn: smsOptInValue,
     });
   }
 
@@ -169,14 +175,30 @@ export function EditClientDialog({
             ) : null}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="client-phone">Phone (optional)</Label>
+            <Label htmlFor="client-phone">Mobile number (optional)</Label>
             <Input
               id="client-phone"
               value={phoneValue}
               maxLength={40}
+              placeholder="+1 555 123 4567"
               onChange={(event) => setPhoneValue(event.target.value)}
             />
           </div>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={smsOptInValue}
+              onChange={(event) => setSmsOptInValue(event.target.checked)}
+            />
+            <span>
+              Text invoice reminders to this client
+              <span className="block text-xs text-slate">
+                Only turn this on when the client has agreed to receive texts. They can ask to
+                stop at any time.
+              </span>
+            </span>
+          </label>
 
           <p className="text-xs text-slate">
             Documents already created keep the details they were written with. New documents use
