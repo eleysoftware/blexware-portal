@@ -665,6 +665,7 @@ export const updateClientDetails = createServerFn({ method: "POST" })
       company: string | null;
       contactEmail: string;
       phone: string | null;
+      smsOptIn?: boolean;
     }) => {
       const currentEmail = data.currentEmail.trim().toLowerCase();
       const contactEmail = data.contactEmail.trim().toLowerCase();
@@ -678,7 +679,9 @@ export const updateClientDetails = createServerFn({ method: "POST" })
       }
       const company = data.company?.trim() ? data.company.trim().slice(0, 120) : null;
       const phone = data.phone?.trim() ? data.phone.trim().slice(0, 40) : null;
-      return { currentEmail, contactEmail, contactName, company, phone };
+      const smsOptIn = data.smsOptIn === true;
+      if (smsOptIn && !phone) throw new Error("Add a mobile number before turning on text reminders");
+      return { currentEmail, contactEmail, contactName, company, phone, smsOptIn };
     },
   )
   .handler(
@@ -703,7 +706,9 @@ export const updateClientDetails = createServerFn({ method: "POST" })
           company: data.company,
           contact_email: data.contactEmail,
           phone: data.phone,
-        })
+          sms_opt_in: data.smsOptIn,
+          sms_opt_in_at: data.smsOptIn ? new Date().toISOString() : null,
+        } as never)
         .in("id", ids);
       if (error) throw new Error(error.message);
 
