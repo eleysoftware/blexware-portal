@@ -228,6 +228,8 @@ export const listQuotes = createServerFn({ method: "POST" })
           scheduledSendAt: string | null;
           payToken: string | null;
           deliveryError: string | null;
+          lastReminderAt: string | null;
+          reminderCount: number;
         }[]
       > = {};
       const hasProposal: Record<string, boolean> = {};
@@ -244,12 +246,23 @@ export const listQuotes = createServerFn({ method: "POST" })
         // Delivery columns are additive (migration 012); read them separately so
         // a database that has not run it yet still loads the queue.
         const deliveryErrors: Record<string, string | null> = {};
+        const reminderState: Record<string, { lastReminderAt: string | null; reminderCount: number }> = {};
         const { data: deliveryRows } = await adminDb()
           .from("invoices")
           .select("id, delivery_error")
           .in("quote_id", ids);
         for (const row of (deliveryRows ?? []) as Record<string, unknown>[]) {
           deliveryErrors[String(row.id)] = (row.delivery_error as string | null) ?? null;
+        }
+        const { data: reminderRows } = await adminDb()
+          .from("invoices")
+          .select("id, last_reminder_at, reminder_count")
+          .in("quote_id", ids);
+        for (const row of (reminderRows ?? []) as Record<string, unknown>[]) {
+          reminderState[String(row.id)] = {
+            lastReminderAt: (row.last_reminder_at as string | null) ?? null,
+            reminderCount: Number(row.reminder_count ?? 0),
+          };
         }
 
         for (const row of (invoices ?? []) as Record<string, unknown>[]) {
@@ -270,6 +283,8 @@ export const listQuotes = createServerFn({ method: "POST" })
             scheduledSendAt: (row.scheduled_send_at as string | null) ?? null,
             payToken: (row.pay_token as string | null) ?? null,
             deliveryError: deliveryErrors[String(row.id)] ?? null,
+            lastReminderAt: reminderState[String(row.id)]?.lastReminderAt ?? null,
+            reminderCount: reminderState[String(row.id)]?.reminderCount ?? 0,
           });
 
           if (["void", "cancelled", "draft"].includes(status)) continue;

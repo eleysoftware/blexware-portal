@@ -12,10 +12,24 @@ import { Section } from "@/components/Section";
 import { EditClientDialog } from "@/components/admin/EditClientDialog";
 import { PaymentEnvironmentCard } from "@/components/admin/PaymentEnvironmentCard";
 import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
+import { InvoiceDateEditor } from "@/components/admin/InvoiceDateEditor";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/documents/types";
 import { describeEmailFailure, isOutOfCredits } from "@/lib/email-failure";
@@ -196,6 +210,7 @@ function AdminDashboard() {
   const billing = quotes.data?.billing ?? {};
   const invoicesByQuote = quotes.data?.invoicesByQuote ?? {};
   const hasProposal = quotes.data?.hasProposal ?? {};
+  const clientAccountStatus = quotes.data?.clientAccountStatus ?? {};
   // One warning beats discovering the same provider problem invoice by invoice.
   const creditsBlocked = Object.values(invoicesByQuote).some((rows) =>
     rows.some((invoice) => isOutOfCredits(invoice.deliveryError)),
@@ -266,41 +281,20 @@ function AdminDashboard() {
                 }`
               : "Scheduled invoice mail: no run recorded yet"}
           </span>
-          <Button variant="outline" size="sm" onClick={signOut}>
-            Sign out
-          </Button>
           <Button variant="secondary" size="sm" asChild>
             <Link to="/admin/import">Import existing project</Link>
           </Button>
           <Button size="sm" asChild className="shadow-cta">
             <Link to="/admin/invoices/new">New invoice</Link>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFilter("archived")}
-            disabled={filter === "archived"}
-          >
-            View archived
-          </Button>
-          <Button
-            variant={showTest ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setShowTest((current) => !current)}
-          >
-            {showTest ? "Hide test data" : "Show test data"}
-            {quotes.data?.testCount ? ` (${quotes.data.testCount})` : ""}
-          </Button>
-          <CleanupTestClientsDialog>
-            <Button variant="ghost" size="sm">
-              Clean up test clients
-            </Button>
-          </CleanupTestClientsDialog>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={converting}
-            onClick={async () => {
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="outline" size="sm">More</Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setFilter("archived")}>View archived</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setShowTest((current) => !current)}>
+                {showTest ? "Hide test data" : "Show test data"}{quotes.data?.testCount ? ` (${quotes.data.testCount})` : ""}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={converting} onSelect={async () => {
               setConverting(true);
               try {
                 const result = await convertProposals({ data: {} });
@@ -315,10 +309,10 @@ function AdminDashboard() {
               } finally {
                 setConverting(false);
               }
-            }}
-          >
-            {converting ? "Converting…" : "Convert existing proposals"}
-          </Button>
+              }}>{converting ? "Converting…" : "Convert existing proposals"}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void signOut()}>Sign out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </PageHero>
 
@@ -338,26 +332,23 @@ function AdminDashboard() {
             </p>
           </div>
         ) : null}
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          <div className="border-l-2 border-primary pl-4"><p className="text-xs text-slate">Active projects</p><p className="text-2xl font-semibold">{Object.values(counts).reduce((sum, count) => sum + count, 0) - (counts.archived ?? 0)}</p></div>
+          <div className="border-l-2 border-primary pl-4"><p className="text-xs text-slate">Clients shown</p><p className="text-2xl font-semibold">{clients.length}</p></div>
+          <div className="border-l-2 border-primary pl-4"><p className="text-xs text-slate">Outstanding</p><p className="text-2xl font-semibold">{formatMoney(clients.reduce((sum, client) => sum + client.outstandingCents, 0))}</p></div>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          {["all", ...quoteStatuses, "archived"].map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilter(value)}
-              className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                filter === value
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-slate hover:border-primary/50"
-              }`}
-            >
-              {value === "all"
-                ? "All"
-                : value === "archived"
-                  ? "Archived"
-                  : quoteStatusLabels[value as keyof typeof quoteStatusLabels]}
-              {value !== "all" && counts[value] ? ` (${counts[value]})` : ""}
-            </button>
-          ))}
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+            <SelectContent>
+              {["all", ...quoteStatuses, "archived"].map((value) => (
+                <SelectItem key={value} value={value}>
+                  {value === "all" ? "All active" : value === "archived" ? "Archived" : quoteStatusLabels[value as keyof typeof quoteStatusLabels]}
+                  {value !== "all" && counts[value] ? ` (${counts[value]})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -396,12 +387,19 @@ function AdminDashboard() {
                     aria-expanded={open}
                     className="flex w-full flex-wrap items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-surface"
                   >
-                    <span>
+                    <span className="min-w-0">
                       <span className="block font-semibold text-foreground">
                         {client.company ?? client.name}
                       </span>
                       <span className="block text-xs text-slate">
                         {client.name} · {client.email}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate">
+                        {clientAccountStatus[client.email]?.hasAccount
+                          ? clientAccountStatus[client.email]?.lastSignInAt
+                            ? `Portal active · last signed in ${new Date(clientAccountStatus[client.email]?.lastSignInAt ?? "").toLocaleDateString()}`
+                            : "Portal account created · not signed in yet"
+                          : "Portal account not created"}
                       </span>
                     </span>
                     <span className="flex flex-wrap items-center gap-4 text-sm text-slate">
@@ -626,6 +624,19 @@ function AdminDashboard() {
                                                 invoiceNumber={invoice.invoiceNumber}
                                                 status={invoice.status}
                                               />
+                                              <InvoiceDateEditor
+                                                invoiceId={invoice.id}
+                                                invoiceNumber={invoice.invoiceNumber}
+                                                status={invoice.status}
+                                                dueDate={invoice.dueDate}
+                                                scheduledSendAt={invoice.scheduledSendAt}
+                                              />
+                                              {invoice.reminderCount ? (
+                                                <span className="text-xs text-slate">
+                                                  {invoice.reminderCount} reminder{invoice.reminderCount === 1 ? "" : "s"}
+                                                  {invoice.lastReminderAt ? ` · last ${new Date(invoice.lastReminderAt).toLocaleDateString()}` : ""}
+                                                </span>
+                                              ) : null}
                                               {invoice.payToken ? (
                                                 <>
                                                   <Button
