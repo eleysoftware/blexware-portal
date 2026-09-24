@@ -313,6 +313,9 @@ function AdminDashboard() {
               <DropdownMenuItem onSelect={() => void signOut()}>Sign out</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <CleanupTestClientsDialog>
+            <Button variant="ghost" size="sm">Clean up test clients</Button>
+          </CleanupTestClientsDialog>
         </div>
       </PageHero>
 

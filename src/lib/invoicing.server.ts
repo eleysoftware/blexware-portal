@@ -1001,7 +1001,7 @@ export async function runScheduledWork() {
           dueDate: invoice.due_date as string,
           url: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
         });
-        if (!result.ok) {
+        if (!result.sent) {
           remindersFailed += 1;
           continue;
         }
