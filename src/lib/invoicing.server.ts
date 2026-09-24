@@ -2,6 +2,7 @@
 // goes through PaymentService (Hyperswitch), never a processor SDK.
 import { adminDb, writeAudit } from "@/lib/blex.server";
 import { paymentPlanToInvoiceEntries, buildPaymentPlan } from "@/lib/documents/compose";
+import { formatMoney } from "@/lib/documents/types";
 import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
 import { isOutOfCredits } from "@/lib/email-failure";
 import { emailInvoice, emailInvoiceReminder, siteUrl } from "@/lib/engagement-email.server";
@@ -970,10 +971,11 @@ export async function runScheduledWork() {
   // makes retries idempotent even when the scheduler runs more than once.
   let remindersSent = 0;
   let remindersFailed = 0;
+  let smsRemindersSent = 0;
   const { data: reminderRows, error: reminderReadError } = await db
     .from("invoices")
     .select(
-      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count",
+      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count, sms_reminder_count, last_sms_reminder_at",
     )
     .in("status", ["sent", "viewed", "partially_paid", "overdue"])
     .lt("due_date", today)
@@ -988,7 +990,7 @@ export async function runScheduledWork() {
       if (!balance || !isBusinessDayDue(anchor, 3, new Date(now))) continue;
       const { data: quote } = await db
         .from("quotes")
-        .select("contact_name, contact_email")
+        .select("contact_name, contact_email, phone, sms_opt_in")
         .eq("id", invoice.quote_id)
         .maybeSingle();
       if (!quote?.contact_email) continue;
@@ -1020,6 +1022,37 @@ export async function runScheduledWork() {
           entityId: invoice.id as string,
           metadata: { channel: "email", reminder_number: Number(invoice.reminder_count ?? 0) + 1 },
         });
+
+        // Text reminder alongside the email, only for clients who opted in.
+        if (quote.sms_opt_in && quote.phone) {
+          const { sendSms } = await import("@/lib/sms.server");
+          const smsResult = await sendSms({
+            to: quote.phone as string,
+            message: `BLEXware: invoice ${invoice.invoice_number as string} has ${formatMoney(balance)} outstanding. Pay: ${siteUrl()}/invoice/${invoice.pay_token as string} Reply STOP to opt out.`,
+          });
+          if (smsResult.sent) {
+            smsRemindersSent += 1;
+            await db
+              .from("invoices")
+              .update({
+                last_sms_reminder_at: now,
+                sms_reminder_count: Number(invoice.sms_reminder_count ?? 0) + 1,
+              } as never)
+              .eq("id", invoice.id);
+            await writeAudit({
+              actorLabel: "system",
+              action: "invoice.reminder_sent",
+              entity: "invoice",
+              entityId: invoice.id as string,
+              metadata: {
+                channel: "sms",
+                reminder_number: Number(invoice.sms_reminder_count ?? 0) + 1,
+              },
+            });
+          } else {
+            console.error("[cron:invoice-reminder-sms]", invoice.id, smsResult.reason);
+          }
+        }
       } catch (error) {
         remindersFailed += 1;
         console.error("[cron:invoice-reminder]", error);
@@ -1052,6 +1085,7 @@ export async function runScheduledWork() {
     invoicesOverdue: overdue?.length ?? 0,
     remindersSent,
     remindersFailed,
+    smsRemindersSent,
     paymentsReconciled: pending?.length ?? 0,
     deliveryError: creditsExhausted,
   };

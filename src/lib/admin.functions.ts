@@ -127,8 +127,8 @@ export const listQuotes = createServerFn({ method: "POST" })
         .from("quotes")
         .select(
           testAware
-            ? "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at, is_test"
-            : "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, created_at, deleted_at",
+            ? "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, sms_opt_in, created_at, deleted_at, is_test"
+            : "id, quote_number, status, project_type, industry, budget, timeline, contact_name, contact_email, company, phone, sms_opt_in, created_at, deleted_at",
         )
         .order("created_at", { ascending: false })
         .limit(200);
@@ -230,6 +230,8 @@ export const listQuotes = createServerFn({ method: "POST" })
           deliveryError: string | null;
           lastReminderAt: string | null;
           reminderCount: number;
+          lastSmsReminderAt: string | null;
+          smsReminderCount: number;
         }[]
       > = {};
       const hasProposal: Record<string, boolean> = {};
@@ -246,7 +248,15 @@ export const listQuotes = createServerFn({ method: "POST" })
         // Delivery columns are additive (migration 012); read them separately so
         // a database that has not run it yet still loads the queue.
         const deliveryErrors: Record<string, string | null> = {};
-        const reminderState: Record<string, { lastReminderAt: string | null; reminderCount: number }> = {};
+        const reminderState: Record<
+          string,
+          {
+            lastReminderAt: string | null;
+            reminderCount: number;
+            lastSmsReminderAt: string | null;
+            smsReminderCount: number;
+          }
+        > = {};
         const { data: deliveryRows } = await adminDb()
           .from("invoices")
           .select("id, delivery_error")
@@ -256,12 +266,14 @@ export const listQuotes = createServerFn({ method: "POST" })
         }
         const { data: reminderRows } = await adminDb()
           .from("invoices")
-          .select("id, last_reminder_at, reminder_count")
+          .select("id, last_reminder_at, reminder_count, last_sms_reminder_at, sms_reminder_count")
           .in("quote_id", ids);
         for (const row of (reminderRows ?? []) as Record<string, unknown>[]) {
           reminderState[String(row.id)] = {
             lastReminderAt: (row.last_reminder_at as string | null) ?? null,
             reminderCount: Number(row.reminder_count ?? 0),
+            lastSmsReminderAt: (row.last_sms_reminder_at as string | null) ?? null,
+            smsReminderCount: Number(row.sms_reminder_count ?? 0),
           };
         }
 
@@ -285,6 +297,8 @@ export const listQuotes = createServerFn({ method: "POST" })
             deliveryError: deliveryErrors[String(row.id)] ?? null,
             lastReminderAt: reminderState[String(row.id)]?.lastReminderAt ?? null,
             reminderCount: reminderState[String(row.id)]?.reminderCount ?? 0,
+            lastSmsReminderAt: reminderState[String(row.id)]?.lastSmsReminderAt ?? null,
+            smsReminderCount: reminderState[String(row.id)]?.smsReminderCount ?? 0,
           });
 
           if (["void", "cancelled", "draft"].includes(status)) continue;
@@ -665,6 +679,7 @@ export const updateClientDetails = createServerFn({ method: "POST" })
       company: string | null;
       contactEmail: string;
       phone: string | null;
+      smsOptIn?: boolean;
     }) => {
       const currentEmail = data.currentEmail.trim().toLowerCase();
       const contactEmail = data.contactEmail.trim().toLowerCase();
@@ -678,7 +693,9 @@ export const updateClientDetails = createServerFn({ method: "POST" })
       }
       const company = data.company?.trim() ? data.company.trim().slice(0, 120) : null;
       const phone = data.phone?.trim() ? data.phone.trim().slice(0, 40) : null;
-      return { currentEmail, contactEmail, contactName, company, phone };
+      const smsOptIn = data.smsOptIn === true;
+      if (smsOptIn && !phone) throw new Error("Add a mobile number before turning on text reminders");
+      return { currentEmail, contactEmail, contactName, company, phone, smsOptIn };
     },
   )
   .handler(
@@ -703,7 +720,9 @@ export const updateClientDetails = createServerFn({ method: "POST" })
           company: data.company,
           contact_email: data.contactEmail,
           phone: data.phone,
-        })
+          sms_opt_in: data.smsOptIn,
+          sms_opt_in_at: data.smsOptIn ? new Date().toISOString() : null,
+        } as never)
         .in("id", ids);
       if (error) throw new Error(error.message);
 

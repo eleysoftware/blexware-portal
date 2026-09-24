@@ -225,6 +225,7 @@ function AdminDashboard() {
         name: string;
         company: string | null;
         phone: string | null;
+        smsOptIn: boolean;
         outstandingCents: number;
         lastActivity: string;
         quotes: NonNullable<typeof quotes.data>["quotes"];
@@ -238,6 +239,7 @@ function AdminDashboard() {
         name: String(quote.contact_name ?? email),
         company: (quote.company as string | null) ?? null,
         phone: (quote.phone as string | null) ?? null,
+        smsOptIn: quote.sms_opt_in === true,
         outstandingCents: 0,
         lastActivity: created,
         quotes: [],
@@ -249,6 +251,7 @@ function AdminDashboard() {
         entry.name = String(quote.contact_name ?? email);
         entry.company = (quote.company as string | null) ?? null;
         entry.phone = (quote.phone as string | null) ?? null;
+        entry.smsOptIn = quote.sms_opt_in === true;
       }
       map.set(email, entry);
     }
@@ -431,6 +434,7 @@ function AdminDashboard() {
                       contactName={client.name}
                       company={client.company}
                       phone={client.phone}
+                      smsOptIn={client.smsOptIn}
                       projectCount={client.quotes.length}
                       otherEmails={clients
                         .map((entry) => entry.email)
@@ -636,8 +640,14 @@ function AdminDashboard() {
                                               />
                                               {invoice.reminderCount ? (
                                                 <span className="text-xs text-slate">
-                                                  {invoice.reminderCount} reminder{invoice.reminderCount === 1 ? "" : "s"}
+                                                  {invoice.reminderCount} email reminder{invoice.reminderCount === 1 ? "" : "s"}
                                                   {invoice.lastReminderAt ? ` · last ${new Date(invoice.lastReminderAt).toLocaleDateString()}` : ""}
+                                                </span>
+                                              ) : null}
+                                              {invoice.smsReminderCount ? (
+                                                <span className="text-xs text-slate">
+                                                  {invoice.smsReminderCount} text reminder{invoice.smsReminderCount === 1 ? "" : "s"}
+                                                  {invoice.lastSmsReminderAt ? ` · last ${new Date(invoice.lastSmsReminderAt).toLocaleDateString()}` : ""}
                                                 </span>
                                               ) : null}
                                               {invoice.payToken ? (

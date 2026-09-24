@@ -67,6 +67,7 @@ function NewInvoicePage() {
 
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [projectType, setProjectType] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [description, setDescription] = useState("");
@@ -142,6 +143,7 @@ function NewInvoicePage() {
           contactEmail,
           company,
           phone,
+          smsOptIn,
           projectType,
 
           internalNotes,
@@ -242,6 +244,22 @@ function NewInvoicePage() {
               <label className="text-sm font-medium">
                 Phone
                 <Input className="mt-1" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </label>
+              <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={smsOptIn}
+                  disabled={!phone.trim()}
+                  onChange={(e) => setSmsOptIn(e.target.checked)}
+                />
+                <span>
+                  Text invoice reminders to this client
+                  <span className="block text-xs text-slate">
+                    Only tick this when the client has agreed to receive texts. Requires a mobile
+                    number.
+                  </span>
+                </span>
               </label>
             </div>
           </div>
