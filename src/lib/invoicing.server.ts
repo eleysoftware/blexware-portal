@@ -970,10 +970,11 @@ export async function runScheduledWork() {
   // makes retries idempotent even when the scheduler runs more than once.
   let remindersSent = 0;
   let remindersFailed = 0;
+  let smsRemindersSent = 0;
   const { data: reminderRows, error: reminderReadError } = await db
     .from("invoices")
     .select(
-      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count",
+      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count, sms_reminder_count, last_sms_reminder_at",
     )
     .in("status", ["sent", "viewed", "partially_paid", "overdue"])
     .lt("due_date", today)
