@@ -325,6 +325,7 @@ function QuoteDetailPage() {
             contactName={quote.contact_name}
             company={quote.company}
             phone={quote.phone}
+            smsOptIn={quote.sms_opt_in === true}
             projectCount={clientProjects.data?.projects?.length ?? 1}
           >
             <Button variant="outline" size="sm">

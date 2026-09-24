@@ -11,6 +11,8 @@ export type DirectInvoiceInput = {
   contactEmail: string;
   company?: string;
   phone?: string;
+  /** Client agreed to receive invoice reminder texts. Requires a phone number. */
+  smsOptIn?: boolean;
   projectType: string;
   internalNotes?: string;
   description: string;
@@ -268,6 +270,9 @@ export const createDirectInvoice = createServerFn({ method: "POST" })
             contact_email: email,
             company: data.company?.trim() || null,
             phone: data.phone?.trim() || null,
+            sms_opt_in: data.smsOptIn === true && !!data.phone?.trim(),
+            sms_opt_in_at:
+              data.smsOptIn === true && data.phone?.trim() ? new Date().toISOString() : null,
             consent: true,
             internal_notes: data.internalNotes?.trim() || "Direct-billed — no quote or proposal.",
           })
