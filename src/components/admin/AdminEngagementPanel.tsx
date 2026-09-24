@@ -7,6 +7,7 @@ import { TabEmptyState } from "@/components/TabIntro";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { SignatureBlock } from "@/components/SignatureBlock";
 import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
+import { InvoiceDateEditor } from "@/components/admin/InvoiceDateEditor";
 import { getTabEmptyState } from "@/lib/workflow-guidance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1395,6 +1396,13 @@ export function AdminEngagementPanel({
                         invoiceId={invoice.id as string}
                         invoiceNumber={String(invoice.invoice_number)}
                         status={String(invoice.status)}
+                      />
+                      <InvoiceDateEditor
+                        invoiceId={invoice.id}
+                        invoiceNumber={invoice.invoice_number}
+                        status={invoice.status}
+                        dueDate={invoice.due_date}
+                        scheduledSendAt={invoice.scheduled_send_at}
                       />
                       {invoice.pay_token ? (
                         <Button

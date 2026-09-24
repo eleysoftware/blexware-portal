@@ -63,6 +63,31 @@ export async function emailInvoice(input: { to: string; name: string; invoiceNum
   return sendEmail({ to: input.to, toName: input.name, subject: `Invoice ${input.invoiceNumber} — ${formatMoney(input.amountCents)}`, ...mail });
 }
 
+export async function emailInvoiceReminder(input: {
+  to: string;
+  name: string;
+  invoiceNumber: string;
+  balanceCents: number;
+  dueDate: string;
+  url: string;
+}) {
+  const mail = renderEmail({
+    heading: `Payment reminder — ${input.invoiceNumber}`,
+    paragraphs: [
+      `Hi ${input.name},`,
+      `${input.invoiceNumber} has an outstanding balance of ${formatMoney(input.balanceCents)} and was due ${new Date(`${input.dueDate}T12:00:00Z`).toLocaleDateString()}.`,
+      "If you've already sent payment, thank you and please disregard this reminder.",
+    ],
+    cta: { label: "View and pay invoice", url: input.url },
+  });
+  return sendEmail({
+    to: input.to,
+    toName: input.name,
+    subject: `Payment reminder — ${input.invoiceNumber}`,
+    ...mail,
+  });
+}
+
 export async function emailReceipt(input: {
   to: string;
   name: string;

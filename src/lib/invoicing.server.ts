@@ -4,7 +4,8 @@ import { adminDb, writeAudit } from "@/lib/blex.server";
 import { paymentPlanToInvoiceEntries, buildPaymentPlan } from "@/lib/documents/compose";
 import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
 import { isOutOfCredits } from "@/lib/email-failure";
-import { emailInvoice, siteUrl } from "@/lib/engagement-email.server";
+import { emailInvoice, emailInvoiceReminder, siteUrl } from "@/lib/engagement-email.server";
+import { isBusinessDayDue } from "@/lib/business-days";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
 export async function createInvoiceSchedule(
@@ -965,6 +966,67 @@ export async function runScheduledWork() {
     await db.from("invoices").update({ status: "overdue" }).eq("id", invoice.id);
   }
 
+  // Payment reminders recur every three weekdays. The persisted timestamp
+  // makes retries idempotent even when the scheduler runs more than once.
+  let remindersSent = 0;
+  let remindersFailed = 0;
+  const { data: reminderRows, error: reminderReadError } = await db
+    .from("invoices")
+    .select(
+      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count",
+    )
+    .in("status", ["sent", "viewed", "partially_paid", "overdue"])
+    .lt("due_date", today)
+    .limit(100);
+  if (reminderReadError) {
+    // Migration 017 may still be waiting to be applied; invoicing continues.
+    console.error("[cron:invoice-reminders]", reminderReadError.message);
+  } else {
+    for (const invoice of reminderRows ?? []) {
+      const anchor = (invoice.last_reminder_at as string | null) ?? `${invoice.due_date as string}T12:00:00Z`;
+      const balance = Math.max(0, Number(invoice.amount_cents) - Number(invoice.amount_paid_cents ?? 0));
+      if (!balance || !isBusinessDayDue(anchor, 3, new Date(now))) continue;
+      const { data: quote } = await db
+        .from("quotes")
+        .select("contact_name, contact_email")
+        .eq("id", invoice.quote_id)
+        .maybeSingle();
+      if (!quote?.contact_email) continue;
+      try {
+        const result = await emailInvoiceReminder({
+          to: quote.contact_email as string,
+          name: quote.contact_name as string,
+          invoiceNumber: invoice.invoice_number as string,
+          balanceCents: balance,
+          dueDate: invoice.due_date as string,
+          url: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
+        });
+        if (!result.sent) {
+          remindersFailed += 1;
+          continue;
+        }
+        remindersSent += 1;
+        await db
+          .from("invoices")
+          .update({
+            last_reminder_at: now,
+            reminder_count: Number(invoice.reminder_count ?? 0) + 1,
+          } as never)
+          .eq("id", invoice.id);
+        await writeAudit({
+          actorLabel: "system",
+          action: "invoice.reminder_sent",
+          entity: "invoice",
+          entityId: invoice.id as string,
+          metadata: { channel: "email", reminder_number: Number(invoice.reminder_count ?? 0) + 1 },
+        });
+      } catch (error) {
+        remindersFailed += 1;
+        console.error("[cron:invoice-reminder]", error);
+      }
+    }
+  }
+
   // Reconciliation: re-check payments still reported as processing.
   const { data: pending } = await db
     .from("invoice_payments")
@@ -988,6 +1050,8 @@ export async function runScheduledWork() {
     proposalsClosed: staleProposals?.length ?? 0,
     estimatesExpired: staleEstimates?.length ?? 0,
     invoicesOverdue: overdue?.length ?? 0,
+    remindersSent,
+    remindersFailed,
     paymentsReconciled: pending?.length ?? 0,
     deliveryError: creditsExhausted,
   };
