@@ -57,6 +57,14 @@ export const CREDENTIAL_GROUPS: CredentialGroup[] = [
       { name: "GROQ_MODEL", label: "Groq model", secret: false },
     ],
   },
+  {
+    id: "system",
+    title: "Scheduled jobs & sign-up hooks",
+    fields: [
+      { name: "AUTH_HOOK_SECRET", label: "Sign-up email hook secret", secret: true },
+      { name: "CRON_SECRET", label: "Scheduled jobs secret", secret: true },
+    ],
+  },
 ];
 
 export const CREDENTIAL_NAMES = new Set(
