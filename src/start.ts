@@ -18,6 +18,18 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+// Loads admin-managed provider keys from the database before each request
+// (cached for a minute) so config readers prefer them over env variables.
+const credentialsMiddleware = createMiddleware().server(async ({ next }) => {
+  try {
+    const { loadCredentialOverrides } = await import("@/lib/credentials.server");
+    await loadCredentialOverrides();
+  } catch (error) {
+    console.error("[credentials] preload failed:", error);
+  }
+  return next();
+});
+
 // Start installs this automatically when src/start.ts is absent; defining the
 // file opts out, so re-add it explicitly to keep server functions protected
 // from cross-site requests.
@@ -27,5 +39,5 @@ const csrfMiddleware = createCsrfMiddleware({
 
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [errorMiddleware, csrfMiddleware, credentialsMiddleware],
 }));

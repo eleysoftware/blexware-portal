@@ -1,3 +1,4 @@
+import { readEnv } from "@/config/env";
 // Server-only SMS delivery via Textbee.dev (https://textbee.dev).
 // Textbee sends through an Android phone registered as a gateway device, so
 // texts go out only while that phone is on, charged and online.
@@ -26,8 +27,8 @@ export function normalizePhoneToE164(raw: string | null | undefined): string | n
 }
 
 export async function sendSms(input: { to: string; message: string }): Promise<SendSmsResult> {
-  const apiKey = process.env["TEXTBEE_API_KEY"];
-  const deviceId = process.env["TEXTBEE_DEVICE_ID"];
+  const apiKey = readEnv("TEXTBEE_API_KEY");
+  const deviceId = readEnv("TEXTBEE_DEVICE_ID");
   if (!apiKey || !deviceId) {
     console.error("[sms] TEXTBEE_API_KEY or TEXTBEE_DEVICE_ID is not configured");
     return { sent: false, reason: "not_configured" };

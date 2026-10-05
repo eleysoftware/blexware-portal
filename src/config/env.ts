@@ -40,7 +40,11 @@ export function readEnv(...names: string[]): string | undefined {
   const vite = viteEnv();
   const node = nodeEnv();
   for (const name of names) {
-    const value = runtimeOverrides[name] ?? vite[name] ?? node[name];
+    const override = runtimeOverrides[name];
+    if (typeof override === "string" && override.trim() !== "") return override.trim();
+  }
+  for (const name of names) {
+    const value = vite[name] ?? node[name];
     if (typeof value === "string" && value.trim() !== "") return value.trim();
   }
   return undefined;
