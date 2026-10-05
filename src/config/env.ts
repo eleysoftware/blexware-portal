@@ -27,15 +27,33 @@ function nodeEnv(): EnvRecord {
   }
 }
 
-/** First non-empty value among `names`, checking Vite env then process env. */
+// Server-side overrides loaded from the database (provider_credentials).
+// Populated per request by src/lib/credentials.server.ts; empty in the browser.
+let runtimeOverrides: EnvRecord = {};
+
+export function setRuntimeOverrides(values: EnvRecord): void {
+  runtimeOverrides = { ...values };
+}
+
+/** First non-empty value among `names`: database overrides, then Vite env, then process env. */
 export function readEnv(...names: string[]): string | undefined {
   const vite = viteEnv();
   const node = nodeEnv();
+  for (const name of names) {
+    const override = runtimeOverrides[name];
+    if (typeof override === "string" && override.trim() !== "") return override.trim();
+  }
   for (const name of names) {
     const value = vite[name] ?? node[name];
     if (typeof value === "string" && value.trim() !== "") return value.trim();
   }
   return undefined;
+}
+
+/** True when a value comes from environment variables (ignores database overrides). */
+export function hasEnvValue(name: string): boolean {
+  const value = viteEnv()[name] ?? nodeEnv()[name];
+  return typeof value === "string" && value.trim() !== "";
 }
 
 export function readBool(defaultValue: boolean, ...names: string[]): boolean {
