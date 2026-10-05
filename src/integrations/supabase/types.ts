@@ -360,14 +360,18 @@ export type Database = {
           id: string
           invoice_number: string
           issue_date: string | null
+          last_reminder_at: string | null
+          last_sms_reminder_at: string | null
           line_items: Json
           paid_at: string | null
           paused: boolean
           pay_token: string
           quote_id: string
+          reminder_count: number
           scheduled_send_at: string | null
           sent_at: string | null
           sequence: number
+          sms_reminder_count: number
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal_cents: number
           updated_at: string
@@ -387,14 +391,18 @@ export type Database = {
           id?: string
           invoice_number?: string
           issue_date?: string | null
+          last_reminder_at?: string | null
+          last_sms_reminder_at?: string | null
           line_items?: Json
           paid_at?: string | null
           paused?: boolean
           pay_token?: string
           quote_id: string
+          reminder_count?: number
           scheduled_send_at?: string | null
           sent_at?: string | null
           sequence: number
+          sms_reminder_count?: number
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal_cents?: number
           updated_at?: string
@@ -414,14 +422,18 @@ export type Database = {
           id?: string
           invoice_number?: string
           issue_date?: string | null
+          last_reminder_at?: string | null
+          last_sms_reminder_at?: string | null
           line_items?: Json
           paid_at?: string | null
           paused?: boolean
           pay_token?: string
           quote_id?: string
+          reminder_count?: number
           scheduled_send_at?: string | null
           sent_at?: string | null
           sequence?: number
+          sms_reminder_count?: number
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal_cents?: number
           updated_at?: string
@@ -806,6 +818,8 @@ export type Database = {
           project_type: string
           quote_number: string
           services: string[]
+          sms_opt_in: boolean
+          sms_opt_in_at: string | null
           source_ip: string | null
           status: Database["public"]["Enums"]["quote_status"]
           timeline: string
@@ -834,6 +848,8 @@ export type Database = {
           project_type: string
           quote_number?: string
           services?: string[]
+          sms_opt_in?: boolean
+          sms_opt_in_at?: string | null
           source_ip?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           timeline: string
@@ -862,6 +878,8 @@ export type Database = {
           project_type?: string
           quote_number?: string
           services?: string[]
+          sms_opt_in?: boolean
+          sms_opt_in_at?: string | null
           source_ip?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           timeline?: string
