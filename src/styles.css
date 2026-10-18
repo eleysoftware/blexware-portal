@@ -196,10 +196,10 @@
   h4,
   h5,
   h6 {
-    color: var(--color-headline);
+    color: var(--headline);
     font-family: var(--font-display);
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
   }
 
   :focus-visible {
@@ -210,6 +210,45 @@
 
 @utility surface-mint {
   background-color: var(--mint-surface);
+}
+
+/* Dark "ink" band: remaps semantic tokens so any content inside adapts. */
+@utility section-dark {
+  --background: oklch(0.185 0.012 255);
+  --surface: oklch(0.215 0.013 255);
+  --card: oklch(0.225 0.013 255);
+  --card-foreground: oklch(0.97 0.003 247.8);
+  --headline: oklch(0.975 0.003 247.8);
+  --foreground: oklch(0.76 0.012 255);
+  --slate: oklch(0.74 0.012 255);
+  --accent: oklch(0.842 0.059 165.3 / 10%);
+  --accent-foreground: oklch(0.975 0.003 247.8);
+  --secondary: oklch(1 0 0 / 6%);
+  --secondary-foreground: oklch(0.975 0.003 247.8);
+  --muted: oklch(1 0 0 / 5%);
+  --muted-foreground: oklch(0.74 0.012 255);
+  --primary: oklch(0.842 0.059 165.3);
+  --primary-foreground: oklch(0.185 0.012 255);
+  --primary-hover: oklch(0.9 0.05 165.3);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 4%) inset;
+  background-color: var(--background);
+  color: var(--foreground);
+  background-image: radial-gradient(
+    ellipse 70% 50% at 50% 0%,
+    oklch(0.842 0.059 165.3 / 6%),
+    transparent 70%
+  );
+}
+
+/* CTA buttons keep the emerald brand fill inside dark bands */
+@utility cta-emerald {
+  background-color: oklch(0.59 0.093 168.4);
+  color: oklch(1 0 0);
+  &:hover {
+    background-color: oklch(0.499 0.076 169.7);
+  }
 }
 
 @utility hero-gradient {

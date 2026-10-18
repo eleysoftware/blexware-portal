@@ -11,10 +11,10 @@ export function CtaBand({
   description?: string;
 }) {
   return (
-    <section className="bg-headline py-16 sm:py-20">
+    <section className="surface-mint border-t border-border py-16 sm:py-20">
       <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-        <h2 className="text-3xl text-primary-foreground sm:text-4xl">{title}</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-mint/85">{description}</p>
+        <h2 className="text-3xl sm:text-4xl">{title}</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-slate">{description}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg" className="shadow-cta">
             <Link to="/free-quote">
@@ -26,7 +26,7 @@ export function CtaBand({
             asChild
             size="lg"
             variant="outline"
-            className="border-mint/40 bg-transparent text-mint hover:bg-mint/10 hover:text-mint"
+            className="bg-surface"
           >
             <Link to="/contact">Talk to us first</Link>
           </Button>

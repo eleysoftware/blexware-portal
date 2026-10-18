@@ -8,7 +8,7 @@ const tones: Record<Tone, string> = {
   default: "bg-background",
   surface: "bg-surface",
   mint: "surface-mint",
-  dark: "bg-headline",
+  dark: "section-dark",
 };
 
 export function Section({

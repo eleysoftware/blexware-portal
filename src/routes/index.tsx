@@ -112,7 +112,7 @@ function Home() {
         </div>
       </section>
 
-      <Section tone="surface">
+      <Section tone="dark">
         <SectionHeading
           eyebrow="Services"
           title="One partner from first sketch to ongoing support"
@@ -168,7 +168,7 @@ function Home() {
         </div>
       </Section>
 
-      <Section tone="surface">
+      <Section tone="dark">
         <SectionHeading
           eyebrow="Selected work"
           title="Products in production, not concept slides"
@@ -201,7 +201,7 @@ function Home() {
         </div>
       </Section>
 
-      <Section>
+      <Section tone="surface">
         <SectionHeading
           eyebrow="Process"
           title="A seven-step process with no mystery phases"
@@ -226,7 +226,7 @@ function Home() {
 
 
 
-      <Section tone="surface">
+      <Section tone="dark">
         <SectionHeading eyebrow="Clients" title="What working with us is like" />
         <div className="mt-12 grid gap-5 sm:grid-cols-2">
           {testimonials.map((item) => (
@@ -288,7 +288,7 @@ function Home() {
         </div>
       </Section>
 
-      <Section tone="surface">
+      <Section tone="dark">
         <SectionHeading eyebrow="Resources" title="Notes from the build" />
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
           {articles.slice(0, 3).map((article) => (
