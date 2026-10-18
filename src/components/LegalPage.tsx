@@ -19,7 +19,7 @@ export function LegalPage({
   return (
     <>
       <PageHero eyebrow={eyebrow} title={title} description={intro} />
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="mx-auto max-w-3xl">
           <p className="text-sm text-slate">Last updated: {updated}</p>
           <div className="mt-8 space-y-10">
