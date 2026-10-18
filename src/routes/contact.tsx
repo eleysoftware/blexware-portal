@@ -66,12 +66,12 @@ function ContactPage() {
         description="Whether you have a spec or a vague frustration, we can help you turn it into a plan."
       />
 
-      <Section tone="dark">
+      <Section>
         <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
           <form
             onSubmit={onSubmit}
             noValidate
-            className="rounded-2xl border border-border bg-background p-7 shadow-card sm:p-9"
+            className="section-dark rounded-2xl border border-border p-7 shadow-card sm:p-9"
           >
             <h2 className="text-xl">Send a message</h2>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
