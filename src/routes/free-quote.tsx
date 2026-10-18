@@ -183,7 +183,7 @@ function FreeQuotePage() {
 
   if (submitted) {
     return (
-      <Section tone="surface" className="min-h-[60vh]">
+      <Section tone="dark" className="min-h-[60vh]">
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-background p-10 text-center shadow-card">
           <span className="mx-auto inline-flex size-14 items-center justify-center rounded-full bg-accent text-primary">
             <Check className="size-7" aria-hidden="true" />
@@ -215,7 +215,7 @@ function FreeQuotePage() {
         description="No sales call required. Answer what you know, skip what you don't, and we'll come back with scope, timeline, and price."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="mx-auto max-w-2xl">
           <div className="flex items-center justify-between text-sm text-slate">
             <span>
