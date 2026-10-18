@@ -30,17 +30,17 @@ export function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-surface/85 backdrop-blur-md">
+    <header className="section-dark sticky top-0 z-50 w-full border-b border-border">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-        <Logo className="h-7 sm:h-8" />
+        <Logo variant="onDark" />
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-md px-3 py-2 text-sm font-medium text-slate transition-colors hover:bg-accent hover:text-headline"
-              activeProps={{ className: "bg-accent text-headline" }}
+              className="rounded-md px-3 py-2 text-sm font-medium text-slate transition-colors hover:text-headline"
+              activeProps={{ className: "text-headline" }}
             >
               {link.label}
             </Link>
@@ -48,16 +48,25 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" className="hidden sm:inline-flex">
+          <Button
+            asChild
+            variant="outline"
+            className="hidden border-border bg-secondary text-headline hover:bg-accent hover:text-headline sm:inline-flex"
+          >
             <Link to={portalLink}>{signedIn ? "My portal" : "Client login"}</Link>
           </Button>
-          <Button asChild className="hidden shadow-cta sm:inline-flex">
+          <Button asChild className="cta-emerald hidden shadow-cta sm:inline-flex">
             <Link to="/free-quote">Get a Free Quote</Link>
           </Button>
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="lg:hidden" aria-label="Open menu">
+              <Button
+                variant="outline"
+                size="icon"
+                className="border-border bg-secondary text-headline hover:bg-accent hover:text-headline lg:hidden"
+                aria-label="Open menu"
+              >
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>

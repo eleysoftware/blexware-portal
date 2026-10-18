@@ -20,10 +20,10 @@ const legal = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-4 lg:px-8">
+    <footer className="section-dark border-t border-border">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div className="lg:col-span-1">
-          <Logo className="h-8" />
+          <Logo variant="onDark" />
           <p className="mt-4 max-w-xs text-sm font-medium text-headline">
             Software built by people who stay.
           </p>
