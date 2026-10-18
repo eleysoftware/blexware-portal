@@ -30,7 +30,7 @@ function ResourcesPage() {
         description="No listicles. Just the decisions and trade-offs behind the software we ship."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="grid gap-6 lg:grid-cols-3">
           {articles.map((article) => (
             <article key={article.slug} className="card-lift overflow-hidden rounded-xl border border-border bg-background shadow-card">

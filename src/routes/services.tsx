@@ -54,7 +54,7 @@ function ServicesPage() {
         description="Nine service lines, one accountable team. No hand-offs to a subcontractor you never met."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="grid gap-6 lg:grid-cols-2">
           {services.map((service) => {
             const Icon = icons[service.icon];

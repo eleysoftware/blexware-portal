@@ -34,7 +34,7 @@ function IndustriesPage() {
         description="We do not learn your business on your budget. Pick your sector to see the systems we build and the outcomes they produce."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <Tabs defaultValue={industryGroups[0].id} className="gap-8">
           <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-accent/60 p-1.5">
             {industryGroups.map((group) => (
