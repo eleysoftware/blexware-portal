@@ -72,7 +72,7 @@ function AuthPage() {
         title="Sign in"
         description="Track your quote requests and review proposals in one place."
       />
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="mx-auto max-w-md rounded-2xl border border-border bg-background p-8 shadow-card">
           {reason === "timeout" ? (
             <p

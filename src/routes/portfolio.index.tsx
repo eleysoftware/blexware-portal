@@ -32,7 +32,7 @@ function PortfolioPage() {
         description="Three platforms across financial consulting, private investment, and sports operations — each solving a specific, expensive problem."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="space-y-8">
           {portfolio.map((project, index) => (
             <article

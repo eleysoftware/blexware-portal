@@ -63,7 +63,7 @@ function AboutPage() {
         description="BLEXware exists because too many businesses were sold a website, handed a login, and left alone. We build systems and then keep them healthy."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
           <div>
             <h2 className="text-3xl sm:text-4xl">Our mission</h2>
@@ -124,7 +124,7 @@ function AboutPage() {
         </div>
       </Section>
 
-      <Section tone="surface">
+      <Section tone="dark">
         <SectionHeading
           eyebrow="The people"
           title="You will know the engineers building your product"

@@ -66,7 +66,7 @@ function ContactPage() {
         description="Whether you have a spec or a vague frustration, we can help you turn it into a plan."
       />
 
-      <Section tone="surface">
+      <Section tone="dark">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
           <form
             onSubmit={onSubmit}

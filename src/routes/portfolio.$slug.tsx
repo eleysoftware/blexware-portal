@@ -54,7 +54,7 @@ function ProjectPage() {
         </div>
       </section>
 
-      <Section tone="surface">
+      <Section tone="dark">
         <img
           src={project.image}
           alt={project.imageAlt}
