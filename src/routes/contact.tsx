@@ -71,7 +71,7 @@ function ContactPage() {
           <form
             onSubmit={onSubmit}
             noValidate
-            className="section-dark rounded-2xl border border-border p-7 shadow-card sm:p-9"
+            className="section-dark self-start rounded-2xl border border-border p-7 shadow-card sm:p-9"
           >
             <h2 className="text-xl">Send a message</h2>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
