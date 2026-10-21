@@ -20,12 +20,14 @@ export function MilestoneEditDialog({
   onOpenChange,
   onSave,
   saving,
+  detailsOnly = false,
 }: {
   milestone: MilestoneRecord;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (values: { title: string; note: string; targetDuration: string }) => void;
   saving?: boolean;
+  detailsOnly?: boolean;
 }) {
   const [title, setTitle] = useState(milestone.title);
   const [note, setNote] = useState(milestone.note ?? "");
@@ -45,27 +47,43 @@ export function MilestoneEditDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit phase</DialogTitle>
+          <DialogTitle>{detailsOnly ? "Edit phase details" : "Edit phase"}</DialogTitle>
           <DialogDescription>
-            Update what this phase covers and how long it should take. The client sees these details
-            on their Milestones board.
+            {detailsOnly
+              ? "Add or update the details for this phase. The BLEXware team will see your changes."
+              : "Update what this phase covers and how long it should take. The client sees these details on their Milestones board."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {detailsOnly ? (
+            <div className="text-sm">
+              <p className="font-medium">Phase name</p>
+              <p className="mt-1 text-slate">{milestone.title}</p>
+              {milestone.target_duration ? (
+                <>
+                  <p className="mt-3 font-medium">Expected duration</p>
+                  <p className="mt-1 text-slate">{milestone.target_duration}</p>
+                </>
+              ) : null}
+            </div>
+          ) : (
           <label className="block text-sm font-medium">
             Phase name
             <Input className="mt-1" value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
+          )}
           <label className="block text-sm font-medium">
             Details
             <Textarea
               className="mt-1"
               rows={3}
               placeholder="What happens in this phase"
+              maxLength={2000}
               value={note}
               onChange={(event) => setNote(event.target.value)}
             />
           </label>
+          {detailsOnly ? null : (
           <label className="block text-sm font-medium">
             Expected duration
             <Input
@@ -75,6 +93,7 @@ export function MilestoneEditDialog({
               onChange={(event) => setDuration(event.target.value)}
             />
           </label>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

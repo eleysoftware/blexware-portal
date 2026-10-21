@@ -13,6 +13,7 @@ import {
   listMilestones,
   moveMilestone,
   saveMilestone,
+  saveMilestoneDetails,
   MILESTONE_LANES,
   MILESTONE_LANE_LABELS,
   type MilestoneLane,
@@ -41,6 +42,7 @@ export function MilestoneBoard({
   const save = useServerFn(saveMilestone);
   const move = useServerFn(moveMilestone);
   const remove = useServerFn(deleteMilestone);
+  const saveDetails = useServerFn(saveMilestoneDetails);
 
   const [title, setTitle] = useState("");
   const [dragging, setDragging] = useState<string | null>(null);
@@ -93,6 +95,16 @@ export function MilestoneBoard({
           targetDuration: input.targetDuration,
         },
       }),
+    onSuccess: () => {
+      setEditing(null);
+      void invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const detailsMutation = useMutation({
+    mutationFn: (input: { id: string; note: string }) =>
+      saveDetails({ data: { quoteId, id: input.id, note: input.note } }),
     onSuccess: () => {
       setEditing(null);
       void invalidate();
@@ -175,7 +187,41 @@ export function MilestoneBoard({
                     {row.target_duration ? (
                       <p className="mt-1 text-xs text-slate">{row.target_duration}</p>
                     ) : null}
-                    {readOnly ? null : (
+                    {readOnly ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {row.lane === "uat" ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={moveMutation.isPending}
+                              className="rounded-md border border-primary bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+                              onClick={() => moveMutation.mutate({ id: row.id, lane: "done" })}
+                            >
+                              Mark done
+                            </button>
+                            <button
+                              type="button"
+                              disabled={moveMutation.isPending}
+                              className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                              onClick={() => moveMutation.mutate({ id: row.id, lane: "in_progress" })}
+                            >
+                              Back to In progress
+                            </button>
+                          </>
+                        ) : null}
+                        {row.lane !== "done" ? (
+                          <button
+                            type="button"
+                            aria-label={`Edit details for ${row.title}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-primary px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                            onClick={() => setEditing(row)}
+                          >
+                            <Pencil className="h-3 w-3" aria-hidden="true" />
+                            Edit details
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <label className="sr-only" htmlFor={`lane-${row.id}`}>
                           Move {row.title} to a lane
@@ -256,11 +302,16 @@ export function MilestoneBoard({
           key={editing.id}
           milestone={editing}
           open
-          saving={editMutation.isPending}
+          detailsOnly={readOnly}
+          saving={readOnly ? detailsMutation.isPending : editMutation.isPending}
           onOpenChange={(next) => {
             if (!next) setEditing(null);
           }}
-          onSave={(values) => editMutation.mutate({ id: editing.id, ...values })}
+          onSave={(values) =>
+            readOnly
+              ? detailsMutation.mutate({ id: editing.id, note: values.note })
+              : editMutation.mutate({ id: editing.id, ...values })
+          }
         />
       ) : null}
 

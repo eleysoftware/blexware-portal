@@ -37,6 +37,49 @@ function sortMilestones(rows: MilestoneRecord[]): MilestoneRecord[] {
   );
 }
 
+/** Lanes a client may move a milestone to while it sits in UAT. */
+export const CLIENT_UAT_TARGETS: MilestoneLane[] = ["done", "in_progress"];
+
+export function clientMayMove(from: MilestoneLane, to: MilestoneLane): boolean {
+  return from === "uat" && CLIENT_UAT_TARGETS.includes(to);
+}
+
+async function isAdminCaller(supabase: unknown, userId: string): Promise<boolean> {
+  const { data } = await viewerDb(supabase).rpc("has_role", { _user_id: userId, _role: "admin" });
+  return data === true;
+}
+
+/** Throws unless the caller (RLS-scoped) can see this project. */
+async function assertClientProject(supabase: unknown, quoteId: string): Promise<void> {
+  const { data, error } = await viewerDb(supabase).from("quotes").select("id").eq("id", quoteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("We couldn't find that project on your account.");
+}
+
+/** Client edit: update only the Details (note) field of a milestone on their project. */
+export const saveMilestoneDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { id: string; quoteId: string; note: string }) => {
+    if (!data?.id || !data.quoteId) throw new Error("Missing milestone");
+    if (typeof data.note !== "string" || data.note.length > 2000) throw new Error("Details are too long");
+    return data;
+  })
+  .handler(
+    guarded("saveMilestoneDetails", "saving the details", async ({ data, context }) => {
+      const { adminDb, writeAudit } = await import("@/lib/blex.server");
+      await assertClientProject(context.supabase, data.quoteId);
+      const db = adminDb();
+      const { data: current } = await db
+        .from("project_milestones").select("id, lane").eq("id", data.id).eq("quote_id", data.quoteId).maybeSingle();
+      if (!current) throw new Error("That milestone no longer exists");
+      if (current.lane === "done") throw new Error("This phase is marked Done and can't be edited.");
+      const { error } = await db.from("project_milestones").update({ note: data.note.trim() || null }).eq("id", data.id);
+      if (error) throw new Error(error.message);
+      await writeAudit({ actorId: context.userId, action: "milestone.details_updated", entity: "quote", entityId: data.quoteId, metadata: { milestoneId: data.id } });
+      return { ok: true };
+    }),
+  );
+
 /** Milestones for a project. RLS decides whether the caller may see them. */
 export const listMilestones = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -134,8 +177,9 @@ export const moveMilestone = createServerFn({ method: "POST" })
   })
   .handler(
     guarded("moveMilestone", "moving the milestone", async ({ data, context }) => {
-      const { requireAdmin, adminDb } = await import("@/lib/blex.server");
-      await requireAdmin(context.supabase, context.userId);
+      const { adminDb, writeAudit } = await import("@/lib/blex.server");
+      const isAdmin = await isAdminCaller(context.supabase, context.userId);
+      if (!isAdmin) await assertClientProject(context.supabase, data.quoteId);
       const db = adminDb();
 
       const { data: rows, error } = await db
@@ -147,6 +191,12 @@ export const moveMilestone = createServerFn({ method: "POST" })
       const all = (rows ?? []) as MilestoneRecord[];
       const moving = all.find((row) => row.id === data.id);
       if (!moving) throw new Error("That milestone no longer exists");
+      if (!isAdmin) {
+        if (!clientMayMove(moving.lane, data.lane)) {
+          throw new Error("You can only move a phase from UAT to Done or back to In progress.");
+        }
+        await writeAudit({ actorId: context.userId, action: "milestone.client_moved", entity: "quote", entityId: data.quoteId, metadata: { milestoneId: data.id, from: moving.lane, to: data.lane } });
+      }
 
       const target = all
         .filter((row) => row.lane === data.lane && row.id !== data.id)

@@ -1019,7 +1019,7 @@ export type Database = {
         | "partially_paid"
         | "overdue"
         | "cancelled"
-      milestone_lane: "not_started" | "in_progress" | "testing" | "done"
+      milestone_lane: "not_started" | "in_progress" | "testing" | "uat" | "done"
       proposal_status:
         | "draft"
         | "sent"
@@ -1181,7 +1181,7 @@ export const Constants = {
         "overdue",
         "cancelled",
       ],
-      milestone_lane: ["not_started", "in_progress", "testing", "done"],
+      milestone_lane: ["not_started", "in_progress", "testing", "uat", "done"],
       proposal_status: [
         "draft",
         "sent",
