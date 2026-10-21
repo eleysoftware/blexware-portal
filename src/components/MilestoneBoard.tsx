@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -124,7 +125,7 @@ export function MilestoneBoard({
         </p>
       ) : null}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-4">
+      <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {MILESTONE_LANES.map((lane) => {
           const laneRows = rows.filter((row) => row.lane === lane);
           const dropAt = (index: number) => (event: React.DragEvent) => {
@@ -225,9 +226,11 @@ export function MilestoneBoard({
                         ) : (
                           <button
                             type="button"
-                            className="text-xs text-primary underline-offset-4 hover:underline"
+                            aria-label={`Edit ${row.title}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-primary bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             onClick={() => setEditing(row)}
                           >
+                            <Pencil className="h-3 w-3" aria-hidden="true" />
                             Edit
                           </button>
                         )}
