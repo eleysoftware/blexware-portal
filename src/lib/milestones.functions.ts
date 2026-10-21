@@ -4,13 +4,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { guarded } from "@/lib/errors";
 
-export const MILESTONE_LANES = ["not_started", "in_progress", "testing", "done"] as const;
+export const MILESTONE_LANES = ["not_started", "in_progress", "testing", "uat", "done"] as const;
 export type MilestoneLane = (typeof MILESTONE_LANES)[number];
 
 export const MILESTONE_LANE_LABELS: Record<MilestoneLane, string> = {
   not_started: "Not started",
   in_progress: "In progress",
   testing: "Testing",
+  uat: "UAT",
   done: "Done",
 };
 

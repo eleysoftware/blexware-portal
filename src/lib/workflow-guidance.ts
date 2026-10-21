@@ -179,7 +179,7 @@ const PURPOSE: Record<Audience, Partial<Record<GuidanceTab, string>>> = {
     proposal: "Draft, review and send the proposal the client responds to.",
     estimate: "Price each proposal item and release the estimate for approval.",
     sow: "Generate, countersign and track the Statement of Work.",
-    milestones: "Track project phases across Not started, In progress, Testing and Done.",
+    milestones: "Track project phases across Not started, In progress, Testing, UAT and Done.",
     invoices: "Issue the instalment schedule and follow payments.",
   },
 };
