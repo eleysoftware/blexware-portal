@@ -3,6 +3,11 @@
 import { SITE_URL } from "@/content/site";
 import { formatMoney } from "@/lib/documents/types";
 import { renderEmail, sendEmail } from "@/lib/email.server";
+import {
+  subscriptionInvoiceEmailCopy,
+  subscriptionReminderEmailCopy,
+  type SubscriptionBillContext,
+} from "@/lib/subscription-copy";
 
 export const PROPOSAL_REVIEW_DAYS = 5;
 export const PROPOSAL_REMINDER_DAYS = 3;
@@ -50,7 +55,21 @@ export async function emailThankYouDeclined(input: { to: string; name: string; q
   return sendEmail({ to: input.to, toName: input.name, subject: `Thank you — ${input.quoteNumber}`, ...mail });
 }
 
-export async function emailInvoice(input: { to: string; name: string; invoiceNumber: string; amountCents: number; dueDate: string | null; url: string; first: boolean }) {
+export async function emailInvoice(input: {
+  to: string;
+  name: string;
+  invoiceNumber: string;
+  amountCents: number;
+  dueDate: string | null;
+  url: string;
+  first: boolean;
+  subscription?: SubscriptionBillContext | null;
+}) {
+  if (input.subscription) {
+    const copy = subscriptionInvoiceEmailCopy({ ...input, subscription: input.subscription });
+    const mail = renderEmail({ heading: copy.heading, paragraphs: copy.paragraphs, cta: { label: copy.ctaLabel, url: input.url } });
+    return sendEmail({ to: input.to, toName: input.name, subject: copy.subject, ...mail });
+  }
   const mail = renderEmail({
     heading: `Invoice ${input.invoiceNumber} — ${formatMoney(input.amountCents)}`,
     paragraphs: [
@@ -70,7 +89,13 @@ export async function emailInvoiceReminder(input: {
   balanceCents: number;
   dueDate: string;
   url: string;
+  serviceName?: string | null;
 }) {
+  if (input.serviceName) {
+    const copy = subscriptionReminderEmailCopy({ ...input, serviceName: input.serviceName });
+    const mail = renderEmail({ heading: copy.heading, paragraphs: copy.paragraphs, cta: { label: copy.ctaLabel, url: input.url } });
+    return sendEmail({ to: input.to, toName: input.name, subject: copy.subject, ...mail });
+  }
   const mail = renderEmail({
     heading: `Payment reminder — ${input.invoiceNumber}`,
     paragraphs: [

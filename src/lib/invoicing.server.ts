@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/documents/types";
 import type { PaymentPlan, ProjectDocument } from "@/lib/documents/types";
 import { isOutOfCredits } from "@/lib/email-failure";
 import { emailInvoice, emailInvoiceReminder, siteUrl } from "@/lib/engagement-email.server";
+import { subscriptionReminderSms } from "@/lib/subscription-copy";
 import { isBusinessDayDue } from "@/lib/business-days";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
@@ -204,17 +205,41 @@ async function patchInvoiceDelivery(invoiceId: string, patch: Record<string, unk
   await db.from("invoices").update(fallback as never).eq("id", invoiceId);
 }
 
+/**
+ * Subscription bills get their own wording. Returns null for normal invoices.
+ * A bill is a renewal when an earlier bill exists for the same subscription.
+ */
+async function subscriptionBillContext(invoiceId: string, subscriptionId: string | null) {
+  if (!subscriptionId) return null;
+  const db = adminDb();
+  const [{ data: sub }, { data: me }] = await Promise.all([
+    db.from("subscriptions").select("service_name").eq("id", subscriptionId).maybeSingle(),
+    db.from("invoices").select("created_at").eq("id", invoiceId).maybeSingle(),
+  ]);
+  let renewal = false;
+  if (me?.created_at) {
+    const { count } = await db
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("subscription_id", subscriptionId)
+      .lt("created_at", me.created_at as string);
+    renewal = (count ?? 0) > 0;
+  }
+  return { serviceName: String(sub?.service_name ?? "Web Hosting"), renewal };
+}
+
 /** Emails the client a pay link, and only then marks the invoice as sent. */
 export async function dispatchInvoice(invoiceId: string) {
   const db = adminDb();
   const { data: invoice } = await db
     .from("invoices")
-    .select("id, quote_id, agreement_id, invoice_number, sequence, amount_cents, due_date, pay_token, status")
+    .select("id, quote_id, agreement_id, invoice_number, sequence, amount_cents, due_date, pay_token, status, subscription_id")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!invoice) throw new Error("Invoice not found");
   if (invoice.status === "paid" || invoice.status === "void")
     return { emailed: false, reason: "This invoice is already settled or void." as string | null };
+  const subscription = await subscriptionBillContext(invoice.id as string, (invoice.subscription_id as string | null) ?? null);
 
   const { data: quote } = await db
     .from("quotes")
@@ -232,6 +257,7 @@ export async function dispatchInvoice(invoiceId: string) {
     dueDate: (invoice.due_date as string | null) ?? null,
     url: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
     first: Number(invoice.sequence) === 1,
+    subscription,
   });
 
   // The invoice only becomes "sent" when the provider accepted the message, so
@@ -302,7 +328,11 @@ export async function renderInvoiceDocument(invoiceId: string) {
   const lineItems = Array.isArray(invoice["line_items"])
     ? (invoice["line_items"] as { label: string; amountCents: number; note?: string }[])
     : [];
+  const subscriptionServiceName = invoice["subscription_id"]
+    ? ((await subscriptionBillContext(invoice.id as string, invoice["subscription_id"] as string))?.serviceName ?? null)
+    : null;
   const doc = buildInvoiceDoc({
+    subscriptionServiceName,
     invoice: invoice as never,
     quote: quote as never,
     agreement: (agreementResult.data ?? null) as never,
@@ -984,7 +1014,7 @@ export async function runScheduledWork() {
   const { data: reminderRows, error: reminderReadError } = await db
     .from("invoices")
     .select(
-      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count, sms_reminder_count, last_sms_reminder_at",
+      "id, quote_id, invoice_number, amount_cents, amount_paid_cents, due_date, pay_token, last_reminder_at, reminder_count, sms_reminder_count, last_sms_reminder_at, subscription_id",
     )
     .in("status", ["sent", "viewed", "partially_paid", "overdue"])
     .lt("due_date", today)
@@ -1004,13 +1034,16 @@ export async function runScheduledWork() {
         .maybeSingle();
       if (!quote?.contact_email) continue;
       try {
+        const subscription = await subscriptionBillContext(invoice.id as string, (invoice.subscription_id as string | null) ?? null);
+        const payUrl = `${siteUrl()}/invoice/${invoice.pay_token as string}`;
         const result = await emailInvoiceReminder({
           to: quote.contact_email as string,
           name: quote.contact_name as string,
           invoiceNumber: invoice.invoice_number as string,
           balanceCents: balance,
           dueDate: invoice.due_date as string,
-          url: `${siteUrl()}/invoice/${invoice.pay_token as string}`,
+          url: payUrl,
+          serviceName: subscription?.serviceName ?? null,
         });
         if (!result.sent) {
           remindersFailed += 1;
@@ -1037,7 +1070,14 @@ export async function runScheduledWork() {
           const { sendSms } = await import("@/lib/sms.server");
           const smsResult = await sendSms({
             to: quote.phone as string,
-            message: `BLEXware: invoice ${invoice.invoice_number as string} has ${formatMoney(balance)} outstanding. Pay: ${siteUrl()}/invoice/${invoice.pay_token as string} Reply STOP to opt out.`,
+            message: subscription
+              ? subscriptionReminderSms({
+                  invoiceNumber: invoice.invoice_number as string,
+                  balanceCents: balance,
+                  serviceName: subscription.serviceName,
+                  url: payUrl,
+                })
+              : `BLEXware: invoice ${invoice.invoice_number as string} has ${formatMoney(balance)} outstanding. Pay: ${payUrl} Reply STOP to opt out.`,
           });
           if (smsResult.sent) {
             smsRemindersSent += 1;

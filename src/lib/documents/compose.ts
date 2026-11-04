@@ -453,8 +453,12 @@ export function buildInvoiceDoc(input: {
   lineItems?: EstimateLineItem[];
   subtotalCents?: number;
   discountCents?: number;
+  /** Set for yearly subscription bills (e.g. "Web Hosting"). */
+  subscriptionServiceName?: string | null;
 }): ProjectDocument {
-  const { invoice, quote, agreement, invoiceCount, payUrl } = input;
+  const { invoice, quote, agreement, payUrl } = input;
+  const subscriptionName = input.subscriptionServiceName?.trim() || null;
+  const invoiceCount = subscriptionName ? undefined : input.invoiceCount;
   const lineItems = input.lineItems ?? [];
   const discountCents = Math.max(0, Math.round(input.discountCents ?? 0));
   const subtotalCents = Math.max(
@@ -470,7 +474,7 @@ export function buildInvoiceDoc(input: {
   const clientName = quote.company?.trim() || quote.contact_name;
 
   const facts: DocFact[] = [
-    { label: "Invoice number", value: invoice.invoice_number },
+    { label: subscriptionName ? "Subscription bill" : "Invoice number", value: invoice.invoice_number },
     ...(agreement ? [{ label: "Agreement", value: agreement.agreement_number }] : []),
     ...(quote.quote_number ? [{ label: "Quote", value: quote.quote_number }] : []),
     { label: "Issue date", value: invoice.issue_date ?? "—" },
@@ -557,8 +561,10 @@ export function buildInvoiceDoc(input: {
     kind: "invoice",
     documentNumber: invoice.invoice_number,
     title: clientName.toUpperCase(),
-    subtitle: "Invoice",
-    documentTitle: paidInFull ? "Invoice — Paid in Full" : "Invoice",
+    subtitle: subscriptionName ? `${subscriptionName} Subscription` : "Invoice",
+    documentTitle: subscriptionName
+      ? `${subscriptionName} Subscription${paidInFull ? " — Paid in Full" : ""}`
+      : paidInFull ? "Invoice — Paid in Full" : "Invoice",
     clientName,
     date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
     preparedFor: {

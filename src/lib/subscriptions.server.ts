@@ -4,6 +4,7 @@
 import { adminDb, writeAudit } from "@/lib/blex.server";
 import { formatMoney } from "@/lib/documents/types";
 import { UserFacingError } from "@/lib/errors";
+import { toSubscriptionNumber } from "@/lib/subscription-copy";
 import {
   addYears,
   coerceSubscriptionSettings,
@@ -75,7 +76,14 @@ async function insertPeriodInvoice(input: {
   };
   const { data, error } = await adminDb().from("invoices").insert(row as never).select("id, invoice_number").single();
   if (error || !data) throw new Error(error?.message ?? "Could not create the subscription invoice.");
-  return { id: data.id as string, invoiceNumber: data.invoice_number as string };
+  // Subscription bills share the invoice sequence (so numbers never collide)
+  // but are labelled SUB- instead of INV-.
+  const invoiceNumber = toSubscriptionNumber(data.invoice_number as string);
+  if (invoiceNumber !== data.invoice_number) {
+    const { error: renameError } = await adminDb().from("invoices").update({ invoice_number: invoiceNumber } as never).eq("id", data.id);
+    if (renameError) return { id: data.id as string, invoiceNumber: data.invoice_number as string };
+  }
+  return { id: data.id as string, invoiceNumber };
 }
 
 export type CreateSubscriptionInput = {
