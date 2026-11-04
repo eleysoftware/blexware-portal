@@ -373,6 +373,8 @@ export type Database = {
           sequence: number
           sms_reminder_count: number
           status: Database["public"]["Enums"]["invoice_status"]
+          subscription_id: string | null
+          subscription_period_end: string | null
           subtotal_cents: number
           updated_at: string
           viewed_at: string | null
@@ -404,6 +406,8 @@ export type Database = {
           sequence: number
           sms_reminder_count?: number
           status?: Database["public"]["Enums"]["invoice_status"]
+          subscription_id?: string | null
+          subscription_period_end?: string | null
           subtotal_cents?: number
           updated_at?: string
           viewed_at?: string | null
@@ -435,6 +439,8 @@ export type Database = {
           sequence?: number
           sms_reminder_count?: number
           status?: Database["public"]["Enums"]["invoice_status"]
+          subscription_id?: string | null
+          subscription_period_end?: string | null
           subtotal_cents?: number
           updated_at?: string
           viewed_at?: string | null
@@ -452,6 +458,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -963,6 +976,77 @@ export type Database = {
             columns: ["invoice_payment_id"]
             isOneToOne: false
             referencedRelation: "invoice_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          activation_invoice_id: string | null
+          amount_cents: number
+          auto_renew: boolean
+          billing_interval: string
+          cancelled_at: string | null
+          created_at: string
+          currency: string
+          id: string
+          last_notice_for: string | null
+          provider: string | null
+          provider_environment: string | null
+          provider_subscription_id: string | null
+          quote_id: string
+          renewal_date: string
+          service_name: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activation_invoice_id?: string | null
+          amount_cents: number
+          auto_renew?: boolean
+          billing_interval?: string
+          cancelled_at?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          last_notice_for?: string | null
+          provider?: string | null
+          provider_environment?: string | null
+          provider_subscription_id?: string | null
+          quote_id: string
+          renewal_date: string
+          service_name?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activation_invoice_id?: string | null
+          amount_cents?: number
+          auto_renew?: boolean
+          billing_interval?: string
+          cancelled_at?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          last_notice_for?: string | null
+          provider?: string | null
+          provider_environment?: string | null
+          provider_subscription_id?: string | null
+          quote_id?: string
+          renewal_date?: string
+          service_name?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
         ]
