@@ -9,3 +9,4 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 - Provider keys/settings resolve from `public.provider_credentials` (server-only table, loaded per request with a 1-minute cache into the `readEnv` overlay) before env variables — keeps the app host-agnostic while env vars remain a fallback.
+- Yearly subscriptions live in `public.subscriptions`; each billing year is a normal invoice linked by `subscription_id`, and renewals run in the nightly cron — keeps payments, reminders and receipts on one path.

@@ -14,6 +14,7 @@ import { PaymentEnvironmentCard } from "@/components/admin/PaymentEnvironmentCar
 import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
 import { InvoiceDateEditor } from "@/components/admin/InvoiceDateEditor";
 import { PaymentMethodSettingsCard } from "@/components/admin/PaymentMethodSettingsCard";
+import { HostingSubscriptionsCard } from "@/components/admin/HostingSubscriptionsCard";
 import { ProviderCredentialsCard } from "@/components/admin/ProviderCredentialsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -765,6 +766,7 @@ function AdminDashboard() {
 
         <PaymentEnvironmentCard />
 
+        <HostingSubscriptionsCard />
         <PaymentMethodSettingsCard />
         <ProviderCredentialsCard />
 

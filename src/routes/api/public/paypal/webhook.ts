@@ -16,6 +16,26 @@ export const Route = createFileRoute("/api/public/paypal/webhook")({
 
         const db = adminDb();
 
+        if (parsed.kind === "subscription_payment" || parsed.kind === "subscription_status") {
+          const eventId = `paypal:sub:${parsed.eventId}`;
+          const { error: dupe } = await db.from("payment_events").insert({
+            event_type: parsed.kind === "subscription_payment" ? "paypal_subscription_payment" : "paypal_subscription_status",
+            event_id: eventId,
+            event_payload: parsed as unknown as Record<string, unknown>,
+            signature_verified: true,
+          });
+          if (dupe) {
+            if (dupe.code === "23505" || dupe.message.includes("duplicate")) return new Response("ok");
+            console.error("[paypal:webhook]", dupe.message);
+            return new Response("error", { status: 500 });
+          }
+          const subs = await import("@/lib/subscriptions.server");
+          if (parsed.kind === "subscription_payment") await subs.applySubscriptionPayment(parsed);
+          else await subs.applySubscriptionStatus(parsed);
+          await db.from("payment_events").update({ processed_at: new Date().toISOString() }).eq("event_id", eventId);
+          return new Response("ok");
+        }
+
         // Build a stable event id for idempotency. PayPal already provides an
         // event id, but we also hash the payload so replays are no-ops.
         const eventId =

@@ -383,6 +383,26 @@ export function createPaypalProvider(environment: PayPalEnvironment = "sandbox")
       };
     }
 
+    // Recurring billing (PayPal Subscriptions) events.
+    const sub = resource as { id?: string; status?: string; billing_agreement_id?: string; amount?: { total?: string; value?: string } };
+    if (eventType === "PAYMENT.SALE.COMPLETED" && sub.billing_agreement_id) {
+      return {
+        kind: "subscription_payment",
+        eventId: event.id ?? `sale:${sub.id ?? ""}`,
+        subscriptionId: sub.billing_agreement_id,
+        saleId: sub.id ?? "",
+        amountCents: parseAmount(sub.amount?.total ?? sub.amount?.value),
+      };
+    }
+    if (eventType.startsWith("BILLING.SUBSCRIPTION.") && sub.id) {
+      return {
+        kind: "subscription_status",
+        eventId: event.id ?? `${eventType}:${sub.id}`,
+        subscriptionId: sub.id,
+        status: (sub.status ?? eventType.replace("BILLING.SUBSCRIPTION.", "")).toUpperCase(),
+      };
+    }
+
     return { kind: "ignore" };
   },
 };
@@ -390,3 +410,84 @@ export function createPaypalProvider(environment: PayPalEnvironment = "sandbox")
 
 /** Env-default instance. Prefer createPaypalProvider(activeEnvironment). */
 export const paypalProvider: PaymentProvider = createPaypalProvider(paypalEnvironment());
+
+// ---------------------------------------------------------------------------
+// PayPal Subscriptions (yearly auto-renew)
+
+export type PayPalSubscription = {
+  id: string;
+  status: string;
+  billing_info?: {
+    next_billing_time?: string;
+    last_payment?: { amount?: { value?: string }; time?: string };
+  };
+  links?: Array<{ rel: string; href: string }>;
+};
+
+export const paypalSubscriptions = {
+  async createProduct(env: PayPalEnvironment, name: string): Promise<string> {
+    const product = await paypalRequest<{ id: string }>(env, "/v1/catalogs/products", {
+      method: "POST",
+      body: { name, type: "SERVICE", category: "SOFTWARE" },
+    });
+    return product.id;
+  },
+  async createYearlyPlan(
+    env: PayPalEnvironment,
+    input: { productId: string; name: string; amountCents: number; currency: string },
+  ): Promise<string> {
+    const plan = await paypalRequest<{ id: string }>(env, "/v1/billing/plans", {
+      method: "POST",
+      body: {
+        product_id: input.productId,
+        name: input.name,
+        status: "ACTIVE",
+        billing_cycles: [
+          {
+            frequency: { interval_unit: "YEAR", interval_count: 1 },
+            tenure_type: "REGULAR",
+            sequence: 1,
+            total_cycles: 0,
+            pricing_scheme: {
+              fixed_price: { value: (input.amountCents / 100).toFixed(2), currency_code: input.currency },
+            },
+          },
+        ],
+        payment_preferences: { auto_bill_outstanding: true, payment_failure_threshold: 2 },
+      },
+    });
+    return plan.id;
+  },
+  async create(
+    env: PayPalEnvironment,
+    input: { planId: string; customId: string; email?: string | null; returnUrl: string; cancelUrl: string },
+  ): Promise<{ id: string; approveUrl: string }> {
+    const result = await paypalRequest<PayPalSubscription>(env, "/v1/billing/subscriptions", {
+      method: "POST",
+      body: {
+        plan_id: input.planId,
+        custom_id: input.customId,
+        ...(input.email ? { subscriber: { email_address: input.email } } : {}),
+        application_context: {
+          brand_name: "BLEXware",
+          user_action: "SUBSCRIBE_NOW",
+          shipping_preference: "NO_SHIPPING",
+          return_url: input.returnUrl,
+          cancel_url: input.cancelUrl,
+        },
+      },
+    });
+    const approveUrl = result.links?.find((link) => link.rel === "approve")?.href;
+    if (!approveUrl) throw new UserFacingError("PayPal did not return an approval link.");
+    return { id: result.id, approveUrl };
+  },
+  get(env: PayPalEnvironment, id: string): Promise<PayPalSubscription> {
+    return paypalRequest<PayPalSubscription>(env, `/v1/billing/subscriptions/${encodeURIComponent(id)}`);
+  },
+  async cancel(env: PayPalEnvironment, id: string, reason: string): Promise<void> {
+    await paypalRequest(env, `/v1/billing/subscriptions/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      body: { reason },
+    });
+  },
+};

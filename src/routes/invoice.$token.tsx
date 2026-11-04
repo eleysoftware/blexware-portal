@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { DocumentPreview } from "@/components/DocumentPreview";
+import { SubscriptionRenewalPanel } from "@/components/SubscriptionRenewalPanel";
 import { Logo } from "@/components/Logo";
 import { PaymentCheckout, type CheckoutSession } from "@/components/PaymentCheckout";
 import { PageHero } from "@/components/PageHero";
@@ -226,6 +227,7 @@ function InvoicePage() {
             <DocumentPreview doc={invoice.data.doc} />
           </div>
         ) : null}
+        <SubscriptionRenewalPanel token={token} />
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-background p-8 shadow-card">
           <div className="flex items-center justify-between gap-4">
             <Logo className="h-7 w-auto" />

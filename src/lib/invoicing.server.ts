@@ -612,6 +612,15 @@ export async function applyPaymentStatus(input: {
       })
       .eq("id", invoice.id);
 
+    if (balance === 0) {
+      try {
+        const { onSubscriptionInvoicePaid } = await import("@/lib/subscriptions.server");
+        await onSubscriptionInvoicePaid(invoice.id as string);
+      } catch (error) {
+        console.error("[subscriptions] paid hook failed", error);
+      }
+    }
+
     // A full-balance payment covers later installments too — settle them in
     // sequence order instead of leaving them scheduled for a future email.
     const overflow = credited - appliedHere;
@@ -1077,7 +1086,16 @@ export async function runScheduledWork() {
     }
   }
 
+  let renewalsIssued = 0;
+  try {
+    const { runSubscriptionRenewals } = await import("@/lib/subscriptions.server");
+    renewalsIssued = (await runSubscriptionRenewals()).renewalsIssued;
+  } catch (error) {
+    console.error("[cron:subscriptions]", error);
+  }
+
   const summary = {
+    subscriptionRenewalsIssued: renewalsIssued,
     invoicesSent,
     invoicesFailed,
     proposalsClosed: staleProposals?.length ?? 0,

@@ -71,6 +71,8 @@ export type PublicConfig = {
 export type WebhookParseResult =
   | { kind: "payment"; providerPaymentId: string; status: PaymentStatus; amountCents?: number; paymentMethod?: string | null; processorTransactionId?: string | null; failureMessage?: string | null }
   | { kind: "refund"; refundId: string; providerPaymentId: string; status: string; amountCents: number; processorRefundId?: string | null }
+  | { kind: "subscription_payment"; eventId: string; subscriptionId: string; saleId: string; amountCents: number }
+  | { kind: "subscription_status"; eventId: string; subscriptionId: string; status: string }
   | { kind: "ignore" };
 
 export interface PaymentProvider {
