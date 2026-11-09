@@ -1,3 +1,4 @@
+import { breadcrumbLd, pageSeo } from "@/lib/seo";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Clock, Mail, MessageSquare, ShieldCheck } from "lucide-react";
 import { useState } from "react";
@@ -32,7 +33,13 @@ export const Route = createFileRoute("/contact")({
       { name: "description", content: description },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+      ...pageSeo("/contact").meta,
     ],
+    links: pageSeo("/contact").links,
+    scripts: [breadcrumbLd([{ name: "Home", path: "/" }, { name: "Contact", path: "/contact" }])],
   }),
   component: ContactPage,
 });

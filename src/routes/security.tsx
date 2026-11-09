@@ -1,3 +1,4 @@
+import { breadcrumbLd, pageSeo } from "@/lib/seo";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { LegalPage } from "@/components/LegalPage";
@@ -14,7 +15,13 @@ export const Route = createFileRoute("/security")({
       { name: "description", content: description },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+      ...pageSeo("/security").meta,
     ],
+    links: pageSeo("/security").links,
+    scripts: [breadcrumbLd([{ name: "Home", path: "/" }, { name: "Security", path: "/security" }])],
   }),
   component: SecurityPage,
 });

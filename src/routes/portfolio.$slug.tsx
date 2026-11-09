@@ -1,3 +1,4 @@
+import { breadcrumbLd, SITE_URL } from "@/lib/seo";
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { ArrowLeft, Check } from "lucide-react";
 
@@ -19,12 +20,33 @@ export const Route = createFileRoute("/portfolio/$slug")({
       };
     }
     const t = `${loaderData.project.name} Case Study — BLEXware`;
+    const url = `${SITE_URL}/portfolio/${loaderData.project.slug}`;
     return {
       meta: [
         { title: t },
         { name: "description", content: loaderData.project.summary },
         { property: "og:title", content: t },
         { property: "og:description", content: loaderData.project.summary },
+        { property: "og:url", content: url },
+        { name: "twitter:title", content: t },
+        { name: "twitter:description", content: loaderData.project.summary },
+        { property: "og:type", content: "article" },
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        { type: "application/ld+json", children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CreativeWork",
+            name: loaderData.project.name,
+            description: loaderData.project.summary,
+            creator: { "@type": "Organization", name: "BLEXware", url: SITE_URL },
+            url,
+          }) },
+        breadcrumbLd([
+          { name: "Home", path: "/" },
+          { name: "Portfolio", path: "/portfolio" },
+          { name: loaderData.project.name, path: `/portfolio/${loaderData.project.slug}` },
+        ]),
       ],
     };
   },

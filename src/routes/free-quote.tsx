@@ -1,3 +1,4 @@
+import { breadcrumbLd, pageSeo } from "@/lib/seo";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -105,7 +106,13 @@ export const Route = createFileRoute("/free-quote")({
       { name: "description", content: description },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+      ...pageSeo("/free-quote").meta,
     ],
+    links: pageSeo("/free-quote").links,
+    scripts: [breadcrumbLd([{ name: "Home", path: "/" }, { name: "Free quote", path: "/free-quote" }])],
   }),
   component: FreeQuotePage,
 });

@@ -1,3 +1,4 @@
+import { breadcrumbLd, pageSeo } from "@/lib/seo";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Check,
@@ -40,7 +41,13 @@ export const Route = createFileRoute("/services")({
       { name: "description", content: description },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+      ...pageSeo("/services").meta,
     ],
+    links: pageSeo("/services").links,
+    scripts: [breadcrumbLd([{ name: "Home", path: "/" }, { name: "Services", path: "/services" }])],
   }),
   component: ServicesPage,
 });

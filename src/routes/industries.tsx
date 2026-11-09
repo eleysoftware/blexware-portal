@@ -1,3 +1,4 @@
+import { breadcrumbLd, pageSeo } from "@/lib/seo";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, Check } from "lucide-react";
 
@@ -20,7 +21,13 @@ export const Route = createFileRoute("/industries")({
       { name: "description", content: description },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+      ...pageSeo("/industries").meta,
     ],
+    links: pageSeo("/industries").links,
+    scripts: [breadcrumbLd([{ name: "Home", path: "/" }, { name: "Industries", path: "/industries" }])],
   }),
   component: IndustriesPage,
 });

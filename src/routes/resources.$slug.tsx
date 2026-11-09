@@ -1,3 +1,4 @@
+import { breadcrumbLd, SITE_URL } from "@/lib/seo";
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 
@@ -17,13 +18,35 @@ export const Route = createFileRoute("/resources/$slug")({
       };
     }
     const t = `${loaderData.article.title} | BLEXware`;
+    const url = `${SITE_URL}/resources/${loaderData.article.slug}`;
     return {
       meta: [
         { title: t },
         { name: "description", content: loaderData.article.summary },
         { property: "og:title", content: t },
         { property: "og:description", content: loaderData.article.summary },
+        { property: "og:url", content: url },
+        { name: "twitter:title", content: t },
+        { name: "twitter:description", content: loaderData.article.summary },
         { property: "og:type", content: "article" },
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [
+        { type: "application/ld+json", children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            headline: loaderData.article.title,
+            description: loaderData.article.summary,
+            datePublished: loaderData.article.publishedDate,
+            author: { "@type": "Organization", name: loaderData.article.author },
+            publisher: { "@type": "Organization", name: "BLEXware", url: SITE_URL },
+            mainEntityOfPage: url,
+          }) },
+        breadcrumbLd([
+          { name: "Home", path: "/" },
+          { name: "Resources", path: "/resources" },
+          { name: loaderData.article.title, path: `/resources/${loaderData.article.slug}` },
+        ]),
       ],
     };
   },

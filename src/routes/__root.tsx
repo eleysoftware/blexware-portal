@@ -14,6 +14,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
+import { organizationLd } from "@/lib/seo";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 
@@ -92,6 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:site_name", content: "BLEXware" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "theme-color", content: "#23272F" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -102,7 +104,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap",
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
     ],
+    scripts: [organizationLd],
   }),
   shellComponent: RootShell,
   component: RootComponent,
