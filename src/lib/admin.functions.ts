@@ -1143,3 +1143,86 @@ export const refreshProposalDocuments = createServerFn({ method: "POST" })
       return { converted };
     }),
   );
+
+/**
+ * Imports an outside proposal document into an existing quote's Proposal tab.
+ * Updates the latest proposal in place (keeping its status) or creates a draft.
+ */
+export const importProposalIntoQuote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { quoteId: string; markdown: string; documentTitle?: string }) => {
+    if (!data.quoteId) throw new Error("Missing project");
+    if (!data.markdown?.trim()) throw new Error("Add the proposal content before importing");
+    return data;
+  })
+  .handler(
+    guarded("importProposalIntoQuote", "importing the proposal", async ({ data, context }) => {
+      const { requireAdmin, adminDb, writeAudit } = await import("@/lib/blex.server");
+      await requireAdmin(context.supabase, context.userId);
+      const db = adminDb();
+
+      const { data: quote, error: quoteError } = await db
+        .from("quotes")
+        .select("quote_number, contact_name, contact_email, project_type, company, phone")
+        .eq("id", data.quoteId)
+        .single();
+      if (quoteError || !quote) throw new Error(quoteError?.message ?? "Project not found");
+
+      const { buildProposalDocFromMarkdown } = await import("@/lib/documents/compose");
+      const { IMPORTED_PROPOSAL_MODEL } = await import("@/lib/documents/proposal");
+      const doc = buildProposalDocFromMarkdown({
+        markdown: data.markdown,
+        clientName: String(quote.contact_name ?? ""),
+        clientCompany: (quote.company as string | null) ?? null,
+        clientEmail: String(quote.contact_email ?? ""),
+        clientPhone: (quote.phone as string | null) ?? null,
+        projectType: String(quote.project_type || "Custom software"),
+        quoteNumber: String(quote.quote_number),
+      });
+      if (data.documentTitle?.trim()) doc.documentTitle = data.documentTitle.trim();
+
+      const { data: existing } = await db
+        .from("proposals")
+        .select("id")
+        .eq("quote_id", data.quoteId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const fields = {
+        model: IMPORTED_PROPOSAL_MODEL,
+        prompt: "Imported from an existing proposal document.",
+        content: data.markdown,
+        doc,
+      };
+      let proposalId: string;
+      if (existing) {
+        const { error } = await db.from("proposals").update(fields).eq("id", existing.id);
+        if (error) throw new Error(error.message);
+        proposalId = existing.id as string;
+      } else {
+        const { data: created, error } = await db
+          .from("proposals")
+          .insert({ quote_id: data.quoteId, status: "draft", ...fields })
+          .select("id")
+          .single();
+        if (error || !created) throw new Error(error?.message ?? "Could not save the proposal");
+        proposalId = created.id as string;
+      }
+
+      await persistProposalDocument(
+        db,
+        { id: proposalId, quote_id: data.quoteId, content: data.markdown, doc, model: IMPORTED_PROPOSAL_MODEL },
+        quote as QuotePartyRow,
+        { storeFiles: true },
+      );
+
+      await writeAudit({
+        actorId: context.userId,
+        action: "proposal.imported",
+        entity: "proposal",
+        entityId: proposalId,
+      });
+      return { proposalId, replaced: Boolean(existing) };
+    }),
+  );

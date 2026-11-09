@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AdminEngagementPanel } from "@/components/admin/AdminEngagementPanel";
+import { ImportProposalDialog } from "@/components/admin/ImportProposalDialog";
 import { EditClientDialog } from "@/components/admin/EditClientDialog";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 import { MoveInvoicesDialog } from "@/components/MoveInvoicesDialog";
@@ -486,6 +487,14 @@ function QuoteDetailPage() {
                       ? "Regenerate"
                       : "Generate draft"}
                 </Button>
+                <ImportProposalDialog
+                  quoteId={id}
+                  hasProposal={Boolean(proposal)}
+                  onImported={() => {
+                    void invalidate();
+                    void queryClient.invalidateQueries({ queryKey: ["engagement-admin", id] });
+                  }}
+                />
                 {proposal ? (
                   <>
                     <Button
