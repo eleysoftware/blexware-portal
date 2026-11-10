@@ -26,7 +26,7 @@ export const portfolio: PortfolioProject[] = [
     description:
       "Build Financial Wellness needed a presence that matched the seriousness of the advice it gives. We designed an authority-first site with structured service pages, an education library, and a consultation intake flow that captures the context an advisor needs before the first meeting.",
     image: bfwImage,
-    imageAlt: "Build Financial Wellness website shown on a laptop with financial planning dashboards",
+    imageAlt: "Build Financial Wellness homepage shown on desktop and mobile: \"Build a stronger financial future starting today\" with a free Financial Check-In sign-up",
     technologies: ["React", "TypeScript", "Tailwind CSS", "PostgreSQL", "Server-side rendering"],
     features: [
       "Service and program pages built for organic search",
@@ -35,10 +35,11 @@ export const portfolio: PortfolioProject[] = [
       "Accessible, mobile-first layouts throughout",
     ],
     screenshots: [
-      { caption: "Homepage with program overview" },
-      { caption: "Consultation intake flow" },
-      { caption: "Education library" },
+      { caption: "Homepage with free Financial Check-In" },
+      { caption: "Services for individuals and employers" },
+      { caption: "Resource library and newsletters" },
     ],
+    url: "https://www.buildyourfinancialwellness.com",
     featured: true,
   },
   {

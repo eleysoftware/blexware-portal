@@ -1,6 +1,6 @@
 import { breadcrumbLd, SITE_URL } from "@/lib/seo";
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 
 import { CtaBand } from "@/components/CtaBand";
 import { Section } from "@/components/Section";
@@ -125,6 +125,18 @@ function ProjectPage() {
                 </li>
               ))}
             </ul>
+            {project.url ? (
+              <a
+                href={project.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cta-emerald mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
+              >
+                Visit live website
+                <ExternalLink className="size-4" aria-hidden="true" />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            ) : null}
             <h2 className="mt-8 text-base">More work</h2>
             <ul className="mt-3 space-y-2">
               {others.map((item) => (
