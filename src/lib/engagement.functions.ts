@@ -730,7 +730,28 @@ export const generateAgreement = createServerFn({ method: "POST" })
         };
       }
 
-      const sourceDoc = estimate.doc as import("@/lib/documents/types").ProjectDocument;
+      const estimateDoc = estimate.doc as import("@/lib/documents/types").ProjectDocument;
+      // Sync narrative sections from the latest proposal so proposal edits flow
+      // into the SOW; pricing/schedule/payment sections stay from the approved estimate.
+      const { data: latestProposal } = await db
+        .from("proposals")
+        .select("doc")
+        .eq("quote_id", estimate.quote_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const proposalDoc = latestProposal?.doc as import("@/lib/documents/types").ProjectDocument | null;
+      const pricingRe = /investment|pricing|payment terms|project schedule/i;
+      const sourceDoc: import("@/lib/documents/types").ProjectDocument =
+        proposalDoc && Array.isArray(proposalDoc.sections) && proposalDoc.sections.length
+          ? {
+              ...estimateDoc,
+              sections: [
+                ...proposalDoc.sections.filter((section) => !pricingRe.test(section.heading)),
+                ...(estimateDoc.sections ?? []).filter((section) => pricingRe.test(section.heading)),
+              ],
+            }
+          : estimateDoc;
       const addendum = data.addendum?.trim();
       const docInput = addendum
         ? { ...sourceDoc, sections: [...(sourceDoc.sections ?? []), ...markdownToSections(addendum)] }
