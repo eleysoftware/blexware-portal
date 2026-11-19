@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { TabEmptyState } from "@/components/TabIntro";
 import { DocumentPreview } from "@/components/DocumentPreview";
+import { sowRevisions } from "@/lib/sow-revisions";
 import { SignatureBlock } from "@/components/SignatureBlock";
 import { InvoiceStatusControl } from "@/components/admin/InvoiceStatusControl";
 import { InvoiceDateEditor } from "@/components/admin/InvoiceDateEditor";
@@ -581,6 +582,8 @@ export function AdminEngagementPanel({
     format: string;
     created_at: string;
   }[];
+  const sowRevisionRows = sowRevisions(documents, agreements);
+  const latestSow = sowRevisionRows.find((row) => row.agreementId === agreement?.id) ?? null;
 
   const tabDocuments = documents.filter((doc) =>
     tab === "proposal"
@@ -1025,20 +1028,17 @@ export function AdminEngagementPanel({
           {agreement?.doc ? (
             <div className="mt-4 space-y-3">
               <DocumentPreview doc={agreement.doc} />
-              {documents.filter((doc) => doc.entity === "agreement").length ? (
-                <div className="flex flex-wrap gap-2">
-                  {documents
-                    .filter((doc) => doc.entity === "agreement")
-                    .map((doc) => (
-                      <Button
-                        key={doc.id}
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openDoc(doc.id)}
-                      >
-                        {doc.format.toUpperCase()}
-                      </Button>
-                    ))}
+              {latestSow ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {latestSow.pdfId ? (
+                    <Button size="sm" variant="outline" onClick={() => openDoc(latestSow.pdfId!)}>PDF</Button>
+                  ) : null}
+                  {latestSow.docxId ? (
+                    <Button size="sm" variant="outline" onClick={() => openDoc(latestSow.docxId!)}>DOCX</Button>
+                  ) : null}
+                  <span className="text-xs text-slate">
+                    Latest files · generated {new Date(latestSow.generatedAt).toLocaleString()}
+                  </span>
                 </div>
               ) : null}
               {sowEditable ? (
@@ -1136,17 +1136,34 @@ export function AdminEngagementPanel({
       {tab === "sow" && agreements.length ? (
         <div className="rounded-2xl border border-border bg-background p-6 shadow-card">
           <h3 className="text-sm font-medium">SOW versions</h3>
-          <ul className="mt-2 space-y-1 text-sm text-slate">
-            {agreements.map((row, index) => (
-              <li key={row.id} className="flex flex-wrap items-center gap-2">
+          <p className="mt-1 text-xs text-slate">A new revision is logged every time the SOW is generated.</p>
+          <ul className="mt-3 divide-y divide-border text-sm text-slate">
+            {sowRevisionRows.map((row) => (
+              <li key={row.key} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="font-medium text-foreground">Rev {row.revision}</span>
                 <span>
-                  v{agreements.length - index} · {row.agreement_number}
-                  {row.total_cents != null ? ` · ${formatMoney(Number(row.total_cents))}` : ""}
-                  {row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}
+                  · {row.agreementNumber} · {new Date(row.generatedAt).toLocaleString()}
                 </span>
-                <Badge variant="outline">{row.status}</Badge>
+                <Badge variant="outline">{row.agreementStatus}</Badge>
+                {row.latest ? <Badge>Latest</Badge> : null}
+                <span className="ml-auto flex gap-2">
+                  {row.pdfId ? (
+                    <Button size="sm" variant="ghost" onClick={() => openDoc(row.pdfId!)}>PDF</Button>
+                  ) : null}
+                  {row.docxId ? (
+                    <Button size="sm" variant="ghost" onClick={() => openDoc(row.docxId!)}>DOCX</Button>
+                  ) : null}
+                </span>
               </li>
             ))}
+            {!sowRevisionRows.length
+              ? agreements.map((row) => (
+                  <li key={row.id} className="py-2">
+                    {row.agreement_number} · updated{" "}
+                    {new Date((row as { updated_at?: string }).updated_at ?? row.created_at ?? "").toLocaleDateString()}
+                  </li>
+                ))
+              : null}
           </ul>
         </div>
       ) : null}
