@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { sowRevisions } from "@/lib/sow-revisions";
+import { expect, test as it } from "@playwright/test";
+const describe = (_: string, fn: () => void) => fn();
+import { sowRevisions } from "../../src/lib/sow-revisions";
 
 const ag = [{ id: "a1", agreement_number: "SOW-2026-0045", status: "draft" }];
 const doc = (id: string, format: string, at: string) => ({ id, entity: "agreement", entity_id: "a1", format, created_at: at });
