@@ -925,6 +925,10 @@ export const saveProposal = createServerFn({ method: "POST" })
 
       const { error } = await db.from("proposals").update({ content: data.content, doc }).eq("id", data.id);
       if (error) throw new Error(error.message);
+      if (doc && quote) {
+        // Keep the PDF/Word files in step with the edited text.
+        await storeProposalFiles(existing.quote_id as string, data.id, quote.quote_number as string, doc);
+      }
 
       await writeAudit({
         actorId: context.userId,

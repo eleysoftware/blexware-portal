@@ -57,7 +57,48 @@ function headingSize(level?: 1 | 2 | 3) {
 
 /* ------------------------------------------------------------------ PDF */
 
-export async function renderPdf(doc: ProjectDocument): Promise<Uint8Array> {
+const PDF_FALLBACKS: Record<string, string> = {
+  "│": "|", "┃": "|", "║": "|", "─": "-", "━": "-", "═": "=",
+  "▼": "v", "▲": "^", "►": ">", "▶": ">", "◄": "<", "◀": "<",
+  "→": "->", "⇒": "=>", "←": "<-", "↔": "<->", "✓": "[x]", "✔": "[x]",
+  "●": "•", "■": "•", "▪": "•", "◆": "•",
+};
+const WINANSI_EXTRA = new Set([
+  0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039,
+  0x0152, 0x017d, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122,
+  0x0161, 0x203a, 0x0153, 0x017e, 0x0178,
+]);
+
+/** Replace characters the standard PDF fonts (WinAnsi) cannot draw. */
+export function toWinAnsi(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (PDF_FALLBACKS[ch] !== undefined) out += PDF_FALLBACKS[ch];
+    else if ((code >= 0x20 && code <= 0x7e) || code === 9 || code === 10 || code === 13) out += ch;
+    else if ((code >= 0xa0 && code <= 0xff) || WINANSI_EXTRA.has(code)) out += ch;
+    else if (code >= 0x2500 && code <= 0x257f) out += "+"; // box-drawing corners/joins
+    else {
+      const plain = ch.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+      out += /^[\x20-\x7e]$/.test(plain) ? plain : " ";
+    }
+  }
+  return out;
+}
+
+function sanitizeForPdf<T>(value: T): T {
+  if (typeof value === "string") return toWinAnsi(value) as T;
+  if (Array.isArray(value)) return value.map(sanitizeForPdf) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, sanitizeForPdf(v)]),
+    ) as T;
+  }
+  return value;
+}
+
+export async function renderPdf(input: ProjectDocument): Promise<Uint8Array> {
+  const doc = sanitizeForPdf(input);
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);

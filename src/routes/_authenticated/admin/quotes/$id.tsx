@@ -170,7 +170,7 @@ function QuoteDetailPage() {
   const saveMutation = useMutation({
     mutationFn: () => save({ data: { id: proposal!.id, content, documentTitle } }),
     onSuccess: () => {
-      toast.success("Draft saved");
+      toast.success("Saved — PDF and Word files updated");
       void invalidate();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -194,7 +194,10 @@ function QuoteDetailPage() {
   });
 
   const refreshMutation = useMutation({
-    mutationFn: () => refreshDocs({ data: { quoteId: id } }),
+    mutationFn: async () => {
+      if (proposal) await save({ data: { id: proposal.id, content, documentTitle } });
+      return refreshDocs({ data: { quoteId: id } });
+    },
     onSuccess: () => {
       toast.success("Formatted documents refreshed");
       void invalidate();
