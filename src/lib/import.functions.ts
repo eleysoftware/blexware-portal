@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { guarded } from "@/lib/errors";
 import type { EstimateLineItem } from "@/lib/documents/types";
+import { normalizeSecondaryEmails } from "@/lib/collaborators";
 
 export type ImportStage =
   | "proposal_draft"
@@ -15,6 +16,7 @@ export type ImportStage =
 export type ImportProjectInput = {
   contactName: string;
   contactEmail: string;
+  secondaryEmails?: string[];
   company?: string;
   phone?: string;
   projectType: string;
@@ -195,7 +197,10 @@ export const importProject = createServerFn({ method: "POST" })
     if (ESTIMATE_STAGES.includes(data.stage) && !data.lineItems?.length) {
       throw new Error("Add at least one estimate line item for this stage");
     }
-    return data;
+    return {
+      ...data,
+      secondaryEmails: normalizeSecondaryEmails(data.secondaryEmails, data.contactEmail),
+    };
   })
   .handler(
     guarded("importProject", "importing the project", async ({ data, context }) => {
@@ -231,6 +236,7 @@ export const importProject = createServerFn({ method: "POST" })
           timeline: data.timeline.trim() || "Not stated",
           contact_name: data.contactName.trim(),
           contact_email: email,
+          secondary_emails: data.secondaryEmails ?? [],
           company: data.company?.trim() || null,
           phone: data.phone?.trim() || null,
           consent: true,

@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { guarded } from "@/lib/errors";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isPrimaryContact } from "@/lib/collaborators";
 
 import type { ProposalRecord } from "@/lib/quote-schema";
 
@@ -24,7 +26,7 @@ export const getProposalByToken = createServerFn({ method: "POST" })
       const [{ data: quote }, { data: documents }] = await Promise.all([
         db
           .from("quotes")
-          .select("id, quote_number, contact_name, project_type")
+          .select("id, quote_number, contact_name, contact_email, project_type")
           .eq("id", proposal.quote_id)
           .maybeSingle(),
         db
@@ -49,6 +51,7 @@ export const getProposalByToken = createServerFn({ method: "POST" })
               id: quote.id as string,
               number: quote.quote_number as string,
               name: quote.contact_name as string,
+              contactEmail: quote.contact_email as string,
               projectType: quote.project_type as string,
             }
           : null,
@@ -96,6 +99,7 @@ export const getProposalDocumentUrl = createServerFn({ method: "POST" })
   );
 
 export const respondToProposal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .validator(
     (data: { token: string; action: "approved" | "changes_requested" | "declined"; note?: string }) => {
       if (!/^[a-f0-9]{16,96}$/i.test(data.token)) throw new Error("Invalid link");
@@ -106,7 +110,7 @@ export const respondToProposal = createServerFn({ method: "POST" })
     },
   )
   .handler(
-    guarded("respondToProposal", "saving your response", async ({ data }) => {
+    guarded("respondToProposal", "saving your response", async ({ data, context }) => {
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
       const db = adminDb();
 
@@ -116,6 +120,16 @@ export const respondToProposal = createServerFn({ method: "POST" })
         .eq("review_token", data.token)
         .maybeSingle();
       if (!proposal || proposal.status === "draft") throw new Error("This link is no longer active.");
+
+      const { data: quote, error: quoteError } = await context.supabase
+        .from("quotes")
+        .select("contact_email")
+        .eq("id", proposal.quote_id)
+        .maybeSingle();
+      if (quoteError) throw new Error(quoteError.message);
+      if (!quote || !isPrimaryContact(context.claims["email"], quote.contact_email)) {
+        throw new Error("Proposal responses are reserved for the project's primary contact.");
+      }
 
       await db
         .from("proposals")
@@ -131,7 +145,7 @@ export const respondToProposal = createServerFn({ method: "POST" })
       await db.from("quotes").update({ status: quoteStatus }).eq("id", proposal.quote_id);
 
       await writeAudit({
-        actorLabel: "prospect",
+        actorLabel: `client:${String(context.claims["email"] ?? "unknown").toLowerCase()}`,
         action: `proposal.${data.action}`,
         entity: "quote",
         entityId: proposal.quote_id as string,

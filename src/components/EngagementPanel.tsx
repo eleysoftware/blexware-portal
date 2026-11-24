@@ -23,6 +23,7 @@ import {
 } from "@/lib/client-engagement.functions";
 import { formatMoney, type ProjectDocument } from "@/lib/documents/types";
 import { getTabEmptyState } from "@/lib/workflow-guidance";
+import { primaryContactOnlyMessage } from "@/lib/collaborators";
 
 type DocRow = { id: string; entity: string; entity_id: string; kind: string; format: string };
 
@@ -183,6 +184,10 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
   } | null;
   const invoices = (engagement.data?.invoices ?? []) as PortalInvoice[];
   const quoteRow = engagement.data?.quote ?? null;
+  const canManageApprovals = engagement.data?.isPrimaryContact === true;
+  const primaryOnlyNotice = primaryContactOnlyMessage(
+    quoteRow?.contact_email ?? "the primary contact",
+  );
   const documents = (engagement.data?.documents ?? []) as DocRow[];
   const payments = (engagement.data?.payments ?? []) as PortalPayment[];
   const project = (engagement.data?.project ?? null) as ProjectSummary | null;
@@ -229,7 +234,11 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
             </div>
           </details>
 
-          {estimate.status === "sent" ? (
+          {estimate.status === "sent" && !canManageApprovals ? (
+            <p className="mt-6 rounded-xl border border-border bg-muted p-4 text-sm text-slate">
+              {primaryOnlyNotice}
+            </p>
+          ) : estimate.status === "sent" ? (
             <div className="mt-6 space-y-3 border-t border-border pt-6">
               <label htmlFor="estimate-note" className="text-sm font-medium">
                 Add a note (optional)
@@ -296,8 +305,11 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
             countersign={agreement.doc?.acceptance?.countersign ?? null}
           />
 
-          {agreement.status === "signed" ? null : (
-
+          {agreement.status === "signed" ? null : !canManageApprovals ? (
+            <p className="mt-6 rounded-xl border border-border bg-muted p-4 text-sm text-slate">
+              {primaryOnlyNotice}
+            </p>
+          ) : (
             <div className="mt-6 space-y-4 border-t border-border pt-6">
               <div>
                 <label htmlFor="signature" className="text-sm font-medium">
@@ -476,28 +488,36 @@ export function EngagementPanel({ quoteId, tab }: { quoteId: string; tab?: Clien
               {quoteRow.completion_note ??
                 "We believe everything has been delivered. Confirm below, or tell us what's still outstanding."}
             </p>
-            <Textarea
-              className="mt-4"
-              rows={3}
-              placeholder="Anything still outstanding? (required if you're asking for changes)"
-              value={completionNote}
-              onChange={(event) => setCompletionNote(event.target.value)}
-            />
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button
-                disabled={completionMutation.isPending}
-                onClick={() => completionMutation.mutate("confirm")}
-              >
-                Confirm the work is complete
-              </Button>
-              <Button
-                variant="outline"
-                disabled={completionMutation.isPending}
-                onClick={() => completionMutation.mutate("request_changes")}
-              >
-                Something's still outstanding
-              </Button>
-            </div>
+            {canManageApprovals ? (
+              <>
+                <Textarea
+                  className="mt-4"
+                  rows={3}
+                  placeholder="Anything still outstanding? (required if you're asking for changes)"
+                  value={completionNote}
+                  onChange={(event) => setCompletionNote(event.target.value)}
+                />
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button
+                    disabled={completionMutation.isPending}
+                    onClick={() => completionMutation.mutate("confirm")}
+                  >
+                    Confirm the work is complete
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={completionMutation.isPending}
+                    onClick={() => completionMutation.mutate("request_changes")}
+                  >
+                    Something's still outstanding
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p className="mt-4 rounded-xl border border-border bg-muted p-4 text-sm text-slate">
+                {primaryOnlyNotice}
+              </p>
+            )}
           </div>
         ) : null
       ) : null}

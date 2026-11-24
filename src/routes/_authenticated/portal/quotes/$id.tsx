@@ -18,8 +18,8 @@ import { WorkspacePanel, WorkspaceTabs, type WorkspaceTab } from "@/components/W
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getMyDocumentUrl, getMyEngagement } from "@/lib/client-engagement.functions";
-import { respondToProposal } from "@/lib/proposals.functions";
+import { getMyDocumentUrl, getMyEngagement, respondToMyProposal } from "@/lib/client-engagement.functions";
+import { primaryContactOnlyMessage } from "@/lib/collaborators";
 import { getMyQuote, getMyQuoteFileUrl } from "@/lib/portal.functions";
 import { quoteStatusLabels, type QuoteStatus } from "@/lib/quote-schema";
 import { getNextStep, getTabPurpose } from "@/lib/workflow-guidance";
@@ -37,7 +37,7 @@ function PortalQuoteDetail() {
   const fetchQuote = useServerFn(getMyQuote);
   const fetchFileUrl = useServerFn(getMyQuoteFileUrl);
   const fetchDocUrl = useServerFn(getMyDocumentUrl);
-  const respond = useServerFn(respondToProposal);
+  const respond = useServerFn(respondToMyProposal);
   const [note, setNote] = useState("");
   const [tab, setTab] = useState("overview");
 
@@ -68,9 +68,9 @@ function PortalQuoteDetail() {
 
   const respondMutation = useMutation({
     mutationFn: (action: "approved" | "changes_requested" | "declined") => {
-      const token = detail.data?.proposal?.review_token;
-      if (!token) throw new Error("No proposal to respond to");
-      return respond({ data: { token, action, note } });
+      const proposalId = detail.data?.proposal?.id;
+      if (!proposalId) throw new Error("No proposal to respond to");
+      return respond({ data: { proposalId, action, note } });
     },
     onSuccess: () => {
       toast.success("Thanks — your response has been recorded.");
@@ -121,7 +121,18 @@ function PortalQuoteDetail() {
     );
   }
 
-  const nextStep = getNextStep(quote.status as QuoteStatus, "client", guidanceContext);
+  const rawNextStep = getNextStep(quote.status as QuoteStatus, "client", guidanceContext);
+  const collaboratorMustWait =
+    detail.data?.isPrimaryContact === false &&
+    rawNextStep.actor === "client" &&
+    (rawNextStep.tab !== "invoices" || Boolean(guidanceContext.completionRequestedAt));
+  const nextStep = collaboratorMustWait
+    ? {
+        ...rawNextStep,
+        actionable: false,
+        message: `You can review the project and help with UAT. ${String(quote.contact_email ?? "The primary contact")} handles approvals, signatures and completion responses.`,
+      }
+    : rawNextStep;
   // Direct-billed work has no proposal, estimate or SOW — show billing only.
   const directBilled =
     !detail.data?.proposal && ["invoicing", "completed"].includes(String(quote.status));
@@ -246,6 +257,10 @@ function PortalQuoteDetail() {
                     ? ` on ${new Date(proposal.responded_at).toLocaleDateString()}`
                     : ""}
                   . Reach out to your BLEXware contact if anything has changed.
+                </p>
+              ) : detail.data?.isPrimaryContact === false ? (
+                <p className="mt-6 rounded-xl border border-border bg-muted p-4 text-sm text-slate">
+                  {primaryContactOnlyMessage(String(quote.contact_email ?? "the primary contact"))}
                 </p>
               ) : (
                 <div className="mt-6 space-y-3 border-t border-border pt-6">

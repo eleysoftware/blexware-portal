@@ -322,6 +322,11 @@ function QuoteDetailPage() {
               {quote.contact_email}
             </a>
           </p>
+          {quote.secondary_emails?.length ? (
+            <p className="mt-1 text-sm text-slate">
+              Collaborators: {quote.secondary_emails.join(", ")}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <EditClientDialog
@@ -330,6 +335,7 @@ function QuoteDetailPage() {
             company={quote.company}
             phone={quote.phone}
             smsOptIn={quote.sms_opt_in === true}
+            secondaryEmails={quote.secondary_emails ?? []}
             projectCount={clientProjects.data?.projects?.length ?? 1}
           >
             <Button variant="outline" size="sm">

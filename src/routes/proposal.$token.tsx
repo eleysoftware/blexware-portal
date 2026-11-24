@@ -31,11 +31,27 @@ export const Route = createFileRoute("/proposal/$token")({
   component: ProposalReviewPage,
 });
 
+function useProposalViewerSession() {
+  return useQuery({
+    queryKey: ["proposal-viewer-session"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return {
+        signedIn: Boolean(data.user),
+        email: data.user?.email?.trim().toLowerCase() ?? null,
+      };
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 function ProposalReviewPage() {
   const { token } = Route.useParams();
   const fetchProposal = useServerFn(getProposalByToken);
   const fetchDocUrl = useServerFn(getProposalDocumentUrl);
   const respond = useServerFn(respondToProposal);
+  const session = useProposalViewerSession();
   const [note, setNote] = useState("");
 
   const query = useQuery({
@@ -76,6 +92,10 @@ function ProposalReviewPage() {
 
   const { proposal, quote } = query.data;
   const responded = proposal.status !== "sent";
+  const primaryContactEmail = quote?.contactEmail.trim().toLowerCase() ?? null;
+  const canRespond = Boolean(
+    session.data?.signedIn && primaryContactEmail && session.data.email === primaryContactEmail,
+  );
 
   const openDoc = async (documentId: string) => {
     try {
@@ -113,6 +133,15 @@ function ProposalReviewPage() {
               You responded: <strong className="text-foreground">{proposal.status.replace("_", " ")}</strong>
               {proposal.note ? ` — “${proposal.note}”` : ""}
             </p>
+          ) : !canRespond ? (
+            <div>
+              <h2 className="text-xl">Primary contact response required</h2>
+              <p className="mt-3 text-sm leading-relaxed text-slate">
+                You can review this proposal here. To approve, request changes or decline, sign in
+                with the primary contact email{primaryContactEmail ? ` (${primaryContactEmail})` : ""}.
+                Secondary contacts can review documents and help with UAT, but cannot submit the decision.
+              </p>
+            </div>
           ) : (
             <>
               <h2 className="text-xl">Your response</h2>
@@ -159,16 +188,7 @@ function ProposalReviewPage() {
 
 /** Offers portal sign-in / sign-up to clients reading a proposal link. */
 function PortalAccessCard({ quoteId }: { quoteId: string | null }) {
-  const session = useQuery({
-    queryKey: ["proposal-viewer-session"],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getSession();
-      return { signedIn: Boolean(data.session) };
-    },
-    staleTime: 60_000,
-    retry: false,
-  });
-
+  const session = useProposalViewerSession();
   const signedIn = session.data?.signedIn === true;
 
   return (

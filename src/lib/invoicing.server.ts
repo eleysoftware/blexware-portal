@@ -8,6 +8,7 @@ import { isOutOfCredits } from "@/lib/email-failure";
 import { emailInvoice, emailInvoiceReminder, siteUrl } from "@/lib/engagement-email.server";
 import { subscriptionReminderSms } from "@/lib/subscription-copy";
 import { isBusinessDayDue } from "@/lib/business-days";
+import { secondaryEmailCc } from "@/lib/collaborators";
 
 /** Builds the invoice schedule from the agreement's payment plan. */
 export async function createInvoiceSchedule(
@@ -243,7 +244,7 @@ export async function dispatchInvoice(invoiceId: string) {
 
   const { data: quote } = await db
     .from("quotes")
-    .select("contact_name, contact_email")
+    .select("contact_name, contact_email, secondary_emails")
     .eq("id", invoice.quote_id)
     .maybeSingle();
   if (!quote) throw new Error("Quote not found");
@@ -251,6 +252,7 @@ export async function dispatchInvoice(invoiceId: string) {
   const now = new Date().toISOString();
   const result = await emailInvoice({
     to: quote.contact_email as string,
+    cc: secondaryEmailCc(quote),
     name: quote.contact_name as string,
     invoiceNumber: invoice.invoice_number as string,
     amountCents: Number(invoice.amount_cents),
@@ -305,7 +307,7 @@ export async function renderInvoiceDocument(invoiceId: string) {
   const [{ data: quote }, agreementResult, { count }] = await Promise.all([
     db
       .from("quotes")
-      .select("contact_name, contact_email, company, quote_number")
+      .select("contact_name, contact_email, secondary_emails, company, quote_number")
       .eq("id", invoice.quote_id as string)
       .maybeSingle(),
     invoice.agreement_id
@@ -383,7 +385,7 @@ export async function loadInvoiceByToken(payToken: string) {
 
   const { data: quote } = await db
     .from("quotes")
-    .select("quote_number, contact_name, contact_email, company")
+    .select("quote_number, contact_name, contact_email, secondary_emails, company")
     .eq("id", invoice.quote_id)
     .maybeSingle();
 
@@ -616,7 +618,7 @@ export async function applyPaymentStatus(input: {
 
   const { data: quote } = await db
     .from("quotes")
-    .select("contact_name, contact_email")
+    .select("contact_name, contact_email, secondary_emails")
     .eq("id", invoice.quote_id)
     .maybeSingle();
   const url = `${siteUrl()}/invoice/${invoice.pay_token as string}`;
@@ -672,6 +674,7 @@ export async function applyPaymentStatus(input: {
     if (quote) {
       await emailReceipt({
         to: quote.contact_email as string,
+        cc: secondaryEmailCc(quote),
         name: quote.contact_name as string,
         invoiceNumber: invoice.invoice_number as string,
         amountCents: credited,
@@ -682,6 +685,7 @@ export async function applyPaymentStatus(input: {
       if (project.balanceCents === 0) {
         await emailPaymentUpdate({
           to: quote.contact_email as string,
+          cc: secondaryEmailCc(quote),
           name: quote.contact_name as string,
           invoiceNumber: invoice.invoice_number as string,
           amountCents: credited,
@@ -703,6 +707,7 @@ export async function applyPaymentStatus(input: {
   if (input.status === "processing" && previous !== "processing" && quote) {
     await emailPaymentUpdate({
       to: quote.contact_email as string,
+      cc: secondaryEmailCc(quote),
       name: quote.contact_name as string,
       invoiceNumber: invoice.invoice_number as string,
       amountCents: Number(matchedAttempt.amount_cents),
@@ -714,6 +719,7 @@ export async function applyPaymentStatus(input: {
   if (input.status === "failed" && previous !== "failed" && quote) {
     await emailPaymentUpdate({
       to: quote.contact_email as string,
+      cc: secondaryEmailCc(quote),
       name: quote.contact_name as string,
       invoiceNumber: invoice.invoice_number as string,
       amountCents: Number(matchedAttempt.amount_cents),
@@ -852,13 +858,14 @@ export async function applyRefundStatus(input: {
 
   const { data: quote } = await db
     .from("quotes")
-    .select("contact_name, contact_email")
+    .select("contact_name, contact_email, secondary_emails")
     .eq("id", invoice.quote_id)
     .maybeSingle();
   if (quote) {
      const { emailPaymentUpdate } = await import("@/lib/engagement-email.server");
     await emailPaymentUpdate({
       to: quote.contact_email as string,
+      cc: secondaryEmailCc(quote),
       name: quote.contact_name as string,
       invoiceNumber: invoice.invoice_number as string,
       amountCents: input.amountCents,
@@ -1029,7 +1036,7 @@ export async function runScheduledWork() {
       if (!balance || !isBusinessDayDue(anchor, 3, new Date(now))) continue;
       const { data: quote } = await db
         .from("quotes")
-        .select("contact_name, contact_email, phone, sms_opt_in")
+        .select("contact_name, contact_email, secondary_emails, phone, sms_opt_in")
         .eq("id", invoice.quote_id)
         .maybeSingle();
       if (!quote?.contact_email) continue;
@@ -1038,6 +1045,7 @@ export async function runScheduledWork() {
         const payUrl = `${siteUrl()}/invoice/${invoice.pay_token as string}`;
         const result = await emailInvoiceReminder({
           to: quote.contact_email as string,
+          cc: secondaryEmailCc(quote),
           name: quote.contact_name as string,
           invoiceNumber: invoice.invoice_number as string,
           balanceCents: balance,

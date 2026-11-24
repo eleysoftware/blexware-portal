@@ -16,7 +16,7 @@ export function siteUrl(): string {
   return SITE_URL.replace(/\/$/, "");
 }
 
-export async function emailEstimateSent(input: { to: string; name: string; quoteNumber: string; url: string; totalCents: number }) {
+export async function emailEstimateSent(input: { to: string; name: string; cc?: string[]; quoteNumber: string; url: string; totalCents: number }) {
   const mail = renderEmail({
     heading: "Your cost and schedule estimate",
     paragraphs: [
@@ -26,10 +26,10 @@ export async function emailEstimateSent(input: { to: string; name: string; quote
     ],
     cta: { label: "Review the estimate", url: input.url },
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Your estimate — ${input.quoteNumber}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Your estimate — ${input.quoteNumber}`, ...mail });
 }
 
-export async function emailAgreementSent(input: { to: string; name: string; agreementNumber: string; url: string }) {
+export async function emailAgreementSent(input: { to: string; name: string; cc?: string[]; agreementNumber: string; url: string }) {
   const mail = renderEmail({
     heading: "Your Statement of Work is ready to sign",
     paragraphs: [
@@ -39,10 +39,10 @@ export async function emailAgreementSent(input: { to: string; name: string; agre
     ],
     cta: { label: "Review and sign", url: input.url },
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Ready to sign — ${input.agreementNumber}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Ready to sign — ${input.agreementNumber}`, ...mail });
 }
 
-export async function emailThankYouDeclined(input: { to: string; name: string; quoteNumber: string; note?: string | null }) {
+export async function emailThankYouDeclined(input: { to: string; name: string; cc?: string[]; quoteNumber: string; note?: string | null }) {
   const mail = renderEmail({
     heading: "Thank you for working through this with us",
     paragraphs: [
@@ -52,12 +52,13 @@ export async function emailThankYouDeclined(input: { to: string; name: string; q
       "It was a pleasure getting to know your project.",
     ],
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Thank you — ${input.quoteNumber}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Thank you — ${input.quoteNumber}`, ...mail });
 }
 
 export async function emailInvoice(input: {
   to: string;
   name: string;
+  cc?: string[];
   invoiceNumber: string;
   amountCents: number;
   dueDate: string | null;
@@ -68,7 +69,7 @@ export async function emailInvoice(input: {
   if (input.subscription) {
     const copy = subscriptionInvoiceEmailCopy({ ...input, subscription: input.subscription });
     const mail = renderEmail({ heading: copy.heading, paragraphs: copy.paragraphs, cta: { label: copy.ctaLabel, url: input.url } });
-    return sendEmail({ to: input.to, toName: input.name, subject: copy.subject, ...mail });
+    return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: copy.subject, ...mail });
   }
   const mail = renderEmail({
     heading: `Invoice ${input.invoiceNumber} — ${formatMoney(input.amountCents)}`,
@@ -79,12 +80,13 @@ export async function emailInvoice(input: {
     ],
     cta: { label: "Pay invoice online", url: input.url },
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Invoice ${input.invoiceNumber} — ${formatMoney(input.amountCents)}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Invoice ${input.invoiceNumber} — ${formatMoney(input.amountCents)}`, ...mail });
 }
 
 export async function emailInvoiceReminder(input: {
   to: string;
   name: string;
+  cc?: string[];
   invoiceNumber: string;
   balanceCents: number;
   dueDate: string;
@@ -94,7 +96,7 @@ export async function emailInvoiceReminder(input: {
   if (input.serviceName) {
     const copy = subscriptionReminderEmailCopy({ ...input, serviceName: input.serviceName });
     const mail = renderEmail({ heading: copy.heading, paragraphs: copy.paragraphs, cta: { label: copy.ctaLabel, url: input.url } });
-    return sendEmail({ to: input.to, toName: input.name, subject: copy.subject, ...mail });
+    return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: copy.subject, ...mail });
   }
   const mail = renderEmail({
     heading: `Payment reminder — ${input.invoiceNumber}`,
@@ -108,6 +110,7 @@ export async function emailInvoiceReminder(input: {
   return sendEmail({
     to: input.to,
     toName: input.name,
+    cc: input.cc,
     subject: `Payment reminder — ${input.invoiceNumber}`,
     ...mail,
   });
@@ -116,6 +119,7 @@ export async function emailInvoiceReminder(input: {
 export async function emailReceipt(input: {
   to: string;
   name: string;
+  cc?: string[];
   invoiceNumber: string;
   amountCents: number;
   projectBalanceCents?: number;
@@ -139,11 +143,11 @@ export async function emailReceipt(input: {
       ...scheduleCopy,
     ],
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Receipt — ${input.invoiceNumber}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Receipt — ${input.invoiceNumber}`, ...mail });
 }
 
 export async function emailPaymentUpdate(input: {
-  to: string; name: string; invoiceNumber: string; amountCents: number;
+  to: string; name: string; cc?: string[]; invoiceNumber: string; amountCents: number;
   kind: "submitted" | "processing" | "failed" | "refunded" | "paid_in_full";
   balanceCents?: number; url?: string;
 }) {
@@ -159,12 +163,12 @@ export async function emailPaymentUpdate(input: {
   const paragraphs = [`Hi ${input.name},`, ...entry.body];
   if (typeof input.balanceCents === "number" && input.balanceCents > 0) paragraphs.push(`Remaining balance on this invoice: ${formatMoney(input.balanceCents)}.`);
   const mail = renderEmail({ heading: entry.heading, paragraphs, ...(input.url ? { cta: { label: "View invoice", url: input.url } } : {}) });
-  return sendEmail({ to: input.to, toName: input.name, subject: entry.subject, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: entry.subject, ...mail });
 }
 
 /** Asks the client to confirm the delivered work so the project can be closed. */
 export async function emailCompletionRequest(input: {
-  to: string; name: string; quoteNumber: string; note?: string | null; url: string;
+  to: string; name: string; cc?: string[]; quoteNumber: string; note?: string | null; url: string;
 }) {
   const paragraphs = [
     `Hi ${input.name},`,
@@ -177,11 +181,11 @@ export async function emailCompletionRequest(input: {
     paragraphs,
     cta: { label: "Review and confirm", url: input.url },
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Confirm completion — ${input.quoteNumber}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Confirm completion — ${input.quoteNumber}`, ...mail });
 }
 
 /** Confirms to the client that the project has been closed out. */
-export async function emailProjectCompleted(input: { to: string; name: string; quoteNumber: string }) {
+export async function emailProjectCompleted(input: { to: string; name: string; cc?: string[]; quoteNumber: string }) {
   const mail = renderEmail({
     heading: "Your project is complete",
     paragraphs: [
@@ -189,7 +193,7 @@ export async function emailProjectCompleted(input: { to: string; name: string; q
       `${input.quoteNumber} is now closed out. Thank you for working with BLEXware — we'd love to help with whatever's next.`,
     ],
   });
-  return sendEmail({ to: input.to, toName: input.name, subject: `Project complete — ${input.quoteNumber}`, ...mail });
+  return sendEmail({ to: input.to, toName: input.name, cc: input.cc, subject: `Project complete — ${input.quoteNumber}`, ...mail });
 }
 
 export async function notifyTeam(subject: string, paragraphs: string[], replyTo?: string) {

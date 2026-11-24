@@ -10,6 +10,7 @@ import type {
 } from "@/lib/quote-schema";
 import { quoteStatuses } from "@/lib/quote-schema";
 import type { ProjectDocument } from "@/lib/documents/types";
+import { normalizeSecondaryEmails, secondaryEmailCc } from "@/lib/collaborators";
 
 type AdminDb = ReturnType<(typeof import("@/lib/blex.server"))["adminDb"]>;
 
@@ -680,6 +681,7 @@ export const updateClientDetails = createServerFn({ method: "POST" })
       contactEmail: string;
       phone: string | null;
       smsOptIn?: boolean;
+      secondaryEmails?: string[];
     }) => {
       const currentEmail = data.currentEmail.trim().toLowerCase();
       const contactEmail = data.contactEmail.trim().toLowerCase();
@@ -695,7 +697,8 @@ export const updateClientDetails = createServerFn({ method: "POST" })
       const phone = data.phone?.trim() ? data.phone.trim().slice(0, 40) : null;
       const smsOptIn = data.smsOptIn === true;
       if (smsOptIn && !phone) throw new Error("Add a mobile number before turning on text reminders");
-      return { currentEmail, contactEmail, contactName, company, phone, smsOptIn };
+      const secondaryEmails = normalizeSecondaryEmails(data.secondaryEmails, contactEmail);
+      return { currentEmail, contactEmail, contactName, company, phone, smsOptIn, secondaryEmails };
     },
   )
   .handler(
@@ -719,6 +722,7 @@ export const updateClientDetails = createServerFn({ method: "POST" })
           contact_name: data.contactName,
           company: data.company,
           contact_email: data.contactEmail,
+          secondary_emails: data.secondaryEmails,
           phone: data.phone,
           sms_opt_in: data.smsOptIn,
           sms_opt_in_at: data.smsOptIn ? new Date().toISOString() : null,
@@ -958,7 +962,7 @@ export const sendProposal = createServerFn({ method: "POST" })
 
       const { data: quote, error: quoteError } = await db
         .from("quotes")
-        .select("quote_number, contact_name, contact_email, project_type, company, phone")
+        .select("quote_number, contact_name, contact_email, secondary_emails, project_type, company, phone")
         .eq("id", proposal.quote_id)
         .single();
       if (quoteError || !quote) throw new Error(quoteError?.message ?? "Quote not found");
@@ -991,6 +995,7 @@ export const sendProposal = createServerFn({ method: "POST" })
         await sendEmail({
           to: contactEmail,
           toName: String(quote.contact_name ?? ""),
+          cc: secondaryEmailCc(quote),
           subject: `Your BLEXware proposal — ${String(quote.quote_number)}`,
           html: rendered.html,
           text: rendered.text,
@@ -1064,7 +1069,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 async function loadQuoteParty(db: AdminDb, quoteId: string) {
   const { data: quote, error } = await db
     .from("quotes")
-    .select("quote_number, contact_name, contact_email, project_type, company, phone")
+    .select("quote_number, contact_name, contact_email, secondary_emails, project_type, company, phone")
     .eq("id", quoteId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -1154,10 +1159,10 @@ export const refreshProposalDocuments = createServerFn({ method: "POST" })
  */
 export const importProposalIntoQuote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { quoteId: string; markdown: string; documentTitle?: string }) => {
+  .validator((data: { quoteId: string; markdown: string; documentTitle?: string; secondaryEmails?: string[] }) => {
     if (!data.quoteId) throw new Error("Missing project");
     if (!data.markdown?.trim()) throw new Error("Add the proposal content before importing");
-    return data;
+    return { ...data, secondaryEmails: normalizeSecondaryEmails(data.secondaryEmails) };
   })
   .handler(
     guarded("importProposalIntoQuote", "importing the proposal", async ({ data, context }) => {
@@ -1167,10 +1172,20 @@ export const importProposalIntoQuote = createServerFn({ method: "POST" })
 
       const { data: quote, error: quoteError } = await db
         .from("quotes")
-        .select("quote_number, contact_name, contact_email, project_type, company, phone")
+        .select("quote_number, contact_name, contact_email, secondary_emails, project_type, company, phone")
         .eq("id", data.quoteId)
         .single();
       if (quoteError || !quote) throw new Error(quoteError?.message ?? "Project not found");
+
+      const collaborators = normalizeSecondaryEmails(
+        data.secondaryEmails,
+        String(quote.contact_email ?? ""),
+      );
+      const { error: collaboratorError } = await db
+        .from("quotes")
+        .update({ secondary_emails: collaborators } as never)
+        .eq("id", data.quoteId);
+      if (collaboratorError) throw new Error(collaboratorError.message);
 
       const { buildProposalDocFromMarkdown } = await import("@/lib/documents/compose");
       const { IMPORTED_PROPOSAL_MODEL } = await import("@/lib/documents/proposal");
@@ -1226,6 +1241,7 @@ export const importProposalIntoQuote = createServerFn({ method: "POST" })
         action: "proposal.imported",
         entity: "proposal",
         entityId: proposalId,
+        metadata: { secondaryEmails: collaborators },
       });
       return { proposalId, replaced: Boolean(existing) };
     }),

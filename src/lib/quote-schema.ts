@@ -69,6 +69,7 @@ export type QuoteRecord = {
   timeline: string;
   contact_name: string;
   contact_email: string;
+  secondary_emails?: string[];
   company: string | null;
   phone: string | null;
   sms_opt_in?: boolean;

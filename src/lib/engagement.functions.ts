@@ -3,6 +3,7 @@ import { guarded } from "@/lib/errors";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { EstimateLineItem } from "@/lib/documents/types";
+import { secondaryEmailCc } from "@/lib/collaborators";
 
 export type EstimateInput = {
   quoteId: string;
@@ -586,7 +587,7 @@ export const sendEstimate = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("id, quote_number, contact_name, contact_email")
+        .select("id, quote_number, contact_name, contact_email, secondary_emails")
         .eq("id", estimate.quote_id)
         .single();
       if (!quote) throw new Error("Quote not found");
@@ -608,6 +609,7 @@ export const sendEstimate = createServerFn({ method: "POST" })
         await emailEstimateSent({
           to: contactEmail,
           name: quote.contact_name as string,
+          cc: secondaryEmailCc(quote),
           quoteNumber: quote.quote_number as string,
           url: `${siteUrl()}/portal/quotes/${estimate.quote_id as string}`,
           totalCents: Number(estimate.total_cents),
@@ -659,7 +661,7 @@ export const generateAgreement = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("id, quote_number, contact_name, contact_email")
+        .select("id, quote_number, contact_name, contact_email, secondary_emails")
         .eq("id", estimate.quote_id)
         .single();
       if (!quote) throw new Error("Quote not found");
@@ -815,7 +817,7 @@ export const sendAgreement = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("contact_name, contact_email")
+        .select("contact_name, contact_email, secondary_emails")
         .eq("id", agreement.quote_id as string)
         .maybeSingle();
       if (!quote) throw new Error("Quote not found");
@@ -826,6 +828,7 @@ export const sendAgreement = createServerFn({ method: "POST" })
         await emailAgreementSent({
           to: quote.contact_email as string,
           name: quote.contact_name as string,
+          cc: secondaryEmailCc(quote),
           agreementNumber: agreement.agreement_number as string,
           url: `${siteUrl()}/portal/quotes/${agreement.quote_id as string}`,
         }),
@@ -1351,7 +1354,7 @@ export const requestProjectCompletion = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("id, quote_number, contact_name, contact_email, completed_at")
+        .select("id, quote_number, contact_name, contact_email, secondary_emails, completed_at")
         .eq("id", data.quoteId)
         .maybeSingle();
       if (!quote) throw new Error("Project not found");
@@ -1375,6 +1378,7 @@ export const requestProjectCompletion = createServerFn({ method: "POST" })
       await emailCompletionRequest({
         to: quote.contact_email as string,
         name: quote.contact_name as string,
+        cc: secondaryEmailCc(quote),
         quoteNumber: quote.quote_number as string,
         note: data.note ?? null,
         url: `${siteUrl()}/portal/quotes/${data.quoteId}`,
@@ -1409,7 +1413,7 @@ export const closeProjectWithoutClient = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("id, quote_number, contact_name, contact_email, completed_at")
+        .select("id, quote_number, contact_name, contact_email, secondary_emails, completed_at")
         .eq("id", data.quoteId)
         .maybeSingle();
       if (!quote) throw new Error("Project not found");
@@ -1434,6 +1438,7 @@ export const closeProjectWithoutClient = createServerFn({ method: "POST" })
       await emailProjectCompleted({
         to: quote.contact_email as string,
         name: quote.contact_name as string,
+        cc: secondaryEmailCc(quote),
         quoteNumber: quote.quote_number as string,
       });
 

@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateClientDetails } from "@/lib/admin.functions";
+import { normalizeSecondaryEmails } from "@/lib/collaborators";
 
 const clientSchema = z.object({
   contactName: z.string().trim().min(2, "Enter the contact's name").max(80),
@@ -31,6 +32,7 @@ export type EditClientDialogProps = {
   company?: string | null;
   phone?: string | null;
   smsOptIn?: boolean;
+  secondaryEmails?: string[];
   projectCount: number;
   /** Emails of every other client in the queue, used to warn about a merge. */
   otherEmails?: string[];
@@ -43,6 +45,7 @@ export function EditClientDialog({
   company,
   phone,
   smsOptIn = false,
+  secondaryEmails = [],
   projectCount,
   otherEmails = [],
   children,
@@ -53,6 +56,7 @@ export function EditClientDialog({
   const [email, setEmail] = useState(currentEmail);
   const [phoneValue, setPhoneValue] = useState(phone ?? "");
   const [smsOptInValue, setSmsOptInValue] = useState(smsOptIn);
+  const [secondaryEmailsValue, setSecondaryEmailsValue] = useState(secondaryEmails.join(", "));
   const [error, setError] = useState<string | null>(null);
   const [mergeAcknowledged, setMergeAcknowledged] = useState(false);
 
@@ -66,9 +70,10 @@ export function EditClientDialog({
     setEmail(currentEmail);
     setPhoneValue(phone ?? "");
     setSmsOptInValue(smsOptIn);
+    setSecondaryEmailsValue(secondaryEmails.join(", "));
     setError(null);
     setMergeAcknowledged(false);
-  }, [open, contactName, company, currentEmail, phone, smsOptIn]);
+  }, [open, contactName, company, currentEmail, phone, smsOptIn, secondaryEmails]);
 
   const normalised = email.trim().toLowerCase();
   const emailChanged = normalised !== currentEmail.trim().toLowerCase();
@@ -83,6 +88,7 @@ export function EditClientDialog({
       contactEmail: string;
       phone: string | null;
       smsOptIn: boolean;
+      secondaryEmails: string[];
     }) => save({ data: input }),
     onSuccess: (result) => {
       const count = result?.updated ?? projectCount;
@@ -118,6 +124,13 @@ export function EditClientDialog({
       setError("Add a mobile number before turning on text reminders.");
       return;
     }
+    let collaborators: string[];
+    try {
+      collaborators = normalizeSecondaryEmails(secondaryEmailsValue, parsed.data.contactEmail);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Check the secondary emails.");
+      return;
+    }
     setError(null);
     mutation.mutate({
       currentEmail,
@@ -126,13 +139,14 @@ export function EditClientDialog({
       contactEmail: parsed.data.contactEmail,
       phone: parsed.data.phone ? parsed.data.phone : null,
       smsOptIn: smsOptInValue,
+      secondaryEmails: collaborators,
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit client details</DialogTitle>
           <DialogDescription>
@@ -173,6 +187,18 @@ export function EditClientDialog({
                 The client will need to sign in with the new address to see their projects.
               </p>
             ) : null}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="client-secondary-emails">Secondary emails (optional)</Label>
+            <Input
+              id="client-secondary-emails"
+              value={secondaryEmailsValue}
+              onChange={(event) => setSecondaryEmailsValue(event.target.value)}
+              placeholder="collaborator@example.com, reviewer@example.com"
+            />
+            <p className="text-xs text-slate">
+              Separate addresses with commas. Collaborators receive project emails and can view documents, share resources and help with UAT. Only the primary contact can approve or sign.
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="client-phone">Mobile number (optional)</Label>

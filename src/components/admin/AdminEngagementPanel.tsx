@@ -998,6 +998,54 @@ export function AdminEngagementPanel({
               : ""}
           </p>
 
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted/40 p-3" data-testid="sow-actions">
+            {sowEditable ? (
+              <Button
+                className="shadow-cta"
+                data-testid="sow-generate"
+                disabled={
+                  generateMutation.isPending ||
+                  sowEstimate.status !== "approved" ||
+                  (agreement != null && agreement.status !== "draft" && !sowReviseMode)
+                }
+                onClick={() => generateMutation.mutate()}
+              >
+                {generateMutation.isPending
+                  ? "Generating…"
+                  : sowReviseMode
+                    ? "Void & generate revised SOW"
+                    : agreement
+                      ? "Regenerate SOW"
+                      : "Generate SOW"}
+              </Button>
+            ) : null}
+            {sowEditable && agreement?.status === "draft" ? (
+              <Button
+                variant="outline"
+                data-testid="sow-send"
+                disabled={sendSowMutation.isPending}
+                onClick={() => sendSowMutation.mutate()}
+              >
+                {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
+              </Button>
+            ) : null}
+            {latestSow?.pdfId ? (
+              <Button size="sm" variant="outline" onClick={() => openDoc(latestSow.pdfId!)}>
+                Latest PDF
+              </Button>
+            ) : null}
+            {latestSow?.docxId ? (
+              <Button size="sm" variant="outline" onClick={() => openDoc(latestSow.docxId!)}>
+                Latest DOCX
+              </Button>
+            ) : null}
+            {latestSow ? (
+              <span className="text-xs text-slate">
+                Generated {new Date(latestSow.generatedAt).toLocaleString()}
+              </span>
+            ) : null}
+          </div>
+
           {sowEditable ? (
             <>
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -1027,20 +1075,9 @@ export function AdminEngagementPanel({
 
           {agreement?.doc ? (
             <div className="mt-4 space-y-3">
-              <DocumentPreview doc={agreement.doc} />
-              {latestSow ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {latestSow.pdfId ? (
-                    <Button size="sm" variant="outline" onClick={() => openDoc(latestSow.pdfId!)}>PDF</Button>
-                  ) : null}
-                  {latestSow.docxId ? (
-                    <Button size="sm" variant="outline" onClick={() => openDoc(latestSow.docxId!)}>DOCX</Button>
-                  ) : null}
-                  <span className="text-xs text-slate">
-                    Latest files · generated {new Date(latestSow.generatedAt).toLocaleString()}
-                  </span>
-                </div>
-              ) : null}
+              <div className="max-h-[32rem] overflow-y-auto rounded-xl border border-border bg-background" data-testid="sow-preview-frame">
+                <DocumentPreview doc={agreement.doc} />
+              </div>
               {sowEditable ? (
                 <details className="rounded-xl border border-border p-3">
                   <summary className="cursor-pointer text-sm font-medium">
@@ -1098,38 +1135,6 @@ export function AdminEngagementPanel({
             </p>
           ) : null}
 
-          {sowEditable ? (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button
-                className="shadow-cta"
-                data-testid="sow-generate"
-                disabled={
-                  generateMutation.isPending ||
-                  sowEstimate.status !== "approved" ||
-                  (agreement != null && agreement.status !== "draft" && !sowReviseMode)
-                }
-                onClick={() => generateMutation.mutate()}
-              >
-                {generateMutation.isPending
-                  ? "Generating…"
-                  : sowReviseMode
-                    ? "Void & generate revised SOW"
-                    : agreement
-                      ? "Regenerate SOW"
-                      : "Generate SOW"}
-              </Button>
-              {agreement?.status === "draft" ? (
-                <Button
-                  variant="outline"
-                  data-testid="sow-send"
-                  disabled={sendSowMutation.isPending}
-                  onClick={() => sendSowMutation.mutate()}
-                >
-                  {sendSowMutation.isPending ? "Sending…" : "Send SOW for signature"}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       ) : null}
 

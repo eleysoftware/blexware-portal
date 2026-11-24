@@ -19,6 +19,7 @@ export const REPLY_TO_ADDRESS = emailReplyTo();
 export type SendEmailInput = {
   to: string;
   toName?: string;
+  cc?: string[];
   subject: string;
   html: string;
   text?: string;
@@ -144,6 +145,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       htmlbody: input.html,
       textbody: input.text ?? "",
     };
+    if (input.cc?.length) {
+      payload.cc = input.cc.map((address) => ({ email_address: { address, name: address } }));
+    }
     if (bounceAddress) payload.bounce_address = bounceAddress;
 
     const response = await fetch(endpoint, {

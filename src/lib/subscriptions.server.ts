@@ -2,6 +2,7 @@
 // normal invoice linked by subscription_id. Clients may opt into PayPal
 // auto-renew; others pay each renewal invoice manually.
 import { adminDb, writeAudit } from "@/lib/blex.server";
+import { secondaryEmailCc } from "@/lib/collaborators";
 import { formatMoney } from "@/lib/documents/types";
 import { UserFacingError } from "@/lib/errors";
 import { toSubscriptionNumber } from "@/lib/subscription-copy";
@@ -532,7 +533,7 @@ export async function runSubscriptionRenewals() {
       }
       const { data: quote } = await db
         .from("quotes")
-        .select("contact_name, contact_email, phone, sms_opt_in")
+        .select("contact_name, contact_email, secondary_emails, phone, sms_opt_in")
         .eq("id", sub.quote_id)
         .maybeSingle();
       const { data: inv } = await db.from("invoices").select("pay_token").eq("id", invoice.id).maybeSingle();
@@ -552,6 +553,7 @@ export async function runSubscriptionRenewals() {
       await sendEmail({
         to: quote.contact_email as string,
         toName: quote.contact_name as string,
+        cc: secondaryEmailCc(quote),
         subject: `Upcoming renewal — ${String(sub.service_name)} ${amount} on ${when}`,
         ...mail,
       });

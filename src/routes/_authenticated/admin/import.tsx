@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMoney } from "@/lib/documents/types";
 import { moveItem, nudgeItem } from "@/lib/reorder";
 import { importTemplates } from "@/content/import-templates";
+import { normalizeSecondaryEmails } from "@/lib/collaborators";
 import {
   extractProposalFromFile,
   importProject,
@@ -59,6 +60,7 @@ function ImportProjectPage() {
 
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [secondaryEmails, setSecondaryEmails] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [projectType, setProjectType] = useState("Website");
@@ -188,6 +190,7 @@ function ImportProjectPage() {
         data: {
           contactName,
           contactEmail,
+          secondaryEmails: normalizeSecondaryEmails(secondaryEmails, contactEmail),
           company,
           phone,
           projectType,
@@ -315,6 +318,18 @@ function ImportProjectPage() {
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
                 />
+              </label>
+              <label className="text-sm font-medium sm:col-span-2">
+                Secondary emails (optional, comma separated)
+                <Input
+                  className="mt-1"
+                  value={secondaryEmails}
+                  onChange={(e) => setSecondaryEmails(e.target.value)}
+                  placeholder="collaborator@example.com, reviewer@example.com"
+                />
+                <span className="mt-1 block text-xs font-normal text-slate">
+                  They receive project emails and can view documents, share resources and help with UAT. Only the primary contact can approve or sign.
+                </span>
               </label>
               <label className="text-sm font-medium">
                 Company

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { ProposalRecord, QuoteFileRecord, QuoteRecord } from "@/lib/quote-schema";
+import { isPrimaryContact } from "@/lib/collaborators";
 
 function viewerDb(supabase: unknown): SupabaseClient {
   return supabase as unknown as SupabaseClient;
@@ -218,6 +219,7 @@ export const getMyQuote = createServerFn({ method: "POST" })
         : { data: [] };
 
       return {
+        isPrimaryContact: isPrimaryContact(context.claims["email"], quote.contact_email),
         quote: quote as unknown as Partial<QuoteRecord>,
         files: (files ?? []) as unknown as QuoteFileRecord[],
         proposal: (proposal ?? null) as unknown as Pick<

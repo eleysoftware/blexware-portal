@@ -851,6 +851,7 @@ export type Database = {
           phone: string | null
           project_type: string
           quote_number: string
+          secondary_emails: string[]
           services: string[]
           sms_opt_in: boolean
           sms_opt_in_at: string | null
@@ -881,6 +882,7 @@ export type Database = {
           phone?: string | null
           project_type: string
           quote_number?: string
+          secondary_emails?: string[]
           services?: string[]
           sms_opt_in?: boolean
           sms_opt_in_at?: string | null
@@ -911,6 +913,7 @@ export type Database = {
           phone?: string | null
           project_type?: string
           quote_number?: string
+          secondary_emails?: string[]
           services?: string[]
           sms_opt_in?: boolean
           sms_opt_in_at?: string | null
@@ -1087,6 +1090,7 @@ export type Database = {
       next_agreement_number: { Args: never; Returns: string }
       next_invoice_number: { Args: never; Returns: string }
       next_quote_number: { Args: never; Returns: string }
+      viewer_can_access_quote: { Args: { _quote_id: string }; Returns: boolean }
       viewer_email: { Args: never; Returns: string }
     }
     Enums: {

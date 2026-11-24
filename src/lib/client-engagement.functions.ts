@@ -4,10 +4,28 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isPrimaryContact, secondaryEmailCc } from "@/lib/collaborators";
 
 /** The generated Database type predates these tables (schema applied by hand). */
 function viewerDb(supabase: unknown): SupabaseClient {
   return supabase as unknown as SupabaseClient;
+}
+
+/** Secondary collaborators may read and test, but never approve or sign. */
+async function requirePrimaryContact(
+  supabase: unknown,
+  viewerEmail: unknown,
+  quoteId: string,
+): Promise<void> {
+  const { data: quote, error } = await viewerDb(supabase)
+    .from("quotes")
+    .select("contact_email")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!quote || !isPrimaryContact(viewerEmail, quote.contact_email)) {
+    throw new Error("Approvals and signatures are reserved for the project's primary contact.");
+  }
 }
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -31,7 +49,7 @@ export const getMyEngagement = createServerFn({ method: "POST" })
         db
           .from("quotes")
           .select(
-            "id, status, quote_number, completion_requested_at, completion_note, completed_at, completion_confirmed_by, completion_change_request",
+            "id, status, quote_number, contact_email, completion_requested_at, completion_note, completed_at, completion_confirmed_by, completion_change_request",
           )
           .eq("id", data.quoteId)
           .maybeSingle(),
@@ -89,10 +107,12 @@ export const getMyEngagement = createServerFn({ method: "POST" })
       }
 
       return {
+        isPrimaryContact: isPrimaryContact(context.claims["email"], quote.data?.contact_email),
         quote: (quote.data ?? null) as {
           id: string;
           status: string;
           quote_number: string;
+          contact_email: string;
           completion_requested_at: string | null;
           completion_note: string | null;
           completed_at: string | null;
@@ -154,6 +174,7 @@ export const respondToMyProposal = createServerFn({ method: "POST" })
         .eq("id", data.proposalId)
         .maybeSingle();
       if (!visible) throw new Error("Proposal not found");
+      await requirePrimaryContact(context.supabase, context.claims["email"], visible.quote_id as string);
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
        const { emailThankYouDeclined, notifyTeam } = await import("@/lib/engagement-email.server");
@@ -176,7 +197,7 @@ export const respondToMyProposal = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("quote_number, contact_name, contact_email")
+        .select("quote_number, contact_name, contact_email, secondary_emails")
         .eq("id", visible.quote_id)
         .maybeSingle();
 
@@ -184,6 +205,7 @@ export const respondToMyProposal = createServerFn({ method: "POST" })
         await emailThankYouDeclined({
           to: quote.contact_email as string,
           name: quote.contact_name as string,
+          cc: secondaryEmailCc(quote),
           quoteNumber: quote.quote_number as string,
           note: data.note ?? null,
         });
@@ -230,6 +252,7 @@ export const respondToMyEstimate = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!visible) throw new Error("Estimate not found");
       if (visible.status !== "sent") throw new Error("This estimate is no longer open for response.");
+      await requirePrimaryContact(context.supabase, context.claims["email"], visible.quote_id as string);
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
        const { emailThankYouDeclined, notifyTeam } = await import("@/lib/engagement-email.server");
@@ -253,7 +276,7 @@ export const respondToMyEstimate = createServerFn({ method: "POST" })
 
       const { data: quote } = await db
         .from("quotes")
-        .select("quote_number, contact_name, contact_email")
+        .select("quote_number, contact_name, contact_email, secondary_emails")
         .eq("id", visible.quote_id)
         .maybeSingle();
 
@@ -261,6 +284,7 @@ export const respondToMyEstimate = createServerFn({ method: "POST" })
         await emailThankYouDeclined({
           to: quote.contact_email as string,
           name: quote.contact_name as string,
+          cc: secondaryEmailCc(quote),
           quoteNumber: quote.quote_number as string,
           note: data.note ?? null,
         });
@@ -307,6 +331,7 @@ export const signMyAgreement = createServerFn({ method: "POST" })
       if (!visible) throw new Error("Agreement not found");
       if (visible.status === "signed") return { alreadySigned: true };
       if (visible.status !== "sent") throw new Error("This agreement is not open for signature.");
+      await requirePrimaryContact(context.supabase, context.claims["email"], visible.quote_id as string);
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
        const { storeDocument } = await import("@/lib/document-storage.server");
@@ -393,12 +418,13 @@ export const respondToProjectCompletion = createServerFn({ method: "POST" })
     guarded("respondToProjectCompletion", "saving your response", async ({ data, context }) => {
       const { data: visible } = await viewerDb(context.supabase)
         .from("quotes")
-        .select("id, quote_number, contact_name, contact_email, completion_requested_at, completed_at")
+        .select("id, quote_number, contact_name, contact_email, secondary_emails, completion_requested_at, completed_at")
         .eq("id", data.quoteId)
         .maybeSingle();
       if (!visible) throw new Error("Project not found");
       if (!visible.completion_requested_at) throw new Error("We haven't asked you to sign off on this project yet.");
       if (visible.completed_at) throw new Error("This project is already closed out.");
+      await requirePrimaryContact(context.supabase, context.claims["email"], data.quoteId);
 
       const { adminDb, writeAudit } = await import("@/lib/blex.server");
       const { notifyTeam, emailProjectCompleted } = await import("@/lib/engagement-email.server");
@@ -424,6 +450,7 @@ export const respondToProjectCompletion = createServerFn({ method: "POST" })
         await emailProjectCompleted({
           to: visible.contact_email as string,
           name: visible.contact_name as string,
+          cc: secondaryEmailCc(visible),
           quoteNumber: visible.quote_number as string,
         });
       }

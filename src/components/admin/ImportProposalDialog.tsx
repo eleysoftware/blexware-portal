@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { importProposalIntoQuote } from "@/lib/admin.functions";
 import { extractProposalFromFile } from "@/lib/import.functions";
+import { normalizeSecondaryEmails } from "@/lib/collaborators";
 
 type Props = { quoteId: string; hasProposal: boolean; onImported: () => void };
 
@@ -30,11 +31,13 @@ export function ImportProposalDialog({ quoteId, hasProposal, onImported }: Props
   const [fileName, setFileName] = useState("");
   const [title, setTitle] = useState("");
   const [markdown, setMarkdown] = useState("");
+  const [secondaryEmails, setSecondaryEmails] = useState("");
 
   const reset = () => {
     setFileName("");
     setTitle("");
     setMarkdown("");
+    setSecondaryEmails("");
   };
 
   const readFile = async (file: File) => {
@@ -71,7 +74,15 @@ export function ImportProposalDialog({ quoteId, hasProposal, onImported }: Props
   };
 
   const mutation = useMutation({
-    mutationFn: () => runImport({ data: { quoteId, markdown, documentTitle: title } }),
+    mutationFn: () =>
+      runImport({
+        data: {
+          quoteId,
+          markdown,
+          documentTitle: title,
+          secondaryEmails: normalizeSecondaryEmails(secondaryEmails),
+        },
+      }),
     onSuccess: (result) => {
       toast.success(result.replaced ? "Proposal replaced with the imported document" : "Proposal imported");
       setOpen(false);
@@ -137,6 +148,18 @@ export function ImportProposalDialog({ quoteId, hasProposal, onImported }: Props
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Website Enhancement Proposal"
           />
+        </label>
+        <label className="block text-sm font-medium">
+          Secondary emails (optional)
+          <Input
+            className="mt-1"
+            value={secondaryEmails}
+            onChange={(event) => setSecondaryEmails(event.target.value)}
+            placeholder="collaborator@example.com, reviewer@example.com"
+          />
+          <span className="mt-1 block text-xs font-normal text-slate">
+            Collaborators receive project emails and can view documents, share resources and help with UAT. Only the primary contact can approve or sign.
+          </span>
         </label>
         <label className="block text-sm font-medium">
           Proposal text
